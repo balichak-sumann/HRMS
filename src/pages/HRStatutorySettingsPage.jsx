@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { Loader2, PlusCircle, Save, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-const emptySlab = () => ({ income_from: 0, income_to: '', rate: 0 });
+const emptySlab = () => ({ name: '', income_from: 0, income_to: '', rate: 0 });
 
 const formatInr = (value) => {
     const num = Number(value);
@@ -26,7 +27,8 @@ const HRStatutorySettingsPage = () => {
             setLoading(true);
             const data = await api.get('/payroll/statutory-settings');
             if (!data?.settings || !Array.isArray(data?.tds_slabs) || data.tds_slabs.length === 0) {
-                throw new Error('Statutory settings are not configured yet. Configure them before payroll generation.');
+                // No settings saved yet — just show empty form, no error
+                return;
             }
             setForm({
                 pf_employee_rate: Number(data.settings.pf_employee_rate),
@@ -35,6 +37,7 @@ const HRStatutorySettingsPage = () => {
                 esi_employer_rate: Number(data.settings.esi_employer_rate),
                 tds_slabs: (data?.tds_slabs || []).length
                     ? data.tds_slabs.map((slab) => ({
+                        name: slab.name || '',
                         income_from: Number(slab.income_from) || 0,
                         income_to: slab.income_to == null ? '' : Number(slab.income_to),
                         rate: Number(slab.rate) || 0
@@ -42,8 +45,12 @@ const HRStatutorySettingsPage = () => {
                     : [emptySlab()]
             });
         } catch (error) {
+            // Only show toast for actual server errors, not "not configured" errors
+            const msg = error?.message || '';
+            if (!msg.includes('not configured')) {
+                toast.error(msg || 'Failed to fetch statutory settings');
+            }
             console.error('Failed to fetch statutory settings', error);
-            alert(error.message || 'Failed to fetch statutory settings');
         } finally {
             setLoading(false);
         }
@@ -62,6 +69,7 @@ const HRStatutorySettingsPage = () => {
 
     const addSlab = () => {
         setForm((prev) => ({ ...prev, tds_slabs: [...prev.tds_slabs, emptySlab()] }));
+        toast.success('New slab added. Fill in the details and click Save Settings.');
     };
 
     const removeSlab = (index) => {
@@ -69,6 +77,7 @@ const HRStatutorySettingsPage = () => {
             ...prev,
             tds_slabs: prev.tds_slabs.filter((_, idx) => idx !== index)
         }));
+        toast.success('Slab removed. Click Save Settings to apply.');
     };
 
     const getSlabSummary = (slab) => {
@@ -94,6 +103,7 @@ const HRStatutorySettingsPage = () => {
                 esi_employer_rate: Number(form.esi_employer_rate) || 0,
                 tds_slabs: form.tds_slabs
                     .map((slab) => ({
+                        name: (slab.name || '').trim(),
                         income_from: Number(slab.income_from) || 0,
                         income_to: slab.income_to === '' ? null : Number(slab.income_to),
                         rate: Number(slab.rate) || 0
@@ -103,10 +113,10 @@ const HRStatutorySettingsPage = () => {
 
             await api.put('/payroll/statutory-settings', payload);
             await fetchSettings();
-            alert('Statutory settings saved successfully');
+            toast.success('Statutory settings saved successfully!');
         } catch (error) {
             console.error('Failed to save statutory settings', error);
-            alert(error.message || 'Failed to save statutory settings');
+            toast.error(error.message || 'Failed to save statutory settings');
         } finally {
             setSaving(false);
         }
@@ -169,7 +179,7 @@ const HRStatutorySettingsPage = () => {
                             <div key={index} style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '10px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                     <div>
-                                        <p style={{ margin: 0, color: 'var(--text-main)', fontWeight: 600 }}>Slab {index + 1}</p>
+                                        <p style={{ margin: 0, color: 'var(--text-main)', fontWeight: 600 }}>{slab.name ? slab.name : `Slab ${index + 1}`}</p>
                                         <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>{getSlabSummary(slab)}</p>
                                     </div>
                                     <button
@@ -182,7 +192,11 @@ const HRStatutorySettingsPage = () => {
                                     </button>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', alignItems: 'end' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', alignItems: 'end' }}>
+                                <div>
+                                    <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Slab Name</label>
+                                    <input className="input-field" type="text" placeholder="e.g. 0% Slab" value={slab.name || ''} onChange={(e) => updateSlab(index, { name: e.target.value })} />
+                                </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Income From (INR)</label>
                                     <input className="input-field" type="number" min="0" value={slab.income_from} onChange={(e) => updateSlab(index, { income_from: e.target.value })} />

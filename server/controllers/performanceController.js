@@ -58,6 +58,28 @@ const createCycle = async (req, res) => {
     }
 };
 
+const addParticipant = async (req, res) => {
+    const { id: cycle_id } = req.params;
+    const { employee_id } = req.body;
+
+    if (!employee_id) {
+        return res.status(400).json({ error: 'employee_id is required' });
+    }
+
+    try {
+        await pool.query(
+            `INSERT INTO appraisal_participants (cycle_id, employee_id)
+             VALUES ($1, $2)
+             ON CONFLICT DO NOTHING`,
+            [cycle_id, employee_id]
+        );
+        res.json({ message: 'Employee added to cycle successfully' });
+    } catch (err) {
+        console.error('addParticipant error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
 const updateCycleStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
@@ -82,7 +104,7 @@ const updateCycleStatus = async (req, res) => {
 // HR gets all, others get active + participated cycles
 const getCycles = async (req, res) => {
     try {
-        if (['hr', 'admin'].includes(req.user.role)) {
+        if (['hr', 'admin', 'Super Admin'].includes(req.user.role)) {
             const result = await pool.query('SELECT * FROM appraisal_cycles ORDER BY start_date DESC');
             return res.json(result.rows);
         }
@@ -93,13 +115,9 @@ const getCycles = async (req, res) => {
         const result = await pool.query(
             `SELECT DISTINCT c.*
              FROM appraisal_cycles c
-             LEFT JOIN goals g ON g.cycle_id = c.id
-             LEFT JOIN self_appraisals sa ON sa.cycle_id = c.id
-             LEFT JOIN manager_appraisals ma ON ma.cycle_id = c.id
+             LEFT JOIN appraisal_participants ap ON ap.cycle_id = c.id
              WHERE c.status = 'active'
-                OR g.employee_id = $1
-                OR sa.employee_id = $1
-                OR ma.employee_id = $1
+                OR ap.employee_id = $1
              ORDER BY c.start_date DESC`,
             [employee.id]
         );
@@ -180,7 +198,7 @@ const getGoals = async (req, res) => {
         let targetEmployeeId = me.id;
 
         if (employee_id) {
-            if (['hr', 'admin'].includes(req.user.role) || await isManagerOf(me.id, employee_id)) {
+            if (['hr', 'admin', 'Super Admin'].includes(req.user.role) || await isManagerOf(me.id, employee_id)) {
                 targetEmployeeId = employee_id;
             } else {
                 return res.status(403).json({ error: 'Forbidden' });
@@ -270,7 +288,7 @@ const submitManagerAppraisal = async (req, res) => {
         const manager = await resolveEmployee(req);
         if (!manager) return res.status(404).json({ error: 'Manager not found' });
 
-        const allowed = ['hr', 'admin'].includes(req.user.role) ? true : await isManagerOf(manager.id, employee_id);
+        const allowed = ['hr', 'admin', 'Super Admin'].includes(req.user.role) ? true : await isManagerOf(manager.id, employee_id);
         if (!allowed) return res.status(403).json({ error: 'Forbidden: Not your direct report' });
 
         await client.query('BEGIN');
@@ -300,10 +318,38 @@ const submitManagerAppraisal = async (req, res) => {
         res.json({ message: 'Manager appraisal submitted successfully' });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('submitManagerAppraisal error:', err.message);
-        res.status(500).json({ error: 'Server error' });
     } finally {
         client.release();
+    }
+};
+
+const respondToAppraisal = async (req, res) => {
+    const { appraisal_id, comment } = req.body;
+
+    if (!appraisal_id || !comment) {
+        return res.status(400).json({ error: 'appraisal_id and comment are required' });
+    }
+
+    try {
+        const employee = await resolveEmployee(req);
+        if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+        const result = await pool.query(
+            `UPDATE manager_appraisals 
+             SET employee_comment = $1, employee_comment_at = NOW()
+             WHERE id = $2 AND employee_id = $3
+             RETURNING *`,
+            [comment, appraisal_id, employee.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Appraisal not found or not authorized' });
+        }
+
+        res.json({ message: 'Response submitted successfully', appraisal: result.rows[0] });
+    } catch (err) {
+        console.error('respondToAppraisal error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
@@ -348,7 +394,7 @@ const getPeerFeedback = async (req, res) => {
         const me = await resolveEmployee(req);
         if (!me) return res.status(404).json({ error: 'Employee not found' });
 
-        const allowed = ['hr', 'admin'].includes(req.user.role) || me.id === employee_id || await isManagerOf(me.id, employee_id);
+        const allowed = ['hr', 'admin', 'Super Admin'].includes(req.user.role) || me.id === employee_id || await isManagerOf(me.id, employee_id);
         if (!allowed) return res.status(403).json({ error: 'Forbidden' });
 
         const result = await pool.query(
@@ -372,9 +418,17 @@ const getPeerFeedback = async (req, res) => {
 const getHRDashboard = async (req, res) => {
     try {
         const cycles = await pool.query('SELECT * FROM appraisal_cycles ORDER BY start_date DESC');
+        
+        const allEmployees = await pool.query(
+            `SELECT id, full_name, email, department_id, role, status
+             FROM employees 
+             ORDER BY full_name`
+        );
+
+
 
         const rows = await pool.query(
-            `SELECT c.id AS cycle_id,
+            `SELECT ap.cycle_id,
                     e.id AS employee_id,
                     e.full_name,
                     COUNT(DISTINCT g.id)::int AS goals_count,
@@ -383,22 +437,21 @@ const getHRDashboard = async (req, res) => {
                     ROUND(AVG(sai.rating)::numeric, 2) AS self_avg,
                     ROUND(AVG(mai.rating)::numeric, 2) AS manager_avg,
                     ROUND(AVG(pf.rating)::numeric, 2) AS peer_avg
-             FROM appraisal_cycles c
-             JOIN employees e ON TRUE
-             LEFT JOIN goals g ON g.cycle_id = c.id AND g.employee_id = e.id
-             LEFT JOIN self_appraisals sa ON sa.cycle_id = c.id AND sa.employee_id = e.id
+             FROM appraisal_participants ap
+             JOIN employees e ON e.id = ap.employee_id
+             LEFT JOIN goals g ON g.cycle_id = ap.cycle_id AND g.employee_id = e.id
+             LEFT JOIN self_appraisals sa ON sa.cycle_id = ap.cycle_id AND sa.employee_id = e.id
              LEFT JOIN self_appraisal_items sai ON sai.self_appraisal_id = sa.id
-             LEFT JOIN manager_appraisals ma ON ma.cycle_id = c.id AND ma.employee_id = e.id
+             LEFT JOIN manager_appraisals ma ON ma.cycle_id = ap.cycle_id AND ma.employee_id = e.id
              LEFT JOIN manager_appraisal_items mai ON mai.manager_appraisal_id = ma.id
-             LEFT JOIN peer_feedback pf ON pf.cycle_id = c.id AND pf.employee_id = e.id
-             GROUP BY c.id, e.id, e.full_name, sa.id, ma.id
-             ORDER BY c.start_date DESC, e.full_name ASC`
+             LEFT JOIN peer_feedback pf ON pf.cycle_id = ap.cycle_id AND pf.employee_id = e.id
+             GROUP BY ap.cycle_id, e.id, e.full_name, sa.id, ma.id
+             ORDER BY e.full_name ASC`
         );
 
         const byCycle = cycles.rows.map((cycle) => {
             const employees = rows.rows
                 .filter((r) => r.cycle_id === cycle.id)
-                .filter((r) => r.goals_count > 0 || r.self_submitted || r.manager_submitted || r.peer_avg !== null)
                 .map((r) => {
                     const values = [r.self_avg, r.manager_avg, r.peer_avg].filter((v) => v !== null);
                     const avg_score = values.length ? Number((values.reduce((a, b) => a + Number(b), 0) / values.length).toFixed(2)) : null;
@@ -422,7 +475,11 @@ const getHRDashboard = async (req, res) => {
             };
         });
 
-        res.json(byCycle);
+
+        res.json({
+            dashboard: byCycle,
+            all_employees: allEmployees.rows
+        });
     } catch (err) {
         console.error('getHRDashboard error:', err.message);
         res.status(500).json({ error: 'Server error' });
@@ -435,10 +492,12 @@ const getMyOverview = async (req, res) => {
         if (!me) return res.status(404).json({ error: 'Employee not found' });
 
         const cycleRes = await pool.query(
-            `SELECT * FROM appraisal_cycles
-             WHERE status = 'active'
-             ORDER BY start_date DESC
-             LIMIT 1`
+            `SELECT c.* FROM appraisal_cycles c
+             JOIN appraisal_participants ap ON ap.cycle_id = c.id
+             WHERE ap.employee_id = $1 AND c.status = 'active'
+             ORDER BY c.start_date DESC
+             LIMIT 1`,
+            [me.id]
         );
 
         if (cycleRes.rows.length === 0) {
@@ -564,6 +623,8 @@ module.exports = {
     submitManagerAppraisal,
     submitPeerFeedback,
     getPeerFeedback,
+    respondToAppraisal,
+    addParticipant,
     getHRDashboard,
     getMyOverview
 };

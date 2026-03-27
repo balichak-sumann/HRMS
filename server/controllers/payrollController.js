@@ -203,12 +203,15 @@ const ensurePayrollColumns = async () => {
 
         CREATE TABLE IF NOT EXISTS payroll_tds_slabs (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT DEFAULT '',
             income_from NUMERIC NOT NULL,
             income_to NUMERIC,
             rate NUMERIC NOT NULL,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
+
+        ALTER TABLE payroll_tds_slabs ADD COLUMN IF NOT EXISTS name TEXT DEFAULT '';
     `);
 
     payrollColumnsEnsured = true;
@@ -230,7 +233,7 @@ const getStatutorySettingsData = async () => {
     );
 
     const slabsRes = await pool.query(
-        `SELECT id, income_from, income_to, rate
+        `SELECT id, name, income_from, income_to, rate
          FROM payroll_tds_slabs
          ORDER BY income_from ASC, income_to ASC NULLS LAST`
     );
@@ -398,7 +401,7 @@ const createPayroll = async (req, res) => {
         if (!approvedRevision && (requestedBasic <= 0 || requestedHra < 0 || requestedAllowances < 0 || requestedGross <= 0)) {
             await client.query('ROLLBACK');
             return res.status(400).json({
-                error: 'Missing salary component inputs. Provide gross/basic/hra/allowances (or approve a salary revision) before generating payroll.',
+                error: 'Cannot generate payslip — salary components are missing. Please set Basic Salary, HRA, and Allowances in the Payslip Preview above before saving. If this employee has a Salary Revision, ensure it is approved first.',
             });
         }
 
@@ -672,10 +675,11 @@ const updateStatutorySettings = async (req, res) => {
                 return res.status(400).json({ error: 'income_to must be greater than income_from' });
             }
 
+            const slabName = (slab.name || '').trim();
             await client.query(
-                `INSERT INTO payroll_tds_slabs (income_from, income_to, rate)
-                 VALUES ($1, $2, $3)`,
-                [incomeFrom, incomeTo, rate]
+                `INSERT INTO payroll_tds_slabs (name, income_from, income_to, rate)
+                 VALUES ($1, $2, $3, $4)`,
+                [slabName, incomeFrom, incomeTo, rate]
             );
         }
 

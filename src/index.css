@@ -177,17 +177,20 @@ p {
   font-weight: 500;
 }
 
-.status-badge.pending {
+.status-badge.pending,
+.status-badge.pending-activation {
   background: var(--status-pending-bg);
   color: var(--status-pending-text);
 }
 
-.status-badge.approved {
+.status-badge.approved,
+.status-badge.active {
   background: var(--status-approved-bg);
   color: var(--status-approved-text);
 }
 
-.status-badge.rejected {
+.status-badge.rejected,
+.status-badge.inactive {
   background: var(--status-rejected-bg);
   color: var(--status-rejected-text);
 }

@@ -8,6 +8,16 @@ const pool = new Pool({
 // ─── Create meeting ──────────────────────────────────────────────
 const createMeeting = async (req, res) => {
     const { title, agenda, date_time, duration, participants, meeting_type } = req.body;
+    
+    // Validate date_time is not in the past (allow 1-minute buffer for network latency)
+    if (meeting_type !== 'instant' && date_time) {
+        const now = new Date();
+        const selectedDate = new Date(date_time);
+        if (selectedDate < new Date(now.getTime() - 60000)) {
+            return res.status(400).json({ error: 'Cannot schedule a meeting for a past date' });
+        }
+    }
+
     try {
         const emp = await pool.query(
             `SELECT e.id, e.full_name, e.email FROM employees e 

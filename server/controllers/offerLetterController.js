@@ -149,4 +149,73 @@ const updateOfferLetterStatus = async (req, res) => {
     }
 };
 
-module.exports = { createOfferLetter, getOfferLetters, sendOfferLetter, updateOfferLetterStatus };
+// ─── Bulk Send offer letters (HR) ──────────────────────────────
+const bulkSendOfferLetters = async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'No offer letter IDs provided for bulk send' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const results = { success: [], failures: [] };
+
+        for (const id of ids) {
+            try {
+                const existing = await pool.query(
+                    "SELECT id, candidate_name, email, role, department, ctc, joining_date, type, file_path FROM offer_letters WHERE id = $1",
+                    [id]
+                );
+
+                if (existing.rows.length === 0) {
+                    results.failures.push({ id, error: 'Offer letter not found' });
+                    continue;
+                }
+
+                const letter = existing.rows[0];
+                if (!letter.email || !emailRegex.test(String(letter.email).trim()) || !letter.file_path) {
+                    results.failures.push({ id, candidate: letter.candidate_name, error: 'Missing email or PDF file' });
+                    continue;
+                }
+
+                const attachmentPath = path.join(__dirname, '..', letter.file_path.replace(/^\/+/, '').replace(/\//g, path.sep));
+                if (!fs.existsSync(attachmentPath)) {
+                    results.failures.push({ id, candidate: letter.candidate_name, error: 'PDF file not found on server' });
+                    continue;
+                }
+
+                await sendOfferLetterEmail({
+                    to: letter.email,
+                    candidateName: letter.candidate_name,
+                    role: letter.role,
+                    positionTitle: letter.role,
+                    department: letter.department,
+                    location: 'Hyderabad',
+                    ctc: letter.ctc,
+                    issueDate: null,
+                    joiningDate: letter.joining_date,
+                    type: letter.type || 'offer',
+                    attachmentPath
+                });
+
+                await pool.query("UPDATE offer_letters SET status = 'Sent' WHERE id = $1", [id]);
+                results.success.push({ id, candidate: letter.candidate_name });
+
+            } catch (itemErr) {
+                console.error(`Bulk send failed for ID ${id}:`, itemErr.message);
+                results.failures.push({ id, error: itemErr.message });
+            }
+        }
+
+        res.json({
+            message: `Bulk processing completed: ${results.success.length} sent, ${results.failures.length} failed.`,
+            results
+        });
+    } catch (err) {
+        console.error('bulkSendOfferLetters failed:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+module.exports = { createOfferLetter, getOfferLetters, sendOfferLetter, bulkSendOfferLetters, updateOfferLetterStatus };
+

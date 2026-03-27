@@ -569,7 +569,7 @@
     font-size: 13px;
 }
 
-.status-badge {
+.helpdesk-detail .status-badge {
     display: flex;
     align-items: center;
     gap: 6px;

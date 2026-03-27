@@ -15,6 +15,8 @@ const EmployeePerformancePage = () => {
     const [managerTarget, setManagerTarget] = useState('');
     const [managerFeedback, setManagerFeedback] = useState('');
     const [managerItems, setManagerItems] = useState([]);
+    const [responseComment, setResponseComment] = useState('');
+    const [submittingResponse, setSubmittingResponse] = useState(false);
 
     const fetchOverview = async () => {
         try {
@@ -63,17 +65,21 @@ const EmployeePerformancePage = () => {
         }
     };
 
-    const submitSelf = async () => {
+    const submitResponse = async () => {
+        if (!overview?.manager_appraisal?.id || !responseComment) return;
         try {
-            await api.post('/performance/self-appraisal', {
-                cycle_id: overview.current_cycle.id,
-                overall_comment: selfComment,
-                items: selfItems
+            setSubmittingResponse(true);
+            await api.post('/performance/respond', {
+                appraisal_id: overview.manager_appraisal.id,
+                comment: responseComment
             });
             await fetchOverview();
+            setResponseComment('');
         } catch (error) {
-            console.error('Self appraisal failed', error);
-            alert('Failed to submit self appraisal');
+            console.error('Failed to submit response', error);
+            alert('Failed to submit response');
+        } finally {
+            setSubmittingResponse(false);
         }
     };
 
@@ -178,38 +184,79 @@ const EmployeePerformancePage = () => {
             </div>
 
             <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Self Appraisal</h3>
-                {(overview.goals || []).map((goal, idx) => (
-                    <div key={goal.id} style={{ borderBottom: '1px solid #F1F5F9', paddingBottom: '10px', marginBottom: '10px' }}>
-                        <p style={{ fontWeight: '600', marginBottom: '6px' }}>{goal.title}</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px' }}>
-                            <select className="input-field" value={selfItems[idx]?.rating || 3} onChange={(e) => {
-                                const next = [...selfItems];
-                                next[idx] = { ...next[idx], goal_id: goal.id, rating: Number(e.target.value) };
-                                setSelfItems(next);
-                            }}>
-                                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} / 5</option>)}
-                            </select>
-                            <input className="input-field" placeholder="Comment" value={selfItems[idx]?.comment || ''} onChange={(e) => {
-                                const next = [...selfItems];
-                                next[idx] = { ...next[idx], goal_id: goal.id, comment: e.target.value };
-                                setSelfItems(next);
-                            }} />
+                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Save size={18} /> Review & Appraisal from Organization
+                </h3>
+                {overview.manager_appraisal ? (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                            <p style={{ fontSize: '13px', fontWeight: '700', color: '#64748B', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Overall Feedback</p>
+                            <p style={{ color: 'var(--text-main)', fontSize: '15px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                                {overview.manager_appraisal.feedback || 'No overall feedback provided.'}
+                            </p>
+                            <p style={{ marginTop: '12px', fontSize: '12px', color: '#94A3B8' }}>
+                                Reviewed by: <strong>{overview.manager_appraisal.manager_name}</strong> on {new Date(overview.manager_appraisal.submitted_at).toLocaleDateString()}
+                            </p>
+                        </div>
+
+                        {overview.manager_appraisal.items?.length > 0 && (
+                            <div>
+                                <p style={{ fontSize: '13px', fontWeight: '700', color: '#64748B', marginBottom: '12px' }}>GOAL-WISE RATINGS</p>
+                                <div style={{ display: 'grid', gap: '8px' }}>
+                                    {overview.manager_appraisal.items.map((item, idx) => {
+                                        const goal = overview.goals?.find(g => g.id === item.goal_id);
+                                        return (
+                                            <div key={idx} style={{ padding: '12px', border: '1px solid #F1F5F9', borderRadius: '8px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                                    <p style={{ fontWeight: '600', fontSize: '14px' }}>{goal?.title || 'Unknown Goal'}</p>
+                                                    <span style={{ padding: '2px 8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '6px', fontWeight: '700', fontSize: '12px' }}>
+                                                        {item.rating} / 5
+                                                    </span>
+                                                </div>
+                                                {item.comment && <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{item.comment}</p>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={{ marginTop: '10px', padding: '16px', border: '1px solid var(--primary-light)', borderRadius: '12px', background: 'rgba(54, 84, 255, 0.02)' }}>
+                            <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', marginBottom: '10px' }}>YOUR COMMENTS / ACKNOWLEDGEMENT</p>
+                            {overview.manager_appraisal.employee_comment ? (
+                                <div style={{ padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                    <p style={{ fontSize: '14px', color: 'var(--text-main)' }}>{overview.manager_appraisal.employee_comment}</p>
+                                    <p style={{ marginTop: '8px', fontSize: '11px', color: '#94A3B8' }}>Submitted on {new Date(overview.manager_appraisal.employee_comment_at).toLocaleString()}</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <textarea 
+                                        className="input-field" 
+                                        rows="3" 
+                                        placeholder="Add your comments or acknowledge the review here..."
+                                        value={responseComment}
+                                        onChange={(e) => setResponseComment(e.target.value)}
+                                        style={{ resize: 'none' }}
+                                    />
+                                    <button 
+                                        className="btn-primary" 
+                                        onClick={submitResponse} 
+                                        disabled={submittingResponse || !responseComment.trim()}
+                                        style={{ borderRadius: '8px', alignSelf: 'flex-start' }}
+                                    >
+                                        {submittingResponse ? 'Submitting...' : 'Submit Response'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
-                ))}
-                <textarea className="input-field" rows="3" placeholder="Overall comments" value={selfComment} onChange={(e) => setSelfComment(e.target.value)} style={{ marginBottom: '10px' }} />
-                <button className="btn-primary" onClick={submitSelf} style={{ borderRadius: '8px' }}><Save size={16} /> Submit Self Appraisal</button>
-            </div>
-
-            <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Manager Appraisal</h3>
-                {overview.manager_appraisal ? (
-                    <>
-                        <p style={{ marginBottom: '8px' }}><strong>Manager:</strong> {overview.manager_appraisal.manager_name || 'Manager'}</p>
-                        <p style={{ color: 'var(--text-muted)' }}>{overview.manager_appraisal.feedback || 'No feedback comment.'}</p>
-                    </>
-                ) : <p style={{ color: 'var(--text-muted)' }}>Manager appraisal pending.</p>}
+                ) : (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                        <Loader2 size={32} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                        <p>Appraisal review is currently pending from the organization.</p>
+                        <p style={{ fontSize: '12px' }}>Once HR or your Manager completes the review, it will appear here for your comments.</p>
+                    </div>
+                )}
             </div>
 
             <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>

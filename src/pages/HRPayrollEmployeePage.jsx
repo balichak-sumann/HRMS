@@ -26,6 +26,7 @@ const HRPayrollEmployeePage = () => {
     const [metricsLoading, setMetricsLoading] = useState(false);
     const [statutorySettings, setStatutorySettings] = useState(null);
     const [generatedPayrollMeta, setGeneratedPayrollMeta] = useState(null);
+    const [validationErrors, setValidationErrors] = useState({});
 
     const round2 = (value) => Number((Math.round((Number(value) || 0) * 100) / 100).toFixed(2));
     const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -268,6 +269,15 @@ const HRPayrollEmployeePage = () => {
     const generatePayslip = async () => {
         if (!selectedEmp || !payslip) return;
 
+        // Client-side validation — no popups, just block submission
+        const basic = Number(payslip.basic_salary) || 0;
+        const gross = Number(payslip.gross_salary) || 0;
+        if (basic <= 0 || gross <= 0) {
+            setValidationErrors({ basic_salary: basic <= 0, gross_salary: gross <= 0 });
+            return;
+        }
+        setValidationErrors({});
+
         try {
             setGenerating(true);
             await new Promise(resolve => setTimeout(resolve, 1200));
@@ -307,7 +317,8 @@ const HRPayrollEmployeePage = () => {
             setGeneratedPayrollMeta(created || null);
             toast.success('Payslip generated and saved successfully!');
         } catch (error) {
-            toast.error(error.message);
+            const msg = error?.message || 'Failed to generate payslip';
+            toast.error(msg, { duration: 5000 });
         } finally {
             setGenerating(false);
         }
@@ -396,11 +407,12 @@ const HRPayrollEmployeePage = () => {
                             <div>
                                 <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', marginBottom: '12px' }}>EARNINGS</p>
                                 <div className="pay-row pay-row-editable">
-                                    <span>Basic Salary</span>
-                                    <input type="number" value={payslip.basic_salary} onChange={(e) => updateNumericField('basic_salary', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                <span>Basic Salary <span style={{ color: '#EF4444' }}>*</span></span>
+                                    <input type="number" value={payslip.basic_salary} onChange={(e) => { updateNumericField('basic_salary', e.target.value); setValidationErrors((v) => ({ ...v, basic_salary: false })); }} style={{ width: '100%', textAlign: 'right', border: validationErrors.basic_salary ? '2px solid #EF4444' : undefined }} className="input-field" />
+                                    {validationErrors.basic_salary && <p style={{ color: '#EF4444', fontSize: '11px', margin: '2px 0 0', gridColumn: '1 / -1' }}>Basic Salary is required</p>}
                                 </div>
                                 <div className="pay-row pay-row-editable">
-                                    <span>HRA</span>
+                                    <span>HRA <span style={{ color: '#EF4444' }}>*</span></span>
                                     <input type="number" value={payslip.hra} onChange={(e) => updateNumericField('hra', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
                                 </div>
                                 <div className="pay-row pay-row-editable">

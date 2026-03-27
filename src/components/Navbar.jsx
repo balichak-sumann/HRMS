@@ -186,12 +186,9 @@ const Navbar = ({ onMenuClick, isMobile }) => {
         socketRef.current.on('meeting_invite', (payload) => {
             if (payload?.targetUserId && payload.targetUserId !== profile.employee_uuid) return;
 
-            pushRealtimeNotification({
-                title: payload?.title || 'Meeting Invite',
-                message: payload?.message || `${payload?.inviterName || 'Someone'} invited you to a meeting.`,
-                type: 'meeting',
-                created_at: payload?.date_time || payload?.created_at || new Date().toISOString(),
-            }, 'meeting');
+            // NOTE: Do NOT call pushRealtimeNotification here.
+            // The 'notification_created' event already adds the bell notification.
+            // This handler only shows the join dialog.
 
             if (!payload?.meetingId) return;
 

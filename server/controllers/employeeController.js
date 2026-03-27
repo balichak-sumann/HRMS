@@ -91,6 +91,9 @@ const ensureEmployeeColumns = async () => {
         WHERE reporting_manager_id IS NULL
           AND manager_id IS NOT NULL;
 
+        ALTER TABLE employees ALTER COLUMN status SET DEFAULT 'Active';
+        UPDATE employees SET status = 'Active' WHERE status IS NULL;
+
     `);
 
     employeeColumnsEnsured = true;

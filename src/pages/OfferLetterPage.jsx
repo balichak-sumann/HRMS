@@ -609,6 +609,7 @@ const OfferLetterPDF = ({ data }) => {
 
 const OfferLetterPage = () => {
     const [history, setHistory] = useState([]);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showErrors, setShowErrors] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
@@ -710,6 +711,36 @@ const OfferLetterPage = () => {
         } catch (err) {
             toast.error(err?.message || 'Failed to send offer letter');
         }
+    };
+
+    const handleBulkSend = async () => {
+        if (selectedIds.length === 0) return;
+        
+        try {
+            setLoading(true);
+            const response = await api.post('/offer-letters/bulk-send', { ids: selectedIds });
+            fetchHistory();
+            setSelectedIds([]);
+            toast.success(response.message || 'Bulk mail processing initiated');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to process bulk mailings');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === history.filter(h => h.email).length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(history.filter(h => h.email).map(h => h.id));
+        }
+    };
+
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
     };
 
     return (
@@ -891,14 +922,36 @@ const OfferLetterPage = () => {
             </div>
 
             {/* History List */}
-            <div className="no-print" style={{ marginTop: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <History size={18} color="var(--primary)" /> Generation History
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <History size={18} color="var(--primary)" /> Generation History
+                    </h3>
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={handleBulkSend}
+                            disabled={loading}
+                            style={{
+                                padding: '8px 16px', background: 'var(--primary)', color: 'white',
+                                border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px'
+                            }}
+                        >
+                            <Mail size={16} /> Send Bulk Email ({selectedIds.length})
+                        </button>
+                    )}
+                </div>
                 <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
                             <tr>
+                                <th style={{ width: '48px', padding: '16px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={history.length > 0 && selectedIds.length === history.filter(h => h.email).length}
+                                        onChange={toggleSelectAll}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                </th>
                                 <th style={{ textAlign: 'left', padding: '16px', fontSize: '12px', fontWeight: '700', color: '#64748B' }}>CANDIDATE</th>
                                 <th style={{ textAlign: 'left', padding: '16px', fontSize: '12px', fontWeight: '700', color: '#64748B' }}>EMAIL</th>
                                 <th style={{ textAlign: 'left', padding: '16px', fontSize: '12px', fontWeight: '700', color: '#64748B' }}>ROLE</th>
@@ -909,7 +962,16 @@ const OfferLetterPage = () => {
                         </thead>
                         <tbody>
                             {history.map((h, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: selectedIds.includes(h.id) ? '#F8FAFC' : 'transparent' }}>
+                                    <td style={{ padding: '16px' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedIds.includes(h.id)}
+                                            onChange={() => toggleSelect(h.id)}
+                                            disabled={!h.email}
+                                            style={{ cursor: h.email ? 'pointer' : 'not-allowed' }}
+                                        />
+                                    </td>
                                     <td style={{ padding: '16px', fontSize: '14px', fontWeight: '600' }}>{h.candidate_name}</td>
                                     <td style={{ padding: '16px', fontSize: '13px', color: h.email ? 'var(--text-main)' : '#DC2626', fontWeight: h.email ? 500 : 700 }}>
                                         {h.email || 'Email missing'}
@@ -939,7 +1001,7 @@ const OfferLetterPage = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
+
             <style>{`
                 @media (max-width: 1200px) {
                     .offer-layout { grid-template-columns: 1fr !important; }

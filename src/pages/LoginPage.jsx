@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Loader2, Eye, EyeOff, Shield, User } from 'lucide-react';
 
 const LoginPage = () => {
     const [role, setRole] = useState('admin');
@@ -106,36 +106,48 @@ const LoginPage = () => {
                         onClick={() => setRole('admin')}
                         style={{
                             flex: 1,
-                            padding: '8px',
+                            padding: '10px',
                             borderRadius: '6px',
                             border: 'none',
                             fontSize: '14px',
-                            fontWeight: '500',
+                            fontWeight: role === 'admin' ? '700' : '500',
                             cursor: 'pointer',
                             background: role === 'admin' ? 'var(--card-bg)' : 'transparent',
-                            color: role === 'admin' ? 'var(--text-main)' : 'var(--text-muted)',
-                            boxShadow: role === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                            transition: 'all 0.2s'
+                            color: role === 'admin' ? 'var(--primary)' : 'var(--text-muted)',
+                            boxShadow: role === 'admin' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            borderBottom: role === 'admin' ? '2px solid var(--primary)' : '2px solid transparent'
                         }}
                     >
+                        <Shield size={16} />
                         Admin Login
                     </button>
                     <button
                         onClick={() => setRole('employee')}
                         style={{
                             flex: 1,
-                            padding: '8px',
+                            padding: '10px',
                             borderRadius: '6px',
                             border: 'none',
                             fontSize: '14px',
-                            fontWeight: '500',
+                            fontWeight: role === 'employee' ? '700' : '500',
                             cursor: 'pointer',
                             background: role === 'employee' ? 'var(--card-bg)' : 'transparent',
-                            color: role === 'employee' ? 'var(--text-main)' : 'var(--text-muted)',
-                            boxShadow: role === 'employee' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                            transition: 'all 0.2s'
+                            color: role === 'employee' ? 'var(--primary)' : 'var(--text-muted)',
+                            boxShadow: role === 'employee' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            borderBottom: role === 'employee' ? '2px solid var(--primary)' : '2px solid transparent'
                         }}
                     >
+                        <User size={16} />
                         Employee Login
                     </button>
                 </div>

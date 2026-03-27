@@ -59,13 +59,24 @@ const MeetingsPage = () => {
 
     const handleSchedule = async (e) => {
         e.preventDefault();
+        
+        const now = new Date();
+        const selectedDate = new Date(formData.date_time);
+        
+        // Allow for a 1-minute buffer to account for the time it takes to fill out the form
+        if (selectedDate < new Date(now.getTime() - 60000)) {
+            toast.error('Cannot schedule a meeting for a past date');
+            return;
+        }
+
         try {
             await api.post('/meetings', formData);
             setIsModalOpen(false);
             setFormData({ title: '', agenda: '', date_time: '', duration: 60, participants: [] });
             fetchData();
+            toast.success('Meeting scheduled successfully!');
         } catch (error) {
-            alert('Failed to schedule meeting');
+            toast.error(error.message || 'Failed to schedule meeting');
         }
     };
 
@@ -77,6 +88,10 @@ const MeetingsPage = () => {
                 : [...prev.participants, id]
         }));
     };
+
+    // Calculate min date string for datetime-local (YYYY-MM-DDThh:mm)
+    const now = new Date();
+    const minDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
     return (
         <>
@@ -184,6 +199,7 @@ const MeetingsPage = () => {
                                         required
                                         className="input-field"
                                         value={formData.date_time}
+                                        min={minDateTime}
                                         onChange={(e) => setFormData({ ...formData, date_time: e.target.value })}
                                     />
                                 </div>
