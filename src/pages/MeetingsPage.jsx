@@ -82,7 +82,7 @@ const MeetingsPage = () => {
         <>
             <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>InSync Video Connect</h1>
+                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Meetings</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Collaborate in real-time with high-definition video conferencing.</p>
                 </div>
 
@@ -119,8 +119,9 @@ const MeetingsPage = () => {
                                 fontWeight: '800',
                                 background: '#EEF2FF',
                                 color: 'var(--primary)',
-                                padding: '4px 8px',
-                                borderRadius: '4px'
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                marginRight: '4px'
                             }}>{meeting.duration} MIN</span>
                         </div>
 
@@ -135,7 +136,7 @@ const MeetingsPage = () => {
                                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>
                                     <Users size={14} color="var(--primary)" />
                                 </div>
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Host: {meeting.creator_name}</span>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', lineHeight: '1' }}>Host: {meeting.creator_name}</span>
                             </div>
 
                             <button
@@ -156,7 +157,7 @@ const MeetingsPage = () => {
             {isModalOpen && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
                     <div className="card" style={{ width: '600px', padding: '32px', position: 'relative', border: '1px solid var(--border)' }}>
-                        <button onClick={() => setIsModalOpen(false)} style={{ position: 'absolute', right: '24px', top: '24px', border: '1px solid var(--border)', background: 'var(--input-bg)', cursor: 'pointer', color: 'var(--text-main)', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button onClick={() => setIsModalOpen(false)} style={{ position: 'absolute', right: '16px', top: '16px', border: '1px solid var(--border)', background: 'var(--input-bg)', cursor: 'pointer', color: 'var(--text-main)', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <X size={24} />
                         </button>
 
@@ -202,7 +203,7 @@ const MeetingsPage = () => {
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>PARTICIPANTS ({formData.participants.length} SELECT)</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '120px', overflowY: 'auto', padding: '12px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--input-bg)' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', rowGap: '12px', maxHeight: '120px', overflowY: 'auto', padding: '12px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--input-bg)' }}>
                                     {employees.map(emp => (
                                         <div
                                             key={emp.id}

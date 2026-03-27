@@ -492,9 +492,9 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
         attachments: [
             {
                 filename: attachmentPath ? path.basename(attachmentPath) : `Offer_Letter_${safeCandidateName}.pdf`,
-                content: normalizedPdfBuffer,
+                content: normalizedPdfBuffer.toString('base64'),
+                encoding: 'base64',
                 contentType: 'application/pdf',
-                contentDisposition: 'attachment'
             }
         ]
         });

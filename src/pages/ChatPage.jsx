@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import CallModal from '../components/Chat/CallModal';
 import {
     Search,
@@ -435,9 +436,8 @@ const ChatPage = () => {
     };
 
     // Calling State
-    const [callConfig, setCallConfig] = useState(null); // { type, remoteUser, isIncoming, offer }
 
-    const socket = useRef(null);
+    const { socket, callConfig, setCallConfig } = useSocket();
     const messageContainerRef = useRef(null);
     const fileInputRef = useRef(null);
     const sendLockRef = useRef(false);
@@ -445,59 +445,41 @@ const ChatPage = () => {
     const commonEmojis = ['😊', '😂', '❤️', '👍', '🔥', '🎉', '🙌', '👀', '✨', '✅', '🚀', '⭐'];
 
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser || !socket.current) return;
 
-        // Initialize socket with explicit options to respect HTTPS proxy
-        socket.current = io({
-            path: '/socket.io',
-            transports: ['polling', 'websocket'],
-            secure: true
-        });
+        const currentSocket = socket.current;
 
-        socket.current.on('connect', () => {
-            console.log('Successfully connected to socket server via proxy');
-            const myId = currentUser.employee_uuid || currentUser.id;
-            if (myId) {
-                console.log('Identifying as:', myId);
-                socket.current.emit('identify', myId);
-            }
-        });
-
-        socket.current.on('receive_message', (message) => {
+        const handleReceiveMessage = (message) => {
             console.log('New message received:', message);
             setMessages(prev => [...prev, message]);
-        });
+        };
 
-        socket.current.on('incoming_call', (data) => {
-            console.log('Incoming call event received:', data);
-            setCallConfig({
-                type: data.type,
-                remoteUser: { id: data.from, name: data.caller_name },
-                isIncoming: true,
-                offer: data.offer
-            });
-        });
-
-        socket.current.on('user_online', (userId) => {
+        const handleUserOnline = (userId) => {
             console.log('User online:', userId);
             setContacts(prev => prev.map(c =>
                 c.id === userId ? { ...c, isOnline: true } : c
             ));
-        });
+        };
 
-        socket.current.on('user_offline', (userId) => {
+        const handleUserOffline = (userId) => {
             console.log('User offline:', userId);
             setContacts(prev => prev.map(c =>
                 c.id === userId ? { ...c, isOnline: false } : c
             ));
-        });
+        };
+
+        currentSocket.on('receive_message', handleReceiveMessage);
+        currentSocket.on('user_online', handleUserOnline);
+        currentSocket.on('user_offline', handleUserOffline);
 
         fetchInitialData();
 
         return () => {
-            if (socket.current) socket.current.disconnect();
+            currentSocket.off('receive_message', handleReceiveMessage);
+            currentSocket.off('user_online', handleUserOnline);
+            currentSocket.off('user_offline', handleUserOffline);
         };
-    }, [currentUser]);
+    }, [currentUser, socket]);
 
     useEffect(() => {
         if (activeChat && currentUser) {
@@ -1197,18 +1179,7 @@ const ChatPage = () => {
                 }}
             />
 
-            {callConfig && (
-                <CallModal
-                    isOpen={!!callConfig}
-                    onClose={() => setCallConfig(null)}
-                    type={callConfig.type}
-                    remoteUser={callConfig.remoteUser}
-                    isIncoming={callConfig.isIncoming}
-                    incomingOffer={callConfig.offer || null}
-                    socket={socket}
-                    currentUser={currentUser}
-                />
-            )}
+            {/* Global Call Container is now in App.jsx */}
         </>
     );
 };

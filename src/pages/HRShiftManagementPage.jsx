@@ -37,8 +37,8 @@ const HRShiftManagementPage = () => {
     const [roster, setRoster] = useState([]);
 
     const [newShift, setNewShift] = useState({ name: '', start_time: '09:00', end_time: '18:00' });
-    const [singleAssign, setSingleAssign] = useState({ employee_id: '', shift_id: '', effective_from: toYmd(new Date()) });
-    const [bulkAssign, setBulkAssign] = useState({ department_id: '', shift_id: '', effective_from: toYmd(new Date()) });
+    const [singleAssign, setSingleAssign] = useState({ employee_id: '', shift_id: '', effective_from: toYmd(new Date()), effective_to: '' });
+    const [bulkAssign, setBulkAssign] = useState({ department_id: '', shift_id: '', effective_from: toYmd(new Date()), effective_to: '' });
 
     const days = useMemo(() => {
         const start = new Date(`${weekStart}T00:00:00`);
@@ -202,34 +202,64 @@ const HRShiftManagementPage = () => {
 
                 <form className="card" style={{ padding: '16px' }} onSubmit={assignEmployee}>
                     <h3 style={{ fontSize: '17px', marginBottom: '10px' }}>Assign to Employee</h3>
-                    <select className="input-field" value={singleAssign.employee_id} onChange={(e) => setSingleAssign((prev) => ({ ...prev, employee_id: e.target.value }))} required>
-                        {employees.map((emp) => (
-                            <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-                        ))}
-                    </select>
-                    <select className="input-field" style={{ marginTop: '8px' }} value={singleAssign.shift_id} onChange={(e) => setSingleAssign((prev) => ({ ...prev, shift_id: e.target.value }))} required>
-                        {shifts.map((shift) => (
-                            <option key={shift.id} value={shift.id}>{shift.name} ({String(shift.start_time).slice(0, 5)}-{String(shift.end_time).slice(0, 5)})</option>
-                        ))}
-                    </select>
-                    <input className="input-field" style={{ marginTop: '8px' }} type="date" value={singleAssign.effective_from} onChange={(e) => setSingleAssign((prev) => ({ ...prev, effective_from: e.target.value }))} required />
-                    <button className="btn-primary" type="submit" disabled={submitting} style={{ marginTop: '10px' }}>Assign</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Select Employee</label>
+                        <select className="input-field" style={{ width: '100%', display: 'block' }} value={singleAssign.employee_id} onChange={(e) => setSingleAssign((prev) => ({ ...prev, employee_id: e.target.value }))} required>
+                            {employees.length === 0 && <option value="">No employees found</option>}
+                            {employees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Select Shift</label>
+                        <select className="input-field" style={{ width: '100%', display: 'block' }} value={singleAssign.shift_id} onChange={(e) => setSingleAssign((prev) => ({ ...prev, shift_id: e.target.value }))} required>
+                            {shifts.length === 0 && <option value="">No shifts available. Create one first.</option>}
+                            {shifts.map((shift) => (
+                                <option key={shift.id} value={shift.id}>{shift.name} ({String(shift.start_time).slice(0, 5)}-{String(shift.end_time).slice(0, 5)})</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Start Date</label>
+                        <input className="input-field" type="date" value={singleAssign.effective_from} onChange={(e) => setSingleAssign((prev) => ({ ...prev, effective_from: e.target.value }))} required />
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>End Date (Leave blank to make permanent)</label>
+                        <input className="input-field" type="date" value={singleAssign.effective_to} min={singleAssign.effective_from} onChange={(e) => setSingleAssign((prev) => ({ ...prev, effective_to: e.target.value }))} />
+                    </div>
+                    <button className="btn-primary" type="submit" disabled={submitting} style={{ marginTop: '14px' }}>Assign</button>
                 </form>
 
                 <form className="card" style={{ padding: '16px' }} onSubmit={assignDepartment}>
                     <h3 style={{ fontSize: '17px', marginBottom: '10px' }}>Bulk Assign Department</h3>
-                    <select className="input-field" value={bulkAssign.department_id} onChange={(e) => setBulkAssign((prev) => ({ ...prev, department_id: e.target.value }))} required>
-                        {departments.map((dep) => (
-                            <option key={dep.id} value={dep.id}>{dep.name}</option>
-                        ))}
-                    </select>
-                    <select className="input-field" style={{ marginTop: '8px' }} value={bulkAssign.shift_id} onChange={(e) => setBulkAssign((prev) => ({ ...prev, shift_id: e.target.value }))} required>
-                        {shifts.map((shift) => (
-                            <option key={shift.id} value={shift.id}>{shift.name} ({String(shift.start_time).slice(0, 5)}-{String(shift.end_time).slice(0, 5)})</option>
-                        ))}
-                    </select>
-                    <input className="input-field" style={{ marginTop: '8px' }} type="date" value={bulkAssign.effective_from} onChange={(e) => setBulkAssign((prev) => ({ ...prev, effective_from: e.target.value }))} required />
-                    <button className="btn-primary" type="submit" disabled={submitting} style={{ marginTop: '10px' }}>Bulk Assign</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Select Department</label>
+                        <select className="input-field" style={{ width: '100%', display: 'block' }} value={bulkAssign.department_id} onChange={(e) => setBulkAssign((prev) => ({ ...prev, department_id: e.target.value }))} required>
+                            {departments.length === 0 && <option value="">No departments found</option>}
+                            {departments.map((dep) => (
+                                <option key={dep.id} value={dep.id}>{dep.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Select Shift</label>
+                        <select className="input-field" style={{ width: '100%', display: 'block' }} value={bulkAssign.shift_id} onChange={(e) => setBulkAssign((prev) => ({ ...prev, shift_id: e.target.value }))} required>
+                            {shifts.length === 0 && <option value="">No shifts available. Create one first.</option>}
+                            {shifts.map((shift) => (
+                                <option key={shift.id} value={shift.id}>{shift.name} ({String(shift.start_time).slice(0, 5)}-{String(shift.end_time).slice(0, 5)})</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Start Date</label>
+                        <input className="input-field" type="date" value={bulkAssign.effective_from} onChange={(e) => setBulkAssign((prev) => ({ ...prev, effective_from: e.target.value }))} required />
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>End Date (Leave blank to make permanent)</label>
+                        <input className="input-field" type="date" value={bulkAssign.effective_to} min={bulkAssign.effective_from} onChange={(e) => setBulkAssign((prev) => ({ ...prev, effective_to: e.target.value }))} />
+                    </div>
+                    <button className="btn-primary" type="submit" disabled={submitting} style={{ marginTop: '14px' }}>Bulk Assign</button>
                 </form>
             </div>
 

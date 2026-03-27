@@ -111,7 +111,7 @@ const HRProjectsPage = () => {
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             <header className="responsive-flex-header" style={{ marginBottom: '40px' }}>
                 <div>
-                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '4px' }}>Projects Portfolio</h1>
+                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '4px' }}>Projects</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Manage enterprise projects, teams, and deliverables.</p>
                 </div>
                 <button
@@ -268,25 +268,7 @@ const HRProjectsPage = () => {
                         </div>
                     </section>
 
-                    <section style={{ marginBottom: '40px' }}>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <ListTodo size={18} color="var(--primary)" /> Task Board
-                        </h3>
-                        <div style={{ display: 'flex', gap: '12px', height: '300px' }}>
-                            {['todo', 'in-progress', 'done'].map(status => (
-                                <div key={status} style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px' }}>
-                                    <p style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>{status}</p>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {projectDetail.tasks.filter(t => t.status === status).map((t, i) => (
-                                            <div key={i} style={{ padding: '10px', background: 'var(--card-bg)', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                                {t.title}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+
 
                     <section>
                         <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>

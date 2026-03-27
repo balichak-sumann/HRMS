@@ -10,8 +10,21 @@ const parseResponse = async (res) => {
     const raw = await res.text();
     if (!raw) return null;
     try {
-        return JSON.parse(raw);
-    } catch {
+        const data = JSON.parse(raw);
+
+        // Auto-logout if account has been deactivated
+        if (data?.error === 'ACCOUNT_DEACTIVATED') {
+            localStorage.removeItem('token');
+            alert(data.message || 'Your account has been deactivated. Please contact an administrator.');
+            window.location.href = '/login';
+            throw new Error(data.message);
+        }
+
+        return data;
+    } catch (e) {
+        // Re-throw if it's our deactivation error
+        if (e.message?.includes('deactivated')) throw e;
+
         if (/<!doctype html>|<html/i.test(raw)) {
             return { error: 'API route not found on backend. Please restart backend server and try again.' };
         }

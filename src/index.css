@@ -308,6 +308,10 @@ input[type="number"]::-webkit-inner-spin-button {
 /* Shared button system to prevent browser-default thick borders */
 .btn-primary,
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-radius: var(--input-radius) !important;
   font: inherit;
   font-weight: 600;

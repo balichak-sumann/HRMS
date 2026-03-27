@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Trash2, Camera } from 'lucide-react';
 import { api } from '../../lib/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
+import CameraCaptureModal from '../CameraCaptureModal';
 
 const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) => {
     const { profile } = useAuth();
@@ -18,6 +19,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
         department: 'Unassigned',
         location: '',
         phone: '',
+        dob: '',
         joining_date: '',
         salary: '',
         personal_email: '',
@@ -32,8 +34,10 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
         manager_id: '',
         onboarding_template_id: ''
     });
+    const [removeAvatar, setRemoveAvatar] = useState(false);
     const [avatarFile, setAvatarFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(employeeData?.avatar_url || null);
+    const [showCameraModal, setShowCameraModal] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [managerOptions, setManagerOptions] = useState([]);
@@ -84,6 +88,8 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
         if (employeeData) {
             setFormData({
                 ...employeeData,
+                dob: employeeData.dob ? new Date(employeeData.dob).toISOString().split('T')[0] : '',
+                joining_date: employeeData.joining_date ? new Date(employeeData.joining_date).toISOString().split('T')[0] : '',
                 manager_id: employeeData.manager_id || employeeData.reporting_manager_id || '',
                 department_id: employeeData.department_id || ''
             });
@@ -101,6 +107,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
             department: 'Unassigned',
             location: '',
             phone: '',
+            dob: '',
             joining_date: '',
             salary: '',
             personal_email: '',
@@ -222,12 +229,19 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
         ? [formData.role, ...baseRoleOptions]
         : baseRoleOptions;
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
+    const handleFileChange = (eOrFile) => {
+        const file = eOrFile?.target?.files ? eOrFile.target.files[0] : eOrFile;
         if (file) {
             setAvatarFile(file);
             setPreviewUrl(URL.createObjectURL(file));
+            setRemoveAvatar(false);
         }
+    };
+
+    const handleRemovePhoto = () => {
+        setAvatarFile(null);
+        setPreviewUrl(null);
+        setRemoveAvatar(true);
     };
 
     const handleSubmit = async (e) => {
@@ -260,6 +274,12 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
         const normalizedEmail = String(formData.email || '').trim().toLowerCase();
         if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
             toast.error('Please enter a valid work email address.');
+            return;
+        }
+
+        const normalizedSalary = String(formData.salary || '').trim();
+        if (!normalizedSalary) {
+            toast.error('Annual Salary is required.');
             return;
         }
 
@@ -306,6 +326,8 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
             });
             if (avatarFile) {
                 data.append('avatar', avatarFile);
+            } else if (removeAvatar) {
+                data.append('remove_avatar', 'true');
             }
 
             if (employeeData) {
@@ -337,6 +359,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
                     department: 'Unassigned',
                     location: '',
                     phone: '',
+                    dob: '',
                     joining_date: '',
                     salary: '',
                     personal_email: '',
@@ -543,7 +566,17 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
                             />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <label style={{ fontSize: '14px', fontWeight: '500' }}>Annual Salary (INR)</label>
+                            <label style={{ fontSize: '14px', fontWeight: '500' }}>Date of Birth</label>
+                            <input
+                                name="dob"
+                                type="date"
+                                className="input-field"
+                                value={formData.dob || ''}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <label style={{ fontSize: '14px', fontWeight: '500' }}>Annual Salary (INR) <span style={{ color: 'red' }}>*</span></label>
                             <input
                                 name="salary"
                                 type="number"
@@ -685,17 +718,68 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
                                     justifyContent: 'center'
                                 }}>
                                     {previewUrl ? (
-                                        <img src={previewUrl.startsWith('blob:') ? previewUrl : `${previewUrl}`} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                            <img src={previewUrl.startsWith('blob:') ? previewUrl : `${previewUrl}`} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <button
+                                                type="button"
+                                                onClick={handleRemovePhoto}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '4px',
+                                                    right: '4px',
+                                                    background: 'rgba(239, 68, 68, 0.9)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    padding: '4px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                                title="Remove photo"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     ) : (
                                         <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No Photo</span>
                                     )}
                                 </div>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleFileChange}
-                                    style={{ fontSize: '14px' }}
-                                />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                            style={{ fontSize: '14px', maxWidth: '180px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCameraModal(true)}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                padding: '6px 12px',
+                                                borderRadius: '6px',
+                                                border: '1px solid var(--border)',
+                                                background: 'var(--card-bg)',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                                color: 'var(--text-muted)'
+                                            }}
+                                        >
+                                            <Camera size={14} />
+                                            Take Photo
+                                        </button>
+                                    </div>
+                                    {previewUrl && (
+                                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                                            Click the trash icon to remove the current photo.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -751,6 +835,12 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
                     }
                 }
             `}</style>
+
+            <CameraCaptureModal
+                isOpen={showCameraModal}
+                onClose={() => setShowCameraModal(false)}
+                onCapture={handleFileChange}
+            />
         </div>
     );
 };

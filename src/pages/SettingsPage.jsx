@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bell, Moon, Sun, Monitor, Type, Save, Globe, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../lib/api';
 import toast from 'react-hot-toast';
 
 const SettingsPage = () => {
@@ -32,12 +33,46 @@ const SettingsPage = () => {
         localStorage.setItem('fontSize', appearance.fontSize);
     }, [appearance.fontSize]);
 
+    // Password State
+    const [passwords, setPasswords] = useState({
+        current: '',
+        new: '',
+        confirm: ''
+    });
+    const [passwordLoading, setPasswordLoading] = useState(false);
+
     const handleSave = async () => {
         setLoading(true);
-        // Simulate API call
+        // Simulate API call for generic settings
         await new Promise(resolve => setTimeout(resolve, 800));
         toast.success('Settings saved successfully!');
         setLoading(false);
+    };
+
+    const handlePasswordChange = async (e) => {
+        e.preventDefault();
+        if (passwords.new !== passwords.confirm) {
+            toast.error('New passwords do not match');
+            return;
+        }
+        if (passwords.new.length < 8) {
+            toast.error('New password must be at least 8 characters');
+            return;
+        }
+
+        setPasswordLoading(true);
+        try {
+            await api.post('/auth/change-password', {
+                current_password: passwords.current,
+                new_password: passwords.new
+            });
+            toast.success('Password changed successfully!');
+            setPasswords({ current: '', new: '', confirm: '' });
+        } catch (error) {
+            toast.error(error.message || 'Failed to change password');
+        } finally {
+            setPasswordLoading(false);
+        }
     };
 
     const Toggle = ({ active, onToggle, label }) => (
@@ -81,6 +116,77 @@ const SettingsPage = () => {
             </header>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Security Section */}
+                <section className="card" style={{ padding: '24px', background: 'var(--card-bg)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ padding: '8px', background: 'var(--input-bg)', borderRadius: '8px', color: 'var(--status-rejected-text)' }}>
+                            <Shield size={20} />
+                        </div>
+                        <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Security</h2>
+                    </div>
+
+                    <form onSubmit={handlePasswordChange} style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'grid', gap: '20px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Current Password</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    required
+                                    value={passwords.current}
+                                    onChange={(e) => setPasswords(p => ({ ...p, current: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>New Password</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    required
+                                    value={passwords.new}
+                                    onChange={(e) => setPasswords(p => ({ ...p, new: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Confirm New Password</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    required
+                                    value={passwords.confirm}
+                                    onChange={(e) => setPasswords(p => ({ ...p, confirm: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                type="submit"
+                                disabled={passwordLoading}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 24px',
+                                    background: 'var(--primary)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    fontSize: '14px',
+                                    cursor: passwordLoading ? 'not-allowed' : 'pointer',
+                                    opacity: passwordLoading ? 0.7 : 1,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {passwordLoading ? 'Updating...' : 'Update Password'}
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
                 {/* Notifications Section */}
                 <section className="card" style={{ padding: '24px', background: 'var(--card-bg)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>

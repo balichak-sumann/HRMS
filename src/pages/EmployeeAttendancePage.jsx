@@ -281,6 +281,7 @@ const EmployeeAttendancePage = () => {
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         style={{ width: '165px', padding: '8px 10px', fontSize: '13px' }}
+                        max={new Date().toISOString().split('T')[0]}
                     />
                     <button
                         className="btn-secondary"

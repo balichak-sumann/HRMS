@@ -326,6 +326,7 @@ const EmployeeTaxDeclarationPage = () => {
                                 <th style={{ padding: '8px' }}>Section</th>
                                 <th style={{ padding: '8px' }}>Item</th>
                                 <th style={{ padding: '8px' }}>Declared Amount</th>
+                                <th style={{ padding: '8px' }}>Approved Amount</th>
                                 <th style={{ padding: '8px' }}>Status</th>
                                 <th style={{ padding: '8px' }}>HR Comment</th>
                                 <th style={{ padding: '8px' }}>Proofs</th>
@@ -334,7 +335,7 @@ const EmployeeTaxDeclarationPage = () => {
                         <tbody>
                             {items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} style={{ padding: '10px', color: 'var(--text-muted)' }}>No declaration items added.</td>
+                                    <td colSpan={7} style={{ padding: '10px', color: 'var(--text-muted)' }}>No declaration items added.</td>
                                 </tr>
                             ) : items.map((row, index) => (
                                 <tr key={row.id || `new-${index}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -369,7 +370,16 @@ const EmployeeTaxDeclarationPage = () => {
                                             disabled={isReviewed}
                                         />
                                     </td>
-                                    <td style={{ padding: '8px' }}>{row.status || 'pending'}</td>
+                                    <td style={{ padding: '8px', fontWeight: '600', color: row.status === 'approved' ? 'var(--status-approved-text)' : 'inherit' }}>
+                                        {row.status === 'approved' && row.approved_amount != null
+                                            ? `₹${Number(row.approved_amount).toLocaleString('en-IN')}`
+                                            : row.status === 'rejected' ? '₹0' : '-'}
+                                    </td>
+                                    <td style={{ padding: '8px' }}>
+                                        <span className={`status-badge ${row.status || 'pending'}`}>
+                                            {(row.status || 'pending').charAt(0).toUpperCase() + (row.status || 'pending').slice(1)}
+                                        </span>
+                                    </td>
                                     <td style={{ padding: '8px' }}>{row.hr_comment || '-'}</td>
                                     <td style={{ padding: '8px' }}>
                                         <div style={{ display: 'grid', gap: '6px' }}>

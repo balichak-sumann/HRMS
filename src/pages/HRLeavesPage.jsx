@@ -46,7 +46,7 @@ const HRLeavesPage = () => {
         <>
             <div className="responsive-flex-header" style={{ marginBottom: '40px' }}>
                 <div>
-                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', fontWeight: '700' }}>Mission Control: Leaves</h1>
+                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', fontWeight: '700' }}>Leave Requests</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '4px' }}>Review, filter, and moderate team time-off requests.</p>
                 </div>
 

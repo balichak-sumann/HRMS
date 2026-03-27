@@ -123,7 +123,7 @@ const HRStatutorySettingsPage = () => {
     return (
         <>
             <div style={{ marginBottom: '24px' }}>
-                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Statutory Payroll Settings</h1>
+                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Statutory Settings</h1>
                 <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
                     Configure PF, ESI, and TDS slab rules used for payroll generation.
                 </p>

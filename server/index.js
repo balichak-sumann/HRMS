@@ -1,7 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Fix: Return DATE columns as plain 'YYYY-MM-DD' strings instead of
+// timezone-shifted JavaScript Date objects (prevents IST offset bug)
+types.setTypeParser(1082, (val) => val); // 1082 = DATE OID
 
 const path = require('path');
 
@@ -99,10 +103,14 @@ io.on('connection', (socket) => {
 
     // Join personal signaling room
     socket.on('identify', (userId) => {
+        if (!userId) {
+            console.warn(`[Socket] User ${socket.id} tried to identify with null/undefined userId`);
+            return;
+        }
         socket.join(userId);
         onlineUsers.set(userId, socket.id);
         socket.userId = userId;
-        console.log(`User ${socket.id} identified as ${userId}`);
+        console.log(`[Socket] User identified: socket=${socket.id}, userId=${userId}`);
 
         // Broadcast that this user is now online
         io.emit('user_online', userId);
@@ -130,7 +138,7 @@ io.on('connection', (socket) => {
 
     // --- Signaling for Voice/Video Calls ---
     socket.on('call_user', (data) => {
-        console.log(`Call from ${data.from} to ${data.to}`);
+        console.log(`[Call] Signaling: call_user from ${data.from} to ${data.to} (Room check: ${io.sockets.adapter.rooms.has(data.to)})`);
         // data contains: to (receiver id), offer, from (sender info/id), type (voice/video)
         io.to(data.to).emit('incoming_call', {
             from: data.from,

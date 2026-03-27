@@ -66,6 +66,8 @@ import EmployeeSurveysPage from './pages/EmployeeSurveysPage';
 import EmployeeSurveyFillPage from './pages/EmployeeSurveyFillPage';
 import AdminManagementPage from './pages/AdminManagementPage';
 import { Toaster } from 'react-hot-toast';
+import { SocketProvider, useSocket } from './context/SocketContext';
+import CallModal from './components/Chat/CallModal';
 import './index.css';
 
 const getRoleBasePath = (role) => {
@@ -119,9 +121,11 @@ function App() {
 
   return (
     <AuthProvider>
-      <Router>
-        <Toaster position="top-center" />
-        <Routes>
+      <SocketProvider>
+        <Router>
+          <Toaster position="top-center" />
+          <GlobalCallContainer />
+          <Routes>
           {/* Public Route */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -290,8 +294,29 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-      </Router>
+        </Router>
+      </SocketProvider>
     </AuthProvider>
+  );
+}
+
+function GlobalCallContainer() {
+  const { callConfig, setCallConfig, socket } = useSocket();
+  const { user } = useAuth();
+
+  if (!callConfig) return null;
+
+  return (
+    <CallModal
+      isOpen={!!callConfig}
+      onClose={() => setCallConfig(null)}
+      type={callConfig.type}
+      remoteUser={callConfig.remoteUser}
+      isIncoming={callConfig.isIncoming}
+      incomingOffer={callConfig.offer || null}
+      socket={socket}
+      currentUser={user}
+    />
   );
 }
 

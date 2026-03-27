@@ -66,9 +66,11 @@ const HRReimbursementSummaryPage = () => {
                         ))}
                     </select>
                     <select className="input-field" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: '100px' }}>
-                        {['2024', '2025', '2026', '2027', '2028'].map((y) => (
-                            <option key={y} value={y}>{y}</option>
-                        ))}
+                        {Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 4 + i))
+                            .filter(y => Number(y) <= new Date().getFullYear())
+                            .map((y) => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
                     </select>
                     <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={fetchSummary}>Load</button>
                     <PDFDownloadLink

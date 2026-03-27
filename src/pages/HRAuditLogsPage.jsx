@@ -120,7 +120,7 @@ const HRAuditLogsPage = () => {
         <>
             <div className="responsive-flex-header" style={{ marginBottom: '32px' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Platform Audit Trail</h1>
+                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Audit Logs</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Monitor all system mutations and administrative actions.</p>
                 </div>
 
@@ -194,6 +194,7 @@ const HRAuditLogsPage = () => {
                         style={{ fontSize: '13px' }}
                         value={filters.start_date}
                         onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+                        max={new Date().toISOString().split('T')[0]}
                     />
                 </div>
 
@@ -205,6 +206,7 @@ const HRAuditLogsPage = () => {
                         style={{ fontSize: '13px' }}
                         value={filters.end_date}
                         onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+                        max={new Date().toISOString().split('T')[0]}
                     />
                 </div>
             </div>
@@ -249,8 +251,20 @@ const HRAuditLogsPage = () => {
                                             {l.action}
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px 24px', fontSize: '13px', color: 'var(--text-main)' }}>
-                                        <span style={{ padding: '4px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '11px', fontWeight: '600' }}>
+                                    <td style={{ padding: '16px 24px', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                                        <span style={{ 
+                                            padding: '4px 8px', 
+                                            background: 'var(--input-bg)', 
+                                            color: 'var(--text-main)', 
+                                            borderRadius: '4px', 
+                                            border: '1px solid var(--border)', 
+                                            fontSize: '11px', 
+                                            fontWeight: '600',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            minWidth: '100px'
+                                        }}>
                                             {l.module}
                                         </span>
                                     </td>

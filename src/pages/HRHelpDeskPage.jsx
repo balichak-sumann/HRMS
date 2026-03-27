@@ -230,7 +230,7 @@ const HRHelpDeskPage = () => {
     return (
         <div className="helpdesk-container">
             <div className="helpdesk-header">
-                <h1>Employee Helpdesk</h1>
+                <h1>Helpdesk</h1>
                 <div className="helpdesk-header-tabs">
                     <button
                         className={`tab-button ${activeTab === 'inbox' ? 'active' : ''}`}

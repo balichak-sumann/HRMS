@@ -295,13 +295,12 @@ const forgotPassword = async (req, res) => {
 
         const user = result.rows[0];
         const token = uuidv4();
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
         await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE profile_id = $1', [user.id]);
 
         await pool.query(
-            'INSERT INTO password_reset_tokens (profile_id, token, expires_at) VALUES ($1, $2, $3)',
-            [user.id, token, expiresAt]
+            "INSERT INTO password_reset_tokens (profile_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')",
+            [user.id, token]
         );
 
         let baseURL = req.headers.origin || req.headers.referer?.replace(/\/$/, '');
@@ -321,6 +320,26 @@ const forgotPassword = async (req, res) => {
         }
 
         res.json({ message: 'Password reset link has been sent to your email address.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Verify Reset Token ──────────────────────────────────────────
+const verifyResetToken = async (req, res) => {
+    const { token } = req.params;
+    try {
+        const result = await pool.query(
+            'SELECT * FROM password_reset_tokens WHERE token = $1 AND used = FALSE AND expires_at > NOW()',
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Reset link is invalid or has expired' });
+        }
+
+        res.json({ valid: true });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
@@ -469,6 +488,7 @@ module.exports = {
     changePassword,
     forgotPassword,
     resetPassword,
+    verifyResetToken,
     getMe,
     handleEmailBounceWebhook
 };

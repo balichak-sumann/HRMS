@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { Building2, Loader2, PencilLine, PlusCircle, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const HRDepartmentsPage = () => {
     const [loading, setLoading] = useState(true);
@@ -15,7 +16,7 @@ const HRDepartmentsPage = () => {
             setDepartments(data || []);
         } catch (error) {
             console.error('Failed to fetch departments', error);
-            alert('Failed to fetch departments');
+            toast.error('Failed to fetch departments');
         } finally {
             setLoading(false);
         }
@@ -42,7 +43,7 @@ const HRDepartmentsPage = () => {
             await fetchDepartments();
         } catch (error) {
             console.error('Department save failed', error);
-            alert(error.message || 'Failed to save department');
+            toast.error(error.message || 'Failed to save department');
         }
     };
 
@@ -65,7 +66,7 @@ const HRDepartmentsPage = () => {
             await fetchDepartments();
         } catch (error) {
             console.error('Delete department failed', error);
-            alert(error.message || 'Failed to delete department');
+            toast.error(error.message || 'Failed to delete department');
         }
     };
 

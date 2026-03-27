@@ -37,7 +37,7 @@ const HRStatutoryCompliancePage = () => {
         <>
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Statutory Compliance Report</h1>
+                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Statutory Report</h1>
                     <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
                         Monthly totals for PF, ESI and TDS based on generated payroll.
                     </p>
@@ -51,9 +51,11 @@ const HRStatutoryCompliancePage = () => {
                         ))}
                     </select>
                     <select className="input-field" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: '100px' }}>
-                        {['2024', '2025', '2026', '2027', '2028'].map((y) => (
-                            <option key={y} value={y}>{y}</option>
-                        ))}
+                        {Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 4 + i))
+                            .filter(y => Number(y) <= new Date().getFullYear())
+                            .map((y) => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
                     </select>
                     <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={fetchReport}>Load</button>
                     <PDFDownloadLink

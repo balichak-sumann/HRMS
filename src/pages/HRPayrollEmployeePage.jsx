@@ -375,7 +375,7 @@ const HRPayrollEmployeePage = () => {
                                 {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m}>{m}</option>)}
                             </select>
                             <select className="input-field" value={year} onChange={(e) => setYear(e.target.value)} style={{ padding: '8px 12px', width: 'auto' }}>
-                                {['2025', '2026', '2027'].map(y => <option key={y}>{y}</option>)}
+                                {[2024, 2025, 2026].filter(y => y <= new Date().getFullYear()).map(y => <option key={y}>{y}</option>)}
                             </select>
                         </div>
                     </div>

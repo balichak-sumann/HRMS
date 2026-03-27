@@ -86,64 +86,61 @@ const EmployeeProjectsPage = () => {
                 </div>
 
                 {/* Report Form */}
-                <div className="card" style={{ padding: '32px' }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '24px' }}>Submit Daily Report</h3>
-                    {!selectedProject ? (
-                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: '#F8FAFC', borderRadius: '12px' }}>
-                            <ListTodo size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                            <p>Select a project from the left to submit your report.</p>
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmitReport}>
-                            <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--primary)10', borderLeft: '4px solid var(--primary)', borderRadius: '4px' }}>
-                                <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: '700' }}>REPORTING FOR</p>
-                                <p style={{ fontWeight: '600' }}>{selectedProject.name}</p>
-                            </div>
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>WORK COMPLETED</label>
-                                <textarea
-                                    className="input-field"
-                                    style={{ height: '120px', resize: 'none' }}
-                                    placeholder="What did you accomplish today?"
-                                    required
-                                    value={formData.work_done}
-                                    onChange={e => setFormData({ ...formData, work_done: e.target.value })}
-                                />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>HOURS SPENT</label>
-                                    <input
-                                        type="number"
+                <div>
+                    {selectedProject && (
+                        <div className="card" style={{ padding: '32px' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '24px' }}>Submit Daily Report</h3>
+                            <form onSubmit={handleSubmitReport}>
+                                <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--primary)10', borderLeft: '4px solid var(--primary)', borderRadius: '4px' }}>
+                                    <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: '700' }}>REPORTING FOR</p>
+                                    <p style={{ fontWeight: '600' }}>{selectedProject.name}</p>
+                                </div>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>WORK COMPLETED</label>
+                                    <textarea
                                         className="input-field"
-                                        placeholder="e.g. 7.5"
+                                        style={{ height: '120px', resize: 'none' }}
+                                        placeholder="What did you accomplish today?"
                                         required
-                                        step="0.5"
-                                        value={formData.hours}
-                                        onChange={e => setFormData({ ...formData, hours: e.target.value })}
+                                        value={formData.work_done}
+                                        onChange={e => setFormData({ ...formData, work_done: e.target.value })}
                                     />
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>BLOCKERS (OPTIONAL)</label>
-                                    <input
-                                        className="input-field"
-                                        placeholder="Any hurdles?"
-                                        value={formData.blockers}
-                                        onChange={e => setFormData({ ...formData, blockers: e.target.value })}
-                                    />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>HOURS SPENT</label>
+                                        <input
+                                            type="number"
+                                            className="input-field"
+                                            placeholder="e.g. 7.5"
+                                            required
+                                            step="0.5"
+                                            value={formData.hours}
+                                            onChange={e => setFormData({ ...formData, hours: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>BLOCKERS (OPTIONAL)</label>
+                                        <input
+                                            className="input-field"
+                                            placeholder="Any hurdles?"
+                                            value={formData.blockers}
+                                            onChange={e => setFormData({ ...formData, blockers: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                            <button
-                                type="submit"
-                                style={{
-                                    width: '100%', padding: '14px', background: 'var(--primary)', color: 'white',
-                                    border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                                }}
-                            >
-                                <Send size={18} /> Submit Transmission
-                            </button>
-                        </form>
+                                <button
+                                    type="submit"
+                                    style={{
+                                        width: '100%', padding: '14px', background: 'var(--primary)', color: 'white',
+                                        border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                    }}
+                                >
+                                    <Send size={18} /> Submit Transmission
+                                </button>
+                            </form>
+                        </div>
                     )}
                 </div>
             </div>

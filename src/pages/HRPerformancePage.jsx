@@ -70,7 +70,7 @@ const HRPerformancePage = () => {
         <>
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: 'var(--text-main)' }}>Performance Management</h1>
+                    <h1 style={{ fontSize: '26px', fontWeight: '700', color: 'var(--text-main)' }}>Performance</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Create appraisal cycles, track completions, and review scores.</p>
                 </div>
                 <button onClick={fetchData} className="btn-primary" style={{ borderRadius: '10px' }}>

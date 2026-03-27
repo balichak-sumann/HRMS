@@ -145,6 +145,7 @@ const EmployeeExpensesPage = () => {
                             value={form.expense_date}
                             onChange={(e) => setForm((prev) => ({ ...prev, expense_date: e.target.value }))}
                             required
+                            max={new Date().toISOString().split('T')[0]}
                         />
                     </div>
 

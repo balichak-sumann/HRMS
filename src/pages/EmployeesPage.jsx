@@ -88,7 +88,7 @@ const EmployeesPage = () => {
         <>
             <div className="no-print responsive-flex-header" style={{ marginBottom: '32px' }}>
                 <div>
-                    <h1 style={{ fontSize: 'var(--font-3xl)', color: 'var(--text-main)', fontWeight: '700' }}>Workforce Management</h1>
+                    <h1 style={{ fontSize: 'var(--font-3xl)', color: 'var(--text-main)', fontWeight: '700' }}>Employees</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-md)', marginTop: '4px' }}>
                         Manage employees, view details, and issue digital identity cards.
                     </p>

@@ -25,6 +25,16 @@ const auth = async (req, res, next) => {
             return res.status(401).json({ error: 'Token has been invalidated. Please log in again.' });
         }
 
+        // Check if user account is still active
+        const profileCheck = await pool.query(
+            'SELECT status FROM profiles WHERE id = $1',
+            [decoded.id]
+        );
+        const profileStatus = String(profileCheck.rows[0]?.status || '').toLowerCase();
+        if (profileStatus === 'inactive') {
+            return res.status(403).json({ error: 'ACCOUNT_DEACTIVATED', message: 'Your account has been deactivated. Please contact an administrator.' });
+        }
+
         req.user = decoded;
         req.token = token; // Attach token so logout route can blacklist it
         next();

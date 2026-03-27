@@ -108,7 +108,7 @@ const HRTaxDeclarationPage = () => {
     return (
         <>
             <div style={{ marginBottom: '20px' }}>
-                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Income Tax Declarations</h1>
+                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>IT Declarations</h1>
                 <p style={{ color: 'var(--text-muted)', marginTop: '6px' }}>
                     Review employee declarations and approve/reject line items with comments.
                 </p>

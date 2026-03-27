@@ -53,7 +53,7 @@ const HRExpenseApprovalsPage = () => {
     return (
         <>
             <div style={{ marginBottom: '20px' }}>
-                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Expense Claim Reviews</h1>
+                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Expense Approvals</h1>
                 <p style={{ color: 'var(--text-muted)', marginTop: '6px' }}>
                     Review pending reimbursement claims and approve or reject with comments.
                 </p>

@@ -187,6 +187,7 @@ const assignShiftToEmployee = async (req, res) => {
         }
 
         const effectiveFrom = parseDate(effective_from, 'effective_from');
+        const effectiveTo = req.body.effective_to ? parseDate(req.body.effective_to, 'effective_to') : null;
         const actorId = await getActorEmployeeId(req);
 
         await client.query('BEGIN');
@@ -203,22 +204,90 @@ const assignShiftToEmployee = async (req, res) => {
             return res.status(404).json({ error: 'Shift not found' });
         }
 
-        await client.query(
-            `UPDATE employee_shift_assignments
-             SET effective_to = ($2::date - INTERVAL '1 day')::date,
-                 updated_at = NOW()
-             WHERE employee_id = $1
-               AND effective_to IS NULL
-               AND effective_from <= $2::date`,
-            [employee_id, effectiveFrom]
-        );
+        // --- Robust Date Interval Splitting ---
+        if (effectiveTo) {
+            // BOUNDED override: cleanly slice the existing schedule into 3 segments
 
+            // 1. Find what shift was active and its original start date
+            const beforeRes = await client.query(
+                `SELECT shift_id, effective_from FROM employee_shift_assignments
+                 WHERE employee_id = $1
+                   AND effective_from <= $2::date
+                   AND (effective_to IS NULL OR effective_to >= $2::date)
+                 ORDER BY effective_from DESC, created_at DESC
+                 LIMIT 1`,
+                [employee_id, effectiveFrom]
+            );
+            const previousShiftId = beforeRes.rows[0]?.shift_id || null;
+            const previousStart = beforeRes.rows[0]?.effective_from || null;
+
+            // 2. Delete ALL assignments that overlap with the override range
+            await client.query(
+                `DELETE FROM employee_shift_assignments
+                 WHERE employee_id = $1
+                   AND effective_from <= $2::date
+                   AND (effective_to IS NULL OR effective_to >= $3::date)`,
+                [employee_id, effectiveTo, effectiveFrom]
+            );
+
+            // 3. Re-create the old shift BEFORE the override (if it started before)
+            if (previousShiftId && previousStart) {
+                const prevStartStr = String(previousStart).slice(0, 10);
+                if (prevStartStr < effectiveFrom) {
+                    await client.query(
+                        `INSERT INTO employee_shift_assignments (
+                            employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                         ) VALUES ($1, $2, $3::date, ($4::date - INTERVAL '1 day')::date, $5, NOW())`,
+                        [employee_id, previousShiftId, prevStartStr, effectiveFrom, actorId]
+                    );
+                }
+            }
+
+            // 4. Insert the bounded override
+            await client.query(
+                `INSERT INTO employee_shift_assignments (
+                    employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [employee_id, shift_id, effectiveFrom, effectiveTo, actorId]
+            );
+
+            // 5. Restore the previous shift AFTER the override ends
+            if (previousShiftId) {
+                await client.query(
+                    `INSERT INTO employee_shift_assignments (
+                        employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                     ) VALUES ($1, $2, ($3::date + INTERVAL '1 day')::date, NULL, $4, NOW())`,
+                    [employee_id, previousShiftId, effectiveTo, actorId]
+                );
+            }
+        } else {
+            // PERMANENT assignment: delete all assignments from this date forward
+            await client.query(
+                `DELETE FROM employee_shift_assignments
+                 WHERE employee_id = $1
+                   AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                [employee_id, effectiveFrom]
+            );
+
+            // Also terminate any assignment that spans across our start date
+            await client.query(
+                `UPDATE employee_shift_assignments
+                 SET effective_to = ($2::date - INTERVAL '1 day')::date,
+                     updated_at = NOW()
+                 WHERE employee_id = $1
+                   AND effective_from < $2::date
+                   AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                [employee_id, effectiveFrom]
+            );
+        }
+
+        // Insert the new assignment
         const assigned = await client.query(
             `INSERT INTO employee_shift_assignments (
-                employee_id, shift_id, effective_from, assigned_by, updated_at
-             ) VALUES ($1, $2, $3, $4, NOW())
+                employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+             ) VALUES ($1, $2, $3, $4, $5, NOW())
              RETURNING *`,
-            [employee_id, shift_id, effectiveFrom, actorId]
+            [employee_id, shift_id, effectiveFrom, effectiveTo, actorId]
         );
 
         await client.query('COMMIT');
@@ -257,6 +326,7 @@ const assignShiftToDepartment = async (req, res) => {
         }
 
         const effectiveFrom = parseDate(effective_from, 'effective_from');
+        const effectiveTo = req.body.effective_to ? parseDate(req.body.effective_to, 'effective_to') : null;
         const actorId = await getActorEmployeeId(req);
 
         await client.query('BEGIN');
@@ -268,7 +338,7 @@ const assignShiftToDepartment = async (req, res) => {
         }
 
         const employeesRes = await client.query(
-                        `SELECT id, full_name, email, employee_id
+            `SELECT id, full_name, email, employee_id
              FROM employees
              WHERE department_id = $1
                AND COALESCE(status, 'Active') <> 'Inactive'`,
@@ -282,21 +352,82 @@ const assignShiftToDepartment = async (req, res) => {
 
         let assignedCount = 0;
         for (const row of employeesRes.rows) {
-            await client.query(
-                `UPDATE employee_shift_assignments
-                 SET effective_to = ($2::date - INTERVAL '1 day')::date,
-                     updated_at = NOW()
-                 WHERE employee_id = $1
-                   AND effective_to IS NULL
-                   AND effective_from <= $2::date`,
-                [row.id, effectiveFrom]
-            );
+            if (effectiveTo) {
+                // BOUNDED: find previous shift, delete overlaps, create 3 segments
+                const beforeRes = await client.query(
+                    `SELECT shift_id, effective_from FROM employee_shift_assignments
+                     WHERE employee_id = $1
+                       AND effective_from <= $2::date
+                       AND (effective_to IS NULL OR effective_to >= $2::date)
+                     ORDER BY effective_from DESC, created_at DESC
+                     LIMIT 1`,
+                    [row.id, effectiveFrom]
+                );
+                const previousShiftId = beforeRes.rows[0]?.shift_id || null;
+                const previousStart = beforeRes.rows[0]?.effective_from || null;
+
+                await client.query(
+                    `DELETE FROM employee_shift_assignments
+                     WHERE employee_id = $1
+                       AND effective_from <= $2::date
+                       AND (effective_to IS NULL OR effective_to >= $3::date)`,
+                    [row.id, effectiveTo, effectiveFrom]
+                );
+
+                // Re-create old shift BEFORE override
+                if (previousShiftId && previousStart) {
+                    const prevStartStr = String(previousStart).slice(0, 10);
+                    if (prevStartStr < effectiveFrom) {
+                        await client.query(
+                            `INSERT INTO employee_shift_assignments (
+                                employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                             ) VALUES ($1, $2, $3::date, ($4::date - INTERVAL '1 day')::date, $5, NOW())`,
+                            [row.id, previousShiftId, prevStartStr, effectiveFrom, actorId]
+                        );
+                    }
+                }
+
+                // Insert the bounded override
+                await client.query(
+                    `INSERT INTO employee_shift_assignments (
+                        employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                     ) VALUES ($1, $2, $3, $4, $5, NOW())`,
+                    [row.id, shift_id, effectiveFrom, effectiveTo, actorId]
+                );
+
+                // Restore previous shift AFTER override
+                if (previousShiftId) {
+                    await client.query(
+                        `INSERT INTO employee_shift_assignments (
+                            employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                         ) VALUES ($1, $2, ($3::date + INTERVAL '1 day')::date, NULL, $4, NOW())`,
+                        [row.id, previousShiftId, effectiveTo, actorId]
+                    );
+                }
+            } else {
+                // PERMANENT: delete future assignments and insert new one
+                await client.query(
+                    `DELETE FROM employee_shift_assignments
+                     WHERE employee_id = $1
+                       AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                    [row.id, effectiveFrom]
+                );
+                await client.query(
+                    `UPDATE employee_shift_assignments
+                     SET effective_to = ($2::date - INTERVAL '1 day')::date,
+                         updated_at = NOW()
+                     WHERE employee_id = $1
+                       AND effective_from < $2::date
+                       AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                    [row.id, effectiveFrom]
+                );
+            }
 
             await client.query(
                 `INSERT INTO employee_shift_assignments (
-                    employee_id, shift_id, effective_from, assigned_by, updated_at
-                 ) VALUES ($1, $2, $3, $4, NOW())`,
-                [row.id, shift_id, effectiveFrom, actorId]
+                    employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [row.id, shift_id, effectiveFrom, effectiveTo, actorId]
             );
 
             assignedCount += 1;
@@ -365,7 +496,7 @@ const getWeeklyRoster = async (req, res) => {
             SELECT se.id AS employee_id,
                    se.full_name,
                    COALESCE(se.department_name, se.department, 'Unassigned') AS department_name,
-                   wd.day,
+                   TO_CHAR(wd.day, 'YYYY-MM-DD') AS day,
                    s.id AS shift_id,
                    s.name AS shift_name,
                    s.start_time,

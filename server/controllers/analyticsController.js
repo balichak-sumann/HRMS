@@ -65,12 +65,16 @@ const getAnalytics = async (req, res) => {
         const upcomingBirthdays = await pool.query(`
             SELECT full_name as name, role, TO_CHAR(dob, 'Mon DD') as date, avatar_url as avatar
             FROM employees 
-            WHERE dob IS NOT NULL 
+            WHERE status = 'Active' AND dob IS NOT NULL 
             AND (
-                EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM NOW())
-                OR EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM (NOW() + INTERVAL '1 month'))
+                (EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM dob) > EXTRACT(DAY FROM CURRENT_DATE))
+                OR
+                (EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month'))
             )
-            ORDER BY EXTRACT(MONTH FROM dob), EXTRACT(DAY FROM dob)
+            ORDER BY 
+                (EXTRACT(MONTH FROM dob) < EXTRACT(MONTH FROM CURRENT_DATE))::int,
+                EXTRACT(MONTH FROM dob), 
+                EXTRACT(DAY FROM dob)
             LIMIT 5
         `);
 

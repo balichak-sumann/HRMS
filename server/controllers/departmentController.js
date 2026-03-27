@@ -2,7 +2,10 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+let departmentColumnsEnsured = false;
+
 const ensureDepartmentColumns = async () => {
+    if (departmentColumnsEnsured) return;
     await pool.query(`
         CREATE TABLE IF NOT EXISTS departments (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,6 +41,7 @@ const ensureDepartmentColumns = async () => {
         WHERE reporting_manager_id IS NULL
           AND manager_id IS NOT NULL;
     `);
+    departmentColumnsEnsured = true;
 };
 
 const getDepartments = async (req, res) => {

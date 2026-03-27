@@ -1,6 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Phone, X, Mic, MicOff, Video, VideoOff, PhoneOff, Loader2 } from 'lucide-react';
 
+const configuration = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        {
+            urls: 'turn:a.relay.metered.ca:80',
+            username: 'e8dd65b92f6dde70d3ce84e4',
+            credential: '3RoB/YKGOaVMnqdv'
+        },
+        {
+            urls: 'turn:a.relay.metered.ca:443',
+            username: 'e8dd65b92f6dde70d3ce84e4',
+            credential: '3RoB/YKGOaVMnqdv'
+        },
+        {
+            urls: 'turns:a.relay.metered.ca:443',
+            username: 'e8dd65b92f6dde70d3ce84e4',
+            credential: '3RoB/YKGOaVMnqdv'
+        }
+    ],
+    iceCandidatePoolSize: 10
+};
+
 const CallModal = ({
     isOpen,
     onClose,
@@ -12,8 +38,6 @@ const CallModal = ({
     currentUser
 }) => {
     const [callStatus, setCallStatus] = useState(isIncoming ? 'ringing' : 'initializing');
-    // Status: initializing -> requesting_media -> calling -> connected | error
-    // For incoming: ringing -> accepting -> connected | error
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(type === 'voice');
     const [error, setError] = useState(null);
@@ -24,36 +48,9 @@ const CallModal = ({
     const localStream = useRef(null);
     const pendingCandidates = useRef([]);
 
-    const configuration = {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            // TURN servers are REQUIRED for media relay when peers are behind NAT (e.g. ngrok)
-            {
-                urls: 'turn:a.relay.metered.ca:80',
-                username: 'e8dd65b92f6dde70d3ce84e4',
-                credential: '3RoB/YKGOaVMnqdv'
-            },
-            {
-                urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-                username: 'e8dd65b92f6dde70d3ce84e4',
-                credential: '3RoB/YKGOaVMnqdv'
-            },
-            {
-                urls: 'turn:a.relay.metered.ca:443',
-                username: 'e8dd65b92f6dde70d3ce84e4',
-                credential: '3RoB/YKGOaVMnqdv'
-            },
-            {
-                urls: 'turns:a.relay.metered.ca:443',
-                username: 'e8dd65b92f6dde70d3ce84e4',
-                credential: '3RoB/YKGOaVMnqdv'
-            }
-        ],
-        iceCandidatePoolSize: 10
-    };
-
     const myId = currentUser?.employee_uuid || currentUser?.id;
+
+    console.log('[CallModal] Init:', { isOpen, myId, remoteUserId: remoteUser?.id, isIncoming });
 
     // ─── Cleanup helper ──────────────────────────────────────────────
     const cleanup = useCallback(() => {
@@ -70,6 +67,10 @@ const CallModal = ({
 
     // ─── Create PeerConnection with all event handlers ──────────────
     const createPeerConnection = useCallback(() => {
+        // If one already exists for this instance, return it
+        if (peerConnection.current) return peerConnection.current;
+
+        console.log('[Call] Creating new RTCPeerConnection...');
         const pc = new RTCPeerConnection(configuration);
 
         pc.ontrack = (event) => {
@@ -96,7 +97,7 @@ const CallModal = ({
 
         pc.onicecandidate = (event) => {
             if (event.candidate && socket?.current) {
-                console.log('[Call] Sending ICE candidate');
+                console.log('[Call] Sending ICE candidate to:', remoteUser.id, 'from:', myId);
                 socket.current.emit('ice_candidate', {
                     to: remoteUser.id,
                     from: myId,
@@ -106,11 +107,12 @@ const CallModal = ({
         };
 
         pc.oniceconnectionstatechange = () => {
-            console.log('[Call] ICE state:', pc.iceConnectionState);
+            console.log('[Call] ICE state change:', pc.iceConnectionState);
             if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
                 setCallStatus('connected');
             }
             if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                console.error('[Call] ICE connection failed/disconnected');
                 setError('Connection lost. Please try again.');
                 setCallStatus('error');
             }
@@ -122,38 +124,51 @@ const CallModal = ({
 
     // ─── Get local media stream ─────────────────────────────────────
     const getLocalStream = async () => {
-        if (!navigator.mediaDevices?.getUserMedia) {
-            throw new Error('Your browser does not support media access. Make sure you are using HTTPS.');
+        try {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error('Your browser does not support media access. Make sure you are using HTTPS.');
+            }
+            const constraints = {
+                video: type === 'video' ? { width: 1280, height: 720 } : false,
+                audio: true
+            };
+            console.log('[Call] Requesting media with constraints:', constraints);
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('[Call] Got local stream. Tracks:', stream.getTracks().map(t => `${t.kind}:${t.enabled}`).join(', '));
+            localStream.current = stream;
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+                localVideoRef.current.play().catch(e => console.log('[Call] Local video autoplay issue:', e));
+            }
+            return stream;
+        } catch (err) {
+            console.error('[Call] getLocalStream failed:', err);
+            if (err.name === 'NotAllowedError') throw new Error('Microphone/Camera permission denied.');
+            if (err.name === 'NotFoundError') throw new Error('No Microphone/Camera found on this device.');
+            throw err;
         }
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: type === 'video',
-            audio: true
-        });
-        console.log('[Call] Got local stream. Tracks:', stream.getTracks().map(t => `${t.kind}:${t.enabled}`).join(', '));
-        localStream.current = stream;
-        if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-            localVideoRef.current.play().catch(e => console.log('[Call] Local video autoplay issue:', e));
-        }
-        return stream;
     };
 
     // ─── Outgoing call: get media → create offer → send ─────────────
     const startOutgoingCall = async () => {
         try {
             setCallStatus('requesting_media');
-            console.log('[Call] Requesting media...');
+            console.log('[Call] startOutgoingCall: requesting media...');
             const stream = await getLocalStream();
 
-            console.log('[Call] Creating peer connection...');
+            console.log('[Call] startOutgoingCall: creating peer connection...');
             const pc = createPeerConnection();
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            stream.getTracks().forEach(track => {
+                console.log('[Call] startOutgoingCall: adding local track:', track.kind);
+                pc.addTrack(track, stream);
+            });
 
-            console.log('[Call] Creating offer...');
+            console.log('[Call] startOutgoingCall: creating offer...');
             const offer = await pc.createOffer();
+            console.log('[Call] startOutgoingCall: setting local description...');
             await pc.setLocalDescription(offer);
 
-            console.log('[Call] Sending call_user event to:', remoteUser.id);
+            console.log('[Call] Sending call_user event to:', remoteUser.id, 'from:', myId);
             socket.current.emit('call_user', {
                 to: remoteUser.id,
                 from: myId,
@@ -174,28 +189,35 @@ const CallModal = ({
     const handleAccept = async () => {
         try {
             setCallStatus('accepting');
-            console.log('[Call] Accepting call, requesting media...');
+            console.log('[Call] handleAccept: accepting call from:', remoteUser.id, 'myId:', myId);
             const stream = await getLocalStream();
 
-            console.log('[Call] Creating peer connection for answer...');
+            console.log('[Call] handleAccept: creating peer connection for answer...');
             const pc = createPeerConnection();
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            stream.getTracks().forEach(track => {
+                console.log('[Call] handleAccept: adding local track:', track.kind);
+                pc.addTrack(track, stream);
+            });
 
-            console.log('[Call] Setting remote description from offer...');
+            console.log('[Call] handleAccept: setting remote description from offer...');
+            if (!incomingOffer) throw new Error('No incoming offer found');
+
             await pc.setRemoteDescription(new RTCSessionDescription(incomingOffer));
 
             // Process any ICE candidates that arrived before we were ready
+            console.log(`[Call] handleAccept: processing ${pendingCandidates.current.length} buffered ICE candidates`);
             for (const candidate of pendingCandidates.current) {
-                console.log('[Call] Adding buffered ICE candidate');
+                console.log('[Call] handleAccept: adding buffered ICE candidate');
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
             }
             pendingCandidates.current = [];
 
-            console.log('[Call] Creating answer...');
+            console.log('[Call] handleAccept: creating answer...');
             const answer = await pc.createAnswer();
+            console.log('[Call] handleAccept: setting local description...');
             await pc.setLocalDescription(answer);
 
-            console.log('[Call] Sending answer_call event to:', remoteUser.id);
+            console.log('[Call] Sending answer_call event back to:', remoteUser.id, 'from:', myId);
             socket.current.emit('answer_call', {
                 to: remoteUser.id,
                 from: myId,
@@ -259,16 +281,19 @@ const CallModal = ({
 
     // ─── Wire up socket listeners ───────────────────────────────────
     useEffect(() => {
-        if (!socket?.current || !isOpen) return;
+        const currentSocket = socket?.current;
+        if (!currentSocket || !isOpen) return;
 
-        socket.current.on('call_answered', handleCallAnswered);
-        socket.current.on('ice_candidate', handleIceCandidate);
-        socket.current.on('call_ended', handleCallEnded);
+        console.log('[Call] Attaching socket listeners');
+        currentSocket.on('call_answered', handleCallAnswered);
+        currentSocket.on('ice_candidate', handleIceCandidate);
+        currentSocket.on('call_ended', handleCallEnded);
 
         return () => {
-            socket.current.off('call_answered', handleCallAnswered);
-            socket.current.off('ice_candidate', handleIceCandidate);
-            socket.current.off('call_ended', handleCallEnded);
+            console.log('[Call] Detaching socket listeners');
+            currentSocket.off('call_answered', handleCallAnswered);
+            currentSocket.off('ice_candidate', handleIceCandidate);
+            currentSocket.off('call_ended', handleCallEnded);
         };
     }, [isOpen, socket, handleCallAnswered, handleIceCandidate, handleCallEnded]);
 
@@ -370,6 +395,7 @@ const CallModal = ({
                                         <X size={40} />
                                     </div>
                                     <h3 style={{ color: '#EF4444', marginBottom: '10px' }}>Call Error</h3>
+                                    <p style={{ color: '#9CA3AF', fontSize: '14px', marginBottom: '20px' }}>{error}</p>
                                     <p style={{ maxWidth: '400px', fontSize: '14px', lineHeight: '1.6', opacity: 0.9 }}>{error}</p>
                                     <button
                                         onClick={handleHangup}

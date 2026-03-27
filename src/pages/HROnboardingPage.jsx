@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { CheckCircle2, Loader2, PlusCircle, RefreshCw } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const HROnboardingPage = () => {
     const [loading, setLoading] = useState(true);
@@ -61,14 +62,27 @@ const HROnboardingPage = () => {
 
     const createTemplate = async (e) => {
         e.preventDefault();
+        if (!templateForm.name.trim()) {
+            toast.error('Template name is required');
+            return;
+        }
+        if (!templateForm.description.trim()) {
+            toast.error('Template description is required');
+            return;
+        }
+        const cleanedTasks = templateForm.tasks.filter((t) => t.title.trim());
+        if (cleanedTasks.length === 0) {
+            toast.error('At least one task with a title is required');
+            return;
+        }
         try {
-            const cleanedTasks = templateForm.tasks.filter((t) => t.title.trim());
             await api.post('/onboarding/templates', { ...templateForm, tasks: cleanedTasks });
             setTemplateForm({ name: '', description: '', tasks: [{ title: '', description: '', requires_document: false }] });
+            toast.success('Template created successfully');
             await fetchData();
         } catch (error) {
             console.error('Create template failed', error);
-            alert('Failed to create template');
+            toast.error(error.message || 'Failed to create template');
         }
     };
 
@@ -92,7 +106,7 @@ const HROnboardingPage = () => {
         <>
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Employee Onboarding</h1>
+                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Onboarding</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Manage templates, assign onboarding, and monitor case completion.</p>
                 </div>
                 <button className="btn-primary" onClick={fetchData} style={{ borderRadius: '10px' }}>
@@ -109,14 +123,20 @@ const HROnboardingPage = () => {
                     <div className="card" style={{ padding: '18px' }}>
                         <h3 style={{ fontSize: '18px', marginBottom: '10px' }}>Create Onboarding Template</h3>
                         <form onSubmit={createTemplate} style={{ display: 'grid', gap: '10px' }}>
-                            <input className="input-field" placeholder="Template name" value={templateForm.name} onChange={(e) => setTemplateForm((p) => ({ ...p, name: e.target.value }))} required />
-                            <textarea className="input-field" rows="2" placeholder="Description" value={templateForm.description} onChange={(e) => setTemplateForm((p) => ({ ...p, description: e.target.value }))} />
+                            <div>
+                                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px', display: 'block' }}>Template Name <span style={{ color: '#EF4444' }}>*</span></label>
+                                <input className="input-field" placeholder="Template name" value={templateForm.name} onChange={(e) => setTemplateForm((p) => ({ ...p, name: e.target.value }))} required />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px', display: 'block' }}>Description <span style={{ color: '#EF4444' }}>*</span></label>
+                                <textarea className="input-field" rows="2" placeholder="Description" value={templateForm.description} onChange={(e) => setTemplateForm((p) => ({ ...p, description: e.target.value }))} required />
+                            </div>
 
                             <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '10px' }}>
-                                <p style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Template Tasks</p>
+                                <p style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Template Tasks <span style={{ color: '#EF4444' }}>*</span></p>
                                 {templateForm.tasks.map((task, idx) => (
                                     <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: '8px', marginBottom: '8px' }}>
-                                        <input className="input-field" placeholder="Task title" value={task.title} onChange={(e) => updateTask(idx, { title: e.target.value })} />
+                                        <input className="input-field" placeholder="Task title *" value={task.title} onChange={(e) => updateTask(idx, { title: e.target.value })} required />
                                         <input className="input-field" placeholder="Task description" value={task.description} onChange={(e) => updateTask(idx, { description: e.target.value })} />
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
                                             <input type="checkbox" checked={task.requires_document} onChange={(e) => updateTask(idx, { requires_document: e.target.checked })} /> Requires doc

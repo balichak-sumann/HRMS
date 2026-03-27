@@ -61,7 +61,7 @@ const HRForm16Page = () => {
     return (
         <>
             <div style={{ marginBottom: '20px' }}>
-                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Form 16 Summary</h1>
+                <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Form 16</h1>
                 <p style={{ color: 'var(--text-muted)', marginTop: '6px' }}>
                     Generate and download employee Form 16 summaries.
                 </p>

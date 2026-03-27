@@ -150,7 +150,7 @@ const HRAssetsPage = () => {
         <>
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                 <div>
-                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Asset Management</h1>
+                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Assets</h1>
                     <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
                         Add assets, assign to employees, and track returns from a single inventory view.
                     </p>
@@ -187,7 +187,7 @@ const HRAssetsPage = () => {
 
                         <input className="input-field" placeholder="Serial number" value={assetForm.serial_number} onChange={(e) => setAssetForm((prev) => ({ ...prev, serial_number: e.target.value }))} required />
 
-                        <input className="input-field" type="date" value={assetForm.purchase_date} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchase_date: e.target.value }))} />
+                        <input className="input-field" type="date" value={assetForm.purchase_date} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchase_date: e.target.value }))} max={new Date().toISOString().split('T')[0]} />
 
                         <input className="input-field" type="number" min="0" step="0.01" placeholder="Value (Rs)" value={assetForm.value} onChange={(e) => setAssetForm((prev) => ({ ...prev, value: e.target.value }))} />
 
@@ -256,6 +256,7 @@ const HRAssetsPage = () => {
                                                                 return_date: e.target.value
                                                             }
                                                         }))}
+                                                        max={new Date().toISOString().split('T')[0]}
                                                     />
                                                     <select
                                                         className="input-field"
@@ -315,6 +316,7 @@ const HRAssetsPage = () => {
                                                                 assignment_date: e.target.value
                                                             }
                                                         }))}
+                                                        max={new Date().toISOString().split('T')[0]}
                                                     />
                                                     <button
                                                         className="btn-primary"

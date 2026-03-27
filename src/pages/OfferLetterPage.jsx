@@ -610,6 +610,7 @@ const OfferLetterPDF = ({ data }) => {
 const OfferLetterPage = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showErrors, setShowErrors] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
     const [formData, setFormData] = useState({
         candidate_name: '',
@@ -672,6 +673,12 @@ const OfferLetterPage = () => {
             toast.error('Please enter a valid candidate email address.');
             return;
         }
+        
+        if (!formData.ctc || Number(formData.ctc) <= 0) {
+            setShowErrors(true);
+            toast.error('CTC is required');
+            return;
+        }
 
         try {
             setLoading(true);
@@ -707,16 +714,12 @@ const OfferLetterPage = () => {
 
     return (
         <div style={{ maxWidth: '1700px', margin: '0 auto', width: '100%' }}>
-            <header className="no-print offer-header" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <header className="no-print offer-header" style={{ marginBottom: '40px' }}>
                 <div>
-                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '4px' }}>Offer Letter Generator</h1>
+                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '4px' }}>Offer Letters</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Draft, preview, and transmit professional employment letters.</p>
                 </div>
-                <div className="no-print" style={{ display: 'flex', background: 'var(--card-bg)', padding: '8px 14px', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '13px', fontWeight: '700', color: 'var(--primary)' }}>
-                    Offer Letter
-                </div>
             </header>
-
             <div className="offer-layout" style={{ display: 'grid', gridTemplateColumns: '560px minmax(0, 1fr)', gap: '20px', alignItems: 'stretch' }}>
                 {/* Left Column */}
                 <div className="no-print" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -727,7 +730,7 @@ const OfferLetterPage = () => {
 
                         <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>CANDIDATE FULL NAME</label>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>CANDIDATE FULL NAME <span style={{ color: '#DC2626' }}>*</span></label>
                             <input
                                 className="input-field"
                                 placeholder="e.g. John Doe"
@@ -736,7 +739,7 @@ const OfferLetterPage = () => {
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>CANDIDATE EMAIL</label>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>CANDIDATE EMAIL <span style={{ color: '#DC2626' }}>*</span></label>
                             <input
                                 className="input-field"
                                 type="email"
@@ -747,7 +750,7 @@ const OfferLetterPage = () => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>POSITION ROLE</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>POSITION ROLE <span style={{ color: '#DC2626' }}>*</span></label>
                                 <input
                                     className="input-field"
                                     placeholder="e.g. Software Developer - L1"
@@ -756,7 +759,7 @@ const OfferLetterPage = () => {
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>POSITION TITLE</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>POSITION TITLE <span style={{ color: '#DC2626' }}>*</span></label>
                                 <input
                                     className="input-field"
                                     placeholder="e.g. Software Developer"
@@ -767,7 +770,7 @@ const OfferLetterPage = () => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>DEPARTMENT</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>DEPARTMENT <span style={{ color: '#DC2626' }}>*</span></label>
                                 <select
                                     className="input-field"
                                     value={formData.department}
@@ -781,7 +784,7 @@ const OfferLetterPage = () => {
                                 </select>
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>LOCATION</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>LOCATION <span style={{ color: '#DC2626' }}>*</span></label>
                                 <input
                                     className="input-field"
                                     placeholder="e.g. Hyderabad"
@@ -792,7 +795,7 @@ const OfferLetterPage = () => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>LETTER DATE</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>LETTER DATE <span style={{ color: '#DC2626' }}>*</span></label>
                                 <input
                                     className="input-field"
                                     type="date"
@@ -801,17 +804,23 @@ const OfferLetterPage = () => {
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>TOTAL CTC (INR)</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: (showErrors && !formData.ctc) ? '#DC2626' : '#64748B', marginBottom: '8px' }}>
+                                    TOTAL CTC (INR) <span style={{ color: '#DC2626' }}>*</span>
+                                </label>
                                 <input
                                     className="input-field"
                                     type="number"
                                     placeholder="e.g. 1200000"
                                     value={formData.ctc}
-                                    onChange={e => setFormData({ ...formData, ctc: e.target.value })}
+                                    onChange={e => {
+                                        setFormData({ ...formData, ctc: e.target.value });
+                                        if (e.target.value) setShowErrors(false);
+                                    }}
+                                    style={showErrors && (!formData.ctc || Number(formData.ctc) <= 0) ? { border: '1px solid #DC2626', background: '#FEF2F2' } : {}}
                                 />
                             </div>
                             <div>
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>JOINING DATE</label>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '8px' }}>JOINING DATE <span style={{ color: '#DC2626' }}>*</span></label>
                                 <input
                                     className="input-field"
                                     type="date"

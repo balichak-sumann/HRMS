@@ -45,7 +45,7 @@ const HRSurveysPage = () => {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
-                    <h1 style={{ fontSize: '24px', margin: 0, color: 'var(--text-main)' }}>Employee Surveys</h1>
+                    <h1 style={{ fontSize: '24px', margin: 0, color: 'var(--text-main)' }}>Surveys</h1>
                     <p style={{ color: 'var(--text-muted)', marginTop: '6px' }}>Create, publish, and monitor survey responses.</p>
                 </div>
                 <button

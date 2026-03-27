@@ -54,7 +54,7 @@ const HRComplaintsPage = () => {
         <>
             <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', fontWeight: '700' }}>Moral & Ethics Control</h1>
+                    <h1 style={{ fontSize: '28px', color: 'var(--text-main)', fontWeight: '700' }}>Complaints</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '4px' }}>Review and resolve employee concerns and ethical reports.</p>
                 </div>
 

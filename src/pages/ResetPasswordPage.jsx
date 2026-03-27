@@ -15,9 +15,18 @@ const ResetPasswordPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (!token) {
-            setError('Invalid or missing reset token.');
-        }
+        const checkToken = async () => {
+            if (!token) {
+                setError('Invalid or missing reset token.');
+                return;
+            }
+            try {
+                await api.get(`/auth/verify-reset-token/${token}`);
+            } catch (err) {
+                setError(err.message || 'Reset link is invalid or has expired.');
+            }
+        };
+        checkToken();
     }, [token]);
 
     const handleSubmit = async (e) => {

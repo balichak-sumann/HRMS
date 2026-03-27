@@ -134,6 +134,7 @@ const HRAttendancePage = () => {
                         value={filters.date}
                         onChange={e => setFilters({ ...filters, date: e.target.value })}
                         style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }}
+                        max={new Date().toISOString().split('T')[0]}
                     />
                 </div>
                 <div style={{ flex: 1 }}>

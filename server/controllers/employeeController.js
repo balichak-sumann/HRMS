@@ -320,7 +320,7 @@ const createEmployee = async (req, res) => {
         full_name, email, role, department, phone, joining_date, salary,
         employee_id, designation, location, pan, bank_account, bank_name,
         personal_email, emergency_contact, technology, experience_years,
-        aadhaar_card, adhar_card, pan_card,
+        aadhaar_card, adhar_card, pan_card, dob,
         onboarding_template_id, department_id, manager_id, reporting_manager_id,
         account_role
     } = req.body;
@@ -491,8 +491,8 @@ const createEmployee = async (req, res) => {
 
         const newEmployee = await client.query(
             `INSERT INTO employees
-             (full_name, email, role, department, department_id, manager_id, reporting_manager_id, phone, joining_date, salary, avatar_url, employee_id, designation, location, pan, bank_account, bank_name, personal_email, emergency_contact, technology, experience_years, aadhaar_card)
-             VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+             (full_name, email, role, department, department_id, manager_id, reporting_manager_id, phone, joining_date, salary, avatar_url, employee_id, designation, location, pan, bank_account, bank_name, personal_email, emergency_contact, technology, experience_years, aadhaar_card, dob)
+             VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
              RETURNING *`,
             [
                 normalizedFullName, normalizedEmail, normalizedJobRole, departmentNameValue, departmentIdValue, effectiveManagerId,
@@ -501,7 +501,8 @@ const createEmployee = async (req, res) => {
                 normalizedPan || null, normalizedBankAccount || null, bank_name || null,
                 normalizedPersonalEmail || null, normalizedEmergencyContact || null, technology || null,
                 normalizedExperienceYears,
-                normalizedAadhaar || null
+                normalizedAadhaar || null,
+                dob || null
             ]
         );
 
@@ -517,11 +518,10 @@ const createEmployee = async (req, res) => {
 
         // Create a password reset link so employee can set a new password immediately.
         const resetToken = crypto.randomUUID();
-        const resetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
         await client.query('UPDATE password_reset_tokens SET used = TRUE WHERE profile_id = $1', [profile.id]);
         await client.query(
-            'INSERT INTO password_reset_tokens (profile_id, token, expires_at) VALUES ($1, $2, $3)',
-            [profile.id, resetToken, resetExpiresAt]
+            "INSERT INTO password_reset_tokens (profile_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')",
+            [profile.id, resetToken]
         );
 
         if (onboarding_template_id) {
@@ -614,7 +614,7 @@ const updateEmployee = async (req, res) => {
         full_name, email, role, department, phone, joining_date, salary,
         employee_id, designation, location, pan, bank_account, bank_name,
         personal_email, emergency_contact, technology, experience_years,
-        aadhaar_card, adhar_card, pan_card,
+        aadhaar_card, adhar_card, pan_card, dob,
         department_id, manager_id, reporting_manager_id, account_role
     } = req.body;
     const avatar_url = req.file ? `/uploads/avatars/${req.file.filename}` : undefined;
@@ -772,7 +772,7 @@ const updateEmployee = async (req, res) => {
                 joining_date = $8, salary = $9, employee_id = $10, designation = $11,
                 location = $12, pan = $13, bank_account = $14, bank_name = $15,
                 personal_email = $16, emergency_contact = $17, technology = $18,
-                experience_years = $19, aadhaar_card = $20,
+                experience_years = $19, aadhaar_card = $20, dob = $21,
                 updated_at = NOW()`;
         let params = [
             normalizedFullName, currentEmployeeEmail, normalizedJobRole, departmentNameValue, departmentIdValue, nextManagerId,
@@ -781,14 +781,18 @@ const updateEmployee = async (req, res) => {
             normalizedPan || null, normalizedBankAccount || null, bank_name || null,
             normalizedPersonalEmail || null, normalizedEmergencyContact || null, technology || null,
             normalizedExperienceYears,
-            normalizedAadhaar || null
+            normalizedAadhaar || null,
+            dob || null
         ];
 
         if (avatar_url !== undefined) {
-            query += ', avatar_url = $21 WHERE id = $22';
+            query += ', avatar_url = $22 WHERE id = $23';
             params.push(avatar_url, req.params.id);
+        } else if (req.body.remove_avatar === 'true') {
+            query += ', avatar_url = NULL WHERE id = $22';
+            params.push(req.params.id);
         } else {
-            query += ' WHERE id = $21';
+            query += ' WHERE id = $22';
             params.push(req.params.id);
         }
 

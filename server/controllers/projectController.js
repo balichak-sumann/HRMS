@@ -155,7 +155,7 @@ const createReport = async (req, res) => {
     try {
         const result = await pool.query(
             "INSERT INTO daily_reports (project_id, employee_id, work_done, hours, blockers) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-            [req.params.id, req.user.id, work_done, hours, blockers]
+            [req.params.id, req.user.employee_uuid || req.user.id, work_done, hours, blockers]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -190,7 +190,7 @@ const getMyReports = async (req, res) => {
             JOIN projects p ON r.project_id = p.id
             WHERE r.employee_id = $1
             ORDER BY r.created_at DESC
-        `, [req.user.id]);
+        `, [req.user.employee_uuid || req.user.id]);
         res.json(result.rows);
     } catch (err) {
         console.error(err.message);

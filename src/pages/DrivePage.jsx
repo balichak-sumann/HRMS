@@ -11,6 +11,7 @@ import {
     Trash2,
     Download,
     ChevronRight,
+    ArrowLeft,
     HardDrive,
     Users,
     ShieldAlert,
@@ -30,6 +31,8 @@ const DrivePage = () => {
     const [viewType, setViewType] = useState('my'); // 'my', 'shared', 'company', 'hr'
     const [searchTerm, setSearchTerm] = useState('');
     const [contextMenu, setContextMenu] = useState(null); // { x, y, item, isFolder }
+    const [showFolderModal, setShowFolderModal] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
     const fileInputRef = useRef(null);
     const menuRef = useRef(null);
     const [userRole, setUserRole] = useState('');
@@ -102,7 +105,7 @@ const DrivePage = () => {
     };
 
     const handleCreateFolder = async () => {
-        const name = prompt('Enter folder name:');
+        const name = newFolderName.trim();
         if (!name) return;
 
         const parentId = currentPath.length > 0 ? currentPath[currentPath.length - 1].id : null;
@@ -113,6 +116,8 @@ const DrivePage = () => {
                 is_company: viewType === 'company',
                 is_hr_only: viewType === 'hr'
             });
+            setShowFolderModal(false);
+            setNewFolderName('');
             fetchContents();
         } catch (error) {
             console.error('Folder creation failed:', error);
@@ -249,11 +254,24 @@ const DrivePage = () => {
                     {/* Header Controls */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {currentPath.length > 0 && (
+                                <button
+                                    onClick={() => setCurrentPath(currentPath.slice(0, -1))}
+                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex', alignItems: 'center', padding: '4px' }}
+                                    title="Go back"
+                                >
+                                    <ArrowLeft size={20} />
+                                </button>
+                            )}
                             <h2 style={{ fontSize: '22px', fontWeight: '700' }}>Cloud Drive</h2>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '13px' }}>
                                 <ChevronRight size={16} />
-                                {currentPath.length === 0 ? viewType.charAt(0).toUpperCase() + viewType.slice(1) : currentPath.map((p, i) => (
-                                    <span key={p.id} onClick={() => setCurrentPath(currentPath.slice(0, i + 1))} style={{ cursor: 'pointer', hover: { color: 'var(--primary)' } }}>{p.name}</span>
+                                <span onClick={() => setCurrentPath([])} style={{ cursor: 'pointer' }}>{viewType.charAt(0).toUpperCase() + viewType.slice(1)}</span>
+                                {currentPath.map((p, i) => (
+                                    <React.Fragment key={p.id}>
+                                        <ChevronRight size={14} />
+                                        <span onClick={() => setCurrentPath(currentPath.slice(0, i + 1))} style={{ cursor: 'pointer', fontWeight: i === currentPath.length - 1 ? '700' : '400', color: i === currentPath.length - 1 ? 'var(--text-main)' : undefined }}>{p.name}</span>
+                                    </React.Fragment>
                                 ))}
                             </div>
                         </div>
@@ -270,7 +288,7 @@ const DrivePage = () => {
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
-                            <button onClick={handleCreateFolder} className="btn-secondary" style={{ padding: '10px' }}><FolderPlus size={18} /></button>
+                            <button onClick={() => { setNewFolderName(''); setShowFolderModal(true); }} className="btn-secondary" style={{ padding: '10px' }}><FolderPlus size={18} /></button>
                             <button onClick={() => fileInputRef.current.click()} className="btn-primary" style={{ padding: '10px 20px', borderRadius: '10px' }}>
                                 <Upload size={18} />
                                 Upload
@@ -289,14 +307,19 @@ const DrivePage = () => {
                                 {contents.folders.map(folder => (
                                     <div
                                         key={folder.id}
-                                        onClick={() => setCurrentPath([...currentPath, { id: folder.id, name: folder.name }])}
+                                        onDoubleClick={() => setCurrentPath([...currentPath, { id: folder.id, name: folder.name }])}
+                                        onClick={() => {
+                                            if (!contextMenu) {
+                                                setCurrentPath([...currentPath, { id: folder.id, name: folder.name }]);
+                                            }
+                                        }}
                                         style={{
                                             padding: '16px',
                                             borderRadius: '12px',
                                             border: '1px solid var(--border)',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s',
-                                            hover: { background: '#F8FAFC' }
+                                            position: 'relative'
                                         }}
                                         className="file-card"
                                     >
@@ -415,6 +438,33 @@ const DrivePage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* New Folder Modal */}
+            {showFolderModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => setShowFolderModal(false)}
+                >
+                    <div style={{ background: 'var(--card-bg)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-main)' }}>Create New Folder</h3>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Folder name"
+                            value={newFolderName}
+                            onChange={(e) => setNewFolderName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); }}
+                            autoFocus
+                            style={{ width: '100%', marginBottom: '16px' }}
+                        />
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowFolderModal(false)} className="btn-secondary" style={{ padding: '10px 20px', borderRadius: '10px' }}>Cancel</button>
+                            <button onClick={handleCreateFolder} className="btn-primary" style={{ padding: '10px 20px', borderRadius: '10px' }} disabled={!newFolderName.trim()}>Create</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 .file-card:hover {

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import CameraCaptureModal from '../components/CameraCaptureModal';
 
 const ProfilePage = () => {
     const { profile: authProfile, setProfile: setAuthProfile } = useAuth();
@@ -22,6 +23,9 @@ const ProfilePage = () => {
     const [address, setAddress] = useState('');
     const [saving, setSaving] = useState(false);
     const [photoUpdating, setPhotoUpdating] = useState(false);
+    const [showPhotoOptions, setShowPhotoOptions] = useState(false);
+    const [showCameraModal, setShowCameraModal] = useState(false);
+    const fileInputRef = React.useRef(null);
 
     const nameValidationRegex = /^[A-Za-z][A-Za-z\s.'-]*$/;
     const allowedRoles = ['admin', 'hr', 'employee'];
@@ -124,8 +128,13 @@ const ProfilePage = () => {
         }
     };
 
-    const handlePhotoChange = async (e) => {
-        const file = e.target.files[0];
+    const handlePhotoChange = async (eOrFile) => {
+        let file;
+        if (eOrFile?.target?.files) {
+            file = eOrFile.target.files[0];
+        } else {
+            file = eOrFile;
+        }
         if (!file) return;
 
         const formData = new FormData();
@@ -243,24 +252,94 @@ const ProfilePage = () => {
                                 <span>{headerName.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase()}</span>
                             )}
                         </div>
-                        <label style={{
-                            position: 'absolute',
-                            bottom: '5px',
-                            right: '5px',
-                            width: '40px',
-                            height: '40px',
-                            background: 'white',
-                            border: '1px solid #D1D5DB',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                        }}>
-                            <Camera size={20} color="#6B7280" />
-                            <input type="file" onChange={handlePhotoChange} style={{ display: 'none' }} accept="image/*" />
-                        </label>
+                        <div style={{ position: 'absolute', bottom: '5px', right: '5px' }}>
+                            <button 
+                                onClick={() => setShowPhotoOptions(!showPhotoOptions)}
+                                style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    background: 'var(--card-bg)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                <Camera size={20} color="var(--text-muted)" />
+                            </button>
+                            
+                            {showPhotoOptions && (
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '100%',
+                                    right: '0',
+                                    marginBottom: '8px',
+                                    background: 'var(--card-bg)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    padding: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px',
+                                    width: '140px',
+                                    zIndex: 10
+                                }}>
+                                    <button 
+                                        onClick={() => {
+                                            setShowPhotoOptions(false);
+                                            fileInputRef.current?.click();
+                                        }}
+                                        style={{
+                                            padding: '8px 12px',
+                                            textAlign: 'left',
+                                            background: 'none',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            width: '100%',
+                                            color: 'var(--text-main)'
+                                        }}
+                                        onMouseOver={(e) => e.target.style.background = 'var(--input-bg)'}
+                                        onMouseOut={(e) => e.target.style.background = 'none'}
+                                    >
+                                        Upload Photo
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            setShowPhotoOptions(false);
+                                            setShowCameraModal(true);
+                                        }}
+                                        style={{
+                                            padding: '8px 12px',
+                                            textAlign: 'left',
+                                            background: 'none',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            width: '100%',
+                                            color: 'var(--text-main)'
+                                        }}
+                                        onMouseOver={(e) => e.target.style.background = 'var(--input-bg)'}
+                                        onMouseOut={(e) => e.target.style.background = 'none'}
+                                    >
+                                        Take Photo
+                                    </button>
+                                </div>
+                            )}
+                            <input 
+                                type="file" 
+                                ref={fileInputRef}
+                                onChange={handlePhotoChange} 
+                                style={{ display: 'none' }} 
+                                accept="image/*" 
+                            />
+                        </div>
                     </div>
 
                     <div style={{ flex: 1 }}>
@@ -410,6 +489,12 @@ const ProfilePage = () => {
                 .animate-spin { animation: spin 1s linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             `}</style>
+
+            <CameraCaptureModal 
+                isOpen={showCameraModal} 
+                onClose={() => setShowCameraModal(false)} 
+                onCapture={handlePhotoChange} 
+            />
         </div>
     );
 };

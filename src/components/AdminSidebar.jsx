@@ -37,7 +37,7 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         // Admin-specific
         { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
         { icon: <Shield size={20} />, label: 'Admin Management', path: '/admin/admin-management' },
-        
+
         // All HR/Organizational Features (via admin routes)
         { icon: <Users size={20} />, label: 'Employees', path: '/admin/employees' },
         { icon: <CalendarCheck size={20} />, label: 'Attendance', path: '/admin/attendance' },
