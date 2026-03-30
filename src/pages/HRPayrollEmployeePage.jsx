@@ -139,13 +139,18 @@ const HRPayrollEmployeePage = () => {
     const buildInitialPayslip = (employee) => {
         const annualSalaryInput = Number(employee.salary);
         const annualSalary = Number.isFinite(annualSalaryInput) && annualSalaryInput > 0 ? annualSalaryInput : 0;
-        const gross = Math.round((annualSalary / 12) * 100) / 100;
-        const basic = gross;
-        const hra = 0;
-        const conveyance = 0;
-        const specialAllowance = 0;
+        const monthlyCtc = Math.round(annualSalary / 12);
+        
+        // Match screenshot logic: Gross = CTC - 1834 (PF + Insurance)
+        const gross = annualSalary > 0 ? Math.max(0, monthlyCtc - 1834) : 0;
+        
+        // Components based on 5/9 logic from screenshot
+        const basic = annualSalary > 0 ? Math.round((gross * 5) / 9) : 0;
+        const hra = Math.round(basic / 2);
+        const conveyance = annualSalary > 0 ? 1500 : 0;
+        const specialAllowance = annualSalary > 0 ? Math.max(0, gross - basic - hra - conveyance) : 0;
 
-        const ptax = 0;
+        const ptax = annualSalary > 0 ? 200 : 0; // Default P Tax
         const otherDeduction = 0;
 
         return {
@@ -170,8 +175,8 @@ const HRPayrollEmployeePage = () => {
             esi_employer: 0,
             tds: 0,
             gross_salary: gross,
-            deductions: 0,
-            net_salary: gross,
+            deductions: ptax,
+            net_salary: gross - ptax,
             conveyance,
             specialAllowance,
             ptax,

@@ -220,22 +220,19 @@ const OfferLetterPDF = ({ data }) => {
     const hasPaidCtc = annualCtc > 0;
     const ctcText = toInr(annualCtc);
 
-    // Calculate salary components based on CTC using Indian salary structure
+    // Match screenshot logic: Gross = Monthly CTC - 1834 (PF + Insurance)
     const monthlyCtc = hasPaidCtc ? Math.round(annualCtc / 12) : 0;
-    
-    // Standard deductions/benefits (fixed amounts)
     const employeePfMonth = hasPaidCtc ? 1500 : 0;
     const insuranceMonth = hasPaidCtc ? 334 : 0;
-    const professionalTaxMonth = hasPaidCtc ? 200 : 0;
+    const professionalTaxMonth = hasPaidCtc ? 200 : 0; // Standard P Tax
     
-    // Gross = CTC - (PF + Insurance)
-    const grossMonth = hasPaidCtc ? Math.round(monthlyCtc - employeePfMonth - insuranceMonth) : 0;
+    const grossMonth = hasPaidCtc ? Math.max(0, monthlyCtc - employeePfMonth - insuranceMonth) : 0;
     
-    // Salary breakdown: Basic (55%), HRA (27.8%), Conveyance (fixed), Special (rest)
-    const basicPayMonth = hasPaidCtc ? Math.round((grossMonth * 55) / 100) : 0;
-    const hraMonth = hasPaidCtc ? Math.round((grossMonth * 27.8) / 100) : 0;
-    const conveyanceMonth = hasPaidCtc ? 1500 : 0; // Fixed when paid CTC is provided
-    const specialAllowanceMonth = hasPaidCtc ? Math.round(grossMonth - basicPayMonth - hraMonth - conveyanceMonth) : 0;
+    // Components based on 5/9 logic from screenshot
+    const basicPayMonth = hasPaidCtc ? Math.round((grossMonth * 5) / 9) : 0;
+    const hraMonth = hasPaidCtc ? Math.round(basicPayMonth / 2) : 0;
+    const conveyanceMonth = hasPaidCtc ? 1500 : 0; // Fixed
+    const specialAllowanceMonth = hasPaidCtc ? Math.max(0, grossMonth - basicPayMonth - hraMonth - conveyanceMonth) : 0;
 
     return (
         <Document>
