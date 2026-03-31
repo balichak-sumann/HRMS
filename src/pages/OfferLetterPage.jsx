@@ -610,6 +610,7 @@ const OfferLetterPage = () => {
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [loading, setLoading] = useState(false);
     const [showErrors, setShowErrors] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [previewUrl, setPreviewUrl] = useState('');
     const [formData, setFormData] = useState({
         candidate_name: '',
@@ -668,7 +669,7 @@ const OfferLetterPage = () => {
         };
     }, [previewUrl]);
 
-    const fetchHistory = async () => {
+    const fetchCandidates = async () => {
         try {
             const data = await api.get('/offer-letters');
             setHistory(data);
@@ -702,7 +703,7 @@ const OfferLetterPage = () => {
             payload.append('offer_letter_pdf', generatedBlob, `offer_letter_${(formData.candidate_name || 'candidate').replace(/\s+/g, '_')}.pdf`);
 
             await api.post('/offer-letters', payload);
-            fetchHistory();
+            fetchCandidates();
             toast.success('Offer letter record created!');
         } catch (err) {
             toast.error(err?.message || 'Failed to save record');
@@ -714,7 +715,7 @@ const OfferLetterPage = () => {
     const handleSend = async (id) => {
         try {
             await api.post(`/offer-letters/${id}/send`, {});
-            fetchHistory();
+            fetchCandidates();
             toast.success('Offer letter sent successfully');
         } catch (err) {
             toast.error(err?.message || 'Failed to send offer letter');
@@ -727,7 +728,7 @@ const OfferLetterPage = () => {
         try {
             setLoading(true);
             const response = await api.post('/offer-letters/bulk-send', { ids: selectedIds });
-            fetchHistory();
+            fetchCandidates();
             setSelectedIds([]);
             toast.success(response.message || 'Bulk mail processing initiated');
         } catch (err) {

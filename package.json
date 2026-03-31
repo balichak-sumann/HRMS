@@ -8,7 +8,12 @@
     "dev:all": "node scripts/dev-all.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:migrate": "npm run --prefix server db:migrate",
+    "db:deploy": "npm run --prefix server db:deploy",
+    "db:status": "npm run --prefix server db:status",
+    "db:studio": "npm run --prefix server db:studio",
+    "db:all": "./start.sh"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",

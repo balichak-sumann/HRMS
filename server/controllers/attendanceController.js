@@ -39,29 +39,8 @@ const parseTimeToMinutes = (timeValue) => {
 };
 
 const getShiftForDate = async (employeeId, attendanceDate) => {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS shifts (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT UNIQUE NOT NULL,
-            start_time TIME NOT NULL,
-            end_time TIME NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS employee_shift_assignments (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-            effective_from DATE NOT NULL,
-            effective_to DATE,
-            assigned_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-    `);
-
     const result = await pool.query(
+
         `SELECT s.id, s.name, s.start_time, s.end_time
          FROM employee_shift_assignments esa
          JOIN shifts s ON s.id = esa.shift_id

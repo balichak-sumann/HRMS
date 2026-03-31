@@ -2,54 +2,12 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let assetSchemaEnsured = false;
+
 
 const ASSET_TYPES = ['Laptop', 'Phone', 'Monitor', 'Access Card', 'Other'];
 const ASSET_STATUSES = ['available', 'assigned', 'damaged', 'retired'];
 
-const ensureAssetSchema = async () => {
-    if (assetSchemaEnsured) return;
 
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS assets (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT NOT NULL,
-            asset_type TEXT NOT NULL CHECK (asset_type IN ('Laptop', 'Phone', 'Monitor', 'Access Card', 'Other')),
-            serial_number TEXT UNIQUE NOT NULL,
-            purchase_date DATE,
-            asset_value NUMERIC,
-            status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'damaged', 'retired')),
-            created_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS asset_assignments (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            assigned_date DATE NOT NULL,
-            return_date DATE,
-            condition_notes TEXT,
-            assigned_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            returned_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_assignments_active_asset
-            ON asset_assignments(asset_id)
-            WHERE return_date IS NULL;
-
-        CREATE INDEX IF NOT EXISTS idx_assets_type_status
-            ON assets(asset_type, status);
-
-        CREATE INDEX IF NOT EXISTS idx_asset_assignments_employee_active
-            ON asset_assignments(employee_id, return_date);
-    `);
-
-    assetSchemaEnsured = true;
-};
 
 const getActorEmployeeId = async (req) => {
     if (req.user?.employee_uuid) return req.user.employee_uuid;
@@ -82,7 +40,7 @@ const createAsset = async (req, res) => {
     }
 
     try {
-        await ensureAssetSchema();
+
         const actorId = await getActorEmployeeId(req);
 
         const result = await pool.query(
@@ -115,7 +73,7 @@ const listAssets = async (req, res) => {
     const { type, status } = req.query;
 
     try {
-        await ensureAssetSchema();
+
 
         const params = [];
         const conditions = [];
@@ -163,7 +121,7 @@ const assignAsset = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureAssetSchema();
+
 
         if (!employee_id) {
             return res.status(400).json({ error: 'employee_id is required' });
@@ -248,7 +206,7 @@ const returnAsset = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureAssetSchema();
+
 
         const nextStatus = return_status || 'available';
         if (!['available', 'damaged', 'retired'].includes(nextStatus)) {
@@ -334,7 +292,7 @@ const returnAsset = async (req, res) => {
 
 const getMyAssets = async (req, res) => {
     try {
-        await ensureAssetSchema();
+
         const employeeId = await getActorEmployeeId(req);
 
         if (!employeeId) {
@@ -367,5 +325,4 @@ module.exports = {
     assignAsset,
     returnAsset,
     getMyAssets,
-    ensureAssetSchema,
 };

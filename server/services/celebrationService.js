@@ -28,21 +28,8 @@ const celebrationMeta = {
     }
 };
 
-const ensureCelebrationTable = async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS employee_celebrations (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            celebration_type TEXT NOT NULL CHECK (celebration_type IN ('birthday', 'work_anniversary')),
-            celebration_date DATE NOT NULL,
-            announcement_id UUID REFERENCES announcements(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            UNIQUE (employee_id, celebration_type, celebration_date)
-        )
-    `);
-};
-
 const getTodayCelebrations = async () => {
+
     const birthdayQuery = `
         SELECT e.id, e.full_name, e.role, e.department, e.avatar_url, 'birthday'::text AS celebration_type,
                EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.dob::date))::int AS years_count
@@ -107,7 +94,7 @@ const processCelebrations = async (io) => {
 
     try {
         await client.query('BEGIN');
-        await ensureCelebrationTable(client);
+
 
         const hrRes = await client.query(
             `SELECT e.id

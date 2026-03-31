@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let salaryRevisionSchemaEnsured = false;
+
 
 const toNumber = (value, defaultValue = 0) => {
     const parsed = Number(value);
@@ -31,40 +31,7 @@ const fallbackStructureFromAnnualSalary = (annualSalaryRaw) => {
     };
 };
 
-const ensureSalaryRevisionSchema = async () => {
-    if (salaryRevisionSchemaEnsured) return;
 
-    await pool.query(`
-        ALTER TABLE employees
-        ADD COLUMN IF NOT EXISTS salary_revision_history_enabled BOOLEAN NOT NULL DEFAULT FALSE;
-
-        CREATE TABLE IF NOT EXISTS salary_revisions (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            effective_date DATE NOT NULL,
-            proposed_basic_salary NUMERIC NOT NULL CHECK (proposed_basic_salary >= 0),
-            proposed_hra NUMERIC NOT NULL CHECK (proposed_hra >= 0),
-            proposed_allowances NUMERIC NOT NULL CHECK (proposed_allowances >= 0),
-            proposed_total_ctc NUMERIC NOT NULL CHECK (proposed_total_ctc >= 0),
-            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-            initiated_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            approved_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            approver_comment TEXT,
-            initiated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            approved_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_salary_revisions_employee_effective
-            ON salary_revisions(employee_id, effective_date DESC, created_at DESC);
-
-        CREATE INDEX IF NOT EXISTS idx_salary_revisions_status
-            ON salary_revisions(status, created_at DESC);
-    `);
-
-    salaryRevisionSchemaEnsured = true;
-};
 
 const getActorEmployeeId = async (req, client = pool) => {
     if (req.user?.employee_uuid) return req.user.employee_uuid;
@@ -78,7 +45,6 @@ const getActorEmployeeId = async (req, client = pool) => {
 };
 
 const getLatestApprovedRevisionForDate = async (employeeId, onOrBeforeDate, client = pool) => {
-    await ensureSalaryRevisionSchema();
 
     const result = await client.query(
         `SELECT *
@@ -95,7 +61,6 @@ const getLatestApprovedRevisionForDate = async (employeeId, onOrBeforeDate, clie
 };
 
 const getCurrentSalaryStructure = async (employeeId, client = pool) => {
-    await ensureSalaryRevisionSchema();
 
     const employeeRes = await client.query(
         `SELECT id, full_name, salary, salary_revision_history_enabled
@@ -157,7 +122,6 @@ const getCurrentSalaryStructure = async (employeeId, client = pool) => {
 };
 
 const getRevisionHistory = async (employeeId, client = pool) => {
-    await ensureSalaryRevisionSchema();
 
     const history = await client.query(
         `SELECT sr.*,
@@ -187,7 +151,7 @@ const initiateRevision = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureSalaryRevisionSchema();
+
 
         if (!employee_id || !effective_date) {
             return res.status(400).json({ error: 'employee_id and effective_date are required' });
@@ -238,7 +202,7 @@ const decideRevision = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureSalaryRevisionSchema();
+
 
         if (!['approved', 'rejected'].includes(decision)) {
             return res.status(400).json({ error: 'decision must be approved or rejected' });
@@ -315,7 +279,7 @@ const decideRevision = async (req, res) => {
 
 const getEmployeeRevisionHistoryForHR = async (req, res) => {
     try {
-        await ensureSalaryRevisionSchema();
+
 
         const employeeId = req.params.employeeId;
         const employeeRes = await pool.query(
@@ -347,7 +311,7 @@ const getEmployeeRevisionHistoryForHR = async (req, res) => {
 
 const setHistoryVisibility = async (req, res) => {
     try {
-        await ensureSalaryRevisionSchema();
+
 
         const employeeId = req.params.employeeId;
         const enabled = !!req.body.enabled;
@@ -374,7 +338,7 @@ const setHistoryVisibility = async (req, res) => {
 
 const listPendingApprovals = async (req, res) => {
     try {
-        await ensureSalaryRevisionSchema();
+
 
         const actorId = await getActorEmployeeId(req);
 
@@ -400,7 +364,7 @@ const listPendingApprovals = async (req, res) => {
 
 const getMyCurrentSalaryStructure = async (req, res) => {
     try {
-        await ensureSalaryRevisionSchema();
+
 
         const employeeId = await getActorEmployeeId(req);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -415,7 +379,7 @@ const getMyCurrentSalaryStructure = async (req, res) => {
 
 const getMySalaryRevisionHistory = async (req, res) => {
     try {
-        await ensureSalaryRevisionSchema();
+
 
         const employeeId = await getActorEmployeeId(req);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -439,7 +403,7 @@ const getMySalaryRevisionHistory = async (req, res) => {
 };
 
 module.exports = {
-    ensureSalaryRevisionSchema,
+
     getLatestApprovedRevisionForDate,
     getCurrentSalaryStructure,
     initiateRevision,

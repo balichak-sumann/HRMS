@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let encashmentSchemaEnsured = false;
+
 
 const LEAVE_TYPE_TO_COLUMNS = {
     Casual: { total: 'casual_total', used: 'casual_used', encashed: 'casual_encashed' },
@@ -13,55 +13,7 @@ const LEAVE_TYPE_TO_COLUMNS = {
 
 const round2 = (value) => Number((Math.round((Number(value) || 0) * 100) / 100).toFixed(2));
 
-const ensureEncashmentSchema = async () => {
-    if (encashmentSchemaEnsured) return;
 
-    await pool.query(`
-        ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS casual_encashed INT DEFAULT 0;
-        ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS sick_encashed INT DEFAULT 0;
-        ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS earned_encashed INT DEFAULT 0;
-        ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS comp_off_encashed INT DEFAULT 0;
-
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS leave_encashment NUMERIC DEFAULT 0;
-
-        CREATE TABLE IF NOT EXISTS leave_encashment_policy (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            encashable_leave_types TEXT[] NOT NULL,
-            max_days_per_year INT NOT NULL,
-            payout_formula TEXT NOT NULL,
-            updated_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS leave_encashment_requests (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            leave_type TEXT NOT NULL CHECK (leave_type IN ('Casual', 'Sick', 'Earned', 'Comp-Off')),
-            days_requested INT NOT NULL CHECK (days_requested > 0),
-            encashment_amount NUMERIC NOT NULL DEFAULT 0,
-            request_year INT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
-            reviewer_id UUID REFERENCES employees(id) ON DELETE SET NULL,
-            reviewer_comment TEXT,
-            reviewed_at TIMESTAMP WITH TIME ZONE,
-            reimbursed_payroll_id UUID REFERENCES payroll(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_leave_encashment_requests_employee_year
-            ON leave_encashment_requests(employee_id, request_year);
-
-        CREATE INDEX IF NOT EXISTS idx_leave_encashment_requests_status
-            ON leave_encashment_requests(status);
-
-        CREATE INDEX IF NOT EXISTS idx_leave_encashment_requests_reimbursed
-            ON leave_encashment_requests(reimbursed_payroll_id);
-    `);
-
-    encashmentSchemaEnsured = true;
-};
 
 const getActorEmployeeId = async (req) => {
     if (req.user?.employee_uuid) return req.user.employee_uuid;
@@ -153,7 +105,6 @@ const calculateEncashmentAmount = async (client, employeeId, days, formula) => {
 
 const getPolicy = async (req, res) => {
     try {
-        await ensureEncashmentSchema();
         const policy = await getPolicyInternal(pool);
         if (!policy) {
             return res.json({ unconfigured: true });
@@ -169,7 +120,6 @@ const updatePolicy = async (req, res) => {
     const { encashable_leave_types, max_days_per_year, payout_formula } = req.body;
 
     try {
-        await ensureEncashmentSchema();
 
         if (!Array.isArray(encashable_leave_types) || encashable_leave_types.length === 0) {
             return res.status(400).json({ error: 'encashable_leave_types must be a non-empty array' });
@@ -237,7 +187,6 @@ const getMyEncashmentSummary = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureEncashmentSchema();
 
         const employeeId = await getActorEmployeeId(req);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -276,7 +225,6 @@ const createEncashmentRequest = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureEncashmentSchema();
 
         const employeeId = await getActorEmployeeId(req);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -339,7 +287,6 @@ const createEncashmentRequest = async (req, res) => {
 
 const getMyEncashmentRequests = async (req, res) => {
     try {
-        await ensureEncashmentSchema();
 
         const employeeId = await getActorEmployeeId(req);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -362,7 +309,6 @@ const getMyEncashmentRequests = async (req, res) => {
 
 const getEncashmentRequestsForHR = async (req, res) => {
     try {
-        await ensureEncashmentSchema();
 
         const status = req.query.status;
         const params = [];
@@ -395,7 +341,6 @@ const reviewEncashmentRequest = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureEncashmentSchema();
 
         if (!['Approved', 'Rejected'].includes(status)) {
             return res.status(400).json({ error: 'Status must be Approved or Rejected' });

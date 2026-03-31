@@ -2,51 +2,12 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let departmentColumnsEnsured = false;
 
-const ensureDepartmentColumns = async () => {
-    if (departmentColumnsEnsured) return;
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS departments (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT UNIQUE NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
 
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS manager_id UUID REFERENCES employees(id) ON DELETE SET NULL;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id UUID;
 
-        DO $$ BEGIN
-            IF NOT EXISTS (
-                SELECT 1
-                FROM information_schema.table_constraints
-                WHERE constraint_name = 'employees_department_id_fkey'
-                  AND table_name = 'employees'
-            ) THEN
-                ALTER TABLE employees
-                ADD CONSTRAINT employees_department_id_fkey
-                FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL;
-            END IF;
-        END $$;
-
-        UPDATE employees
-        SET manager_id = reporting_manager_id
-        WHERE manager_id IS NULL
-          AND reporting_manager_id IS NOT NULL;
-
-        UPDATE employees
-        SET reporting_manager_id = manager_id
-        WHERE reporting_manager_id IS NULL
-          AND manager_id IS NOT NULL;
-    `);
-    departmentColumnsEnsured = true;
-};
 
 const getDepartments = async (req, res) => {
     try {
-        await ensureDepartmentColumns();
         const result = await pool.query(
             `SELECT d.id,
                     d.name,
@@ -73,7 +34,6 @@ const createDepartment = async (req, res) => {
     }
 
     try {
-        await ensureDepartmentColumns();
         const result = await pool.query(
             `INSERT INTO departments (name, description)
              VALUES ($1, $2)
@@ -99,7 +59,6 @@ const updateDepartment = async (req, res) => {
     }
 
     try {
-        await ensureDepartmentColumns();
         const existing = await pool.query('SELECT id, name FROM departments WHERE id = $1', [id]);
         if (existing.rows.length === 0) {
             return res.status(404).json({ error: 'Department not found' });
@@ -138,7 +97,6 @@ const deleteDepartment = async (req, res) => {
     const { id } = req.params;
 
     try {
-        await ensureDepartmentColumns();
 
         const usage = await pool.query(
             'SELECT COUNT(*)::int AS count FROM employees WHERE department_id = $1',
@@ -165,7 +123,6 @@ const getOrgChart = async (req, res) => {
     const { department_id } = req.query;
 
     try {
-        await ensureDepartmentColumns();
 
         const departmentsRes = await pool.query(
             `SELECT id, name, description
@@ -222,7 +179,6 @@ const updateEmployeeOrgInfo = async (req, res) => {
 
     const client = await pool.connect();
     try {
-        await ensureDepartmentColumns();
         await client.query('BEGIN');
 
         let departmentName = 'Unassigned';

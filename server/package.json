@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "db:setup": "node db/setup.js",
+    "db:setup": "prisma migrate deploy && node db/setup.js",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:studio": "prisma studio",
     "db:seed:employees": "node db/seedEmployeeDetails.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -26,5 +30,9 @@
     "pdfkit": "^0.18.0",
     "pg": "^8.20.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@prisma/client": "^7.6.0",
+    "prisma": "^7.6.0"
   }
 }

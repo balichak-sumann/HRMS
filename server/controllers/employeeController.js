@@ -11,9 +11,6 @@ const pool = new Pool({
 
 const isStrictEmailReachabilityEnabled = String(process.env.STRICT_EMAIL_REACHABILITY || '').toLowerCase() === 'true';
 
-let employeeColumnsEnsured = false;
-let profileStatusConstraintEnsured = false;
-
 const isEmailDomainReachable = async (email) => {
     const domain = String(email || '').split('@')[1]?.trim().toLowerCase();
     if (!domain) return false;
@@ -42,97 +39,11 @@ const isEmailDomainReachable = async (email) => {
     }
 };
 
-const ensureEmployeeColumns = async () => {
-    if (employeeColumnsEnsured) return;
 
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS departments (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT UNIQUE NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS pan TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_account TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_name TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS location TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS address TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS personal_email TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS emergency_contact TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS technology TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS experience_years NUMERIC;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS aadhaar_card TEXT;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS manager_id UUID REFERENCES employees(id) ON DELETE SET NULL;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id UUID;
-        ALTER TABLE employees ADD COLUMN IF NOT EXISTS salary_revision_history_enabled BOOLEAN NOT NULL DEFAULT FALSE;
-
-        DO $$ BEGIN
-            IF NOT EXISTS (
-                SELECT 1
-                FROM information_schema.table_constraints
-                WHERE constraint_name = 'employees_department_id_fkey'
-                  AND table_name = 'employees'
-            ) THEN
-                ALTER TABLE employees
-                ADD CONSTRAINT employees_department_id_fkey
-                FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL;
-            END IF;
-        END $$;
-
-        UPDATE employees
-        SET manager_id = reporting_manager_id
-        WHERE manager_id IS NULL
-          AND reporting_manager_id IS NOT NULL;
-
-        UPDATE employees
-        SET reporting_manager_id = manager_id
-        WHERE reporting_manager_id IS NULL
-          AND manager_id IS NOT NULL;
-
-        ALTER TABLE employees ALTER COLUMN status SET DEFAULT 'Active';
-        UPDATE employees SET status = 'Active' WHERE status IS NULL;
-
-    `);
-
-    employeeColumnsEnsured = true;
-};
-
-const ensureProfileStatusConstraint = async () => {
-    if (profileStatusConstraintEnsured) return;
-
-    await pool.query(`
-        ALTER TABLE profiles
-        ALTER COLUMN status SET DEFAULT 'active';
-
-        DO $$
-        BEGIN
-            IF EXISTS (
-                SELECT 1
-                FROM information_schema.table_constraints
-                WHERE table_name = 'profiles'
-                  AND constraint_name = 'profiles_status_check'
-            ) THEN
-                ALTER TABLE profiles DROP CONSTRAINT profiles_status_check;
-            END IF;
-
-            ALTER TABLE profiles
-              ADD CONSTRAINT profiles_status_check
-              CHECK (status IN ('active', 'inactive', 'pending_activation'));
-        EXCEPTION
-            WHEN duplicate_object THEN
-                NULL;
-        END $$;
-    `);
-
-    profileStatusConstraintEnsured = true;
-};
 
 // ─── Get all employees ───────────────────────────────────────────
 const getEmployees = async (req, res) => {
     try {
-        await ensureEmployeeColumns();
         const rawManagerId = req.query.manager_id || null;
         const scope = String(req.query.scope || '').toLowerCase();
         let managerIdFilter = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawManagerId || '')
@@ -175,7 +86,6 @@ const getEmployees = async (req, res) => {
 // ─── Get HR accounts (admin only) ──────────────────────────────
 const getHrAccounts = async (req, res) => {
     try {
-        await ensureEmployeeColumns();
 
         const result = await pool.query(
             `SELECT e.id,
@@ -293,7 +203,6 @@ const getDashboardStats = async (req, res) => {
 // ─── Get employee by ID ──────────────────────────────────────────
 const getEmployeeById = async (req, res) => {
     try {
-        await ensureEmployeeColumns();
         const { id } = req.params;
         const result = await pool.query(
             `SELECT e.*, 
@@ -338,8 +247,6 @@ const createEmployee = async (req, res) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     try {
-        await ensureEmployeeColumns();
-        await ensureProfileStatusConstraint();
         await client.query('BEGIN');
 
         const normalizedFullName = String(full_name || '').trim();
@@ -630,7 +537,6 @@ const updateEmployee = async (req, res) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     try {
-        await ensureEmployeeColumns();
 
         const normalizedFullName = String(full_name || '').trim();
         if (!normalizedFullName) {

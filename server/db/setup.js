@@ -9,11 +9,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function setupDatabase() {
     try {
-        console.log('━━━ IndusInnovate Database Migration ━━━');
-        const sqlPath = path.join(__dirname, 'init.sql');
-        const sql = fs.readFileSync(sqlPath, 'utf8');
-        await pool.query(sql);
-        console.log('✅ Schema applied successfully.');
+        console.log('━━━ IndusInnovate Database Seeding ━━━');
+
 
         const shouldSeed = String(process.env.SEED_DEFAULT_USERS || 'false').toLowerCase() === 'true';
         if (!shouldSeed) {
@@ -113,6 +110,39 @@ async function setupDatabase() {
             if (!process.env[passwordEnvKey]) {
                 console.log(`   Generated temporary password: ${user.password}`);
             }
+        }
+
+        // ─── Seed Statutory Settings ──────────────────────────────────
+        console.log('━━━ Seeding Statutory Settings ━━━');
+        try {
+            const settingsCount = await pool.query('SELECT COUNT(*)::int FROM payroll_statutory_settings');
+            if (settingsCount.rows[0].count === 0) {
+                await pool.query(
+                    `INSERT INTO payroll_statutory_settings (pf_employee_rate, pf_employer_rate, esi_employee_rate, esi_employer_rate, updated_at)
+                     VALUES ($1, $2, $3, $4, NOW())`,
+                    [12.0, 12.0, 0.75, 3.25]
+                );
+                console.log('✅ Default statutory rates seeded (PF 12%, ESI 0.75%/3.25%)');
+            }
+
+            const slabsCount = await pool.query('SELECT COUNT(*)::int FROM payroll_tds_slabs');
+            if (slabsCount.rows[0].count === 0) {
+                const slabs = [
+                    { name: 'Slab 1', from: 0, to: 250000, rate: 0 },
+                    { name: 'Slab 2', from: 250000, to: 500000, rate: 5 },
+                    { name: 'Slab 3', from: 500000, to: 1000000, rate: 20 },
+                    { name: 'Slab 4', from: 1000000, to: null, rate: 30 },
+                ];
+                for (const s of slabs) {
+                    await pool.query(
+                        'INSERT INTO payroll_tds_slabs (name, income_from, income_to, rate) VALUES ($1, $2, $3, $4)',
+                        [s.name, s.from, s.to, s.rate]
+                    );
+                }
+                console.log('✅ Default TDS slabs seeded (Tax-free up to 2.5L)');
+            }
+        } catch (seedErr) {
+            console.warn('⚠️  Statutory seeding skipped (tables might not exist yet):', seedErr.message);
         }
 
         console.log('━━━ Migration Complete ━━━');

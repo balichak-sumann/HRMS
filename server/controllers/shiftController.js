@@ -3,41 +3,9 @@ const { sendShiftAssignmentEmail } = require('../services/emailService');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let shiftSchemaEnsured = false;
 
-const ensureShiftSchema = async () => {
-    if (shiftSchemaEnsured) return;
 
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS shifts (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT UNIQUE NOT NULL,
-            start_time TIME NOT NULL,
-            end_time TIME NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
 
-        CREATE TABLE IF NOT EXISTS employee_shift_assignments (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-            effective_from DATE NOT NULL,
-            effective_to DATE,
-            assigned_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_shift_assignments_employee_dates
-            ON employee_shift_assignments(employee_id, effective_from, effective_to);
-
-        CREATE INDEX IF NOT EXISTS idx_shift_assignments_shift
-            ON employee_shift_assignments(shift_id);
-    `);
-
-    shiftSchemaEnsured = true;
-};
 
 const parseDate = (value, fieldName) => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
@@ -135,7 +103,7 @@ const createShift = async (req, res) => {
     const { name, start_time, end_time } = req.body;
 
     try {
-        await ensureShiftSchema();
+
 
         if (!name || !String(name).trim()) {
             return res.status(400).json({ error: 'Shift name is required' });
@@ -166,7 +134,7 @@ const createShift = async (req, res) => {
 
 const getShifts = async (req, res) => {
     try {
-        await ensureShiftSchema();
+
         const result = await pool.query('SELECT * FROM shifts ORDER BY name ASC');
         res.json(result.rows);
     } catch (err) {
@@ -180,7 +148,7 @@ const assignShiftToEmployee = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureShiftSchema();
+
 
         if (!employee_id || !shift_id || !effective_from) {
             return res.status(400).json({ error: 'employee_id, shift_id and effective_from are required' });
@@ -319,7 +287,7 @@ const assignShiftToDepartment = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureShiftSchema();
+
 
         if (!department_id || !shift_id || !effective_from) {
             return res.status(400).json({ error: 'department_id, shift_id and effective_from are required' });
@@ -464,7 +432,7 @@ const getWeeklyRoster = async (req, res) => {
     const departmentId = req.query.department_id || null;
 
     try {
-        await ensureShiftSchema();
+
 
         const now = new Date();
         const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -533,7 +501,7 @@ const getWeeklyRoster = async (req, res) => {
 
 const getMyCurrentShift = async (req, res) => {
     try {
-        await ensureShiftSchema();
+
 
         let employeeId = req.user.employee_uuid;
         if (!employeeId && req.user.email) {

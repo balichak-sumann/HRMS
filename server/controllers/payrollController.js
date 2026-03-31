@@ -1,11 +1,10 @@
 const { Pool } = require('pg');
 const {
-    ensureIncomeTaxSchema,
     getFinancialYearFromPayrollMonth,
     getApprovedDeclarationAmount,
 } = require('./incomeTaxController');
 const {
-    ensureSalaryRevisionSchema,
+
     getLatestApprovedRevisionForDate,
 } = require('./salaryRevisionController');
 
@@ -13,7 +12,7 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
-let payrollColumnsEnsured = false;
+
 
 const MONTH_MAP = {
     january: 1,
@@ -130,95 +129,9 @@ const getAttendanceSummary = async (employeeId, month, year) => {
     };
 };
 
-const ensurePayrollColumns = async () => {
-    if (payrollColumnsEnsured) return;
 
-    await pool.query(`
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS conveyance NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS special_allowance NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS ptax NUMERIC DEFAULT 200;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS emp_code TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS designation TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS department TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS location TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS processed_days INT DEFAULT 31;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS paid_days INT DEFAULT 31;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS pan_no TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS bank_account TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS bank_name TEXT;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS pf_employee NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS pf_employer NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS esi_employee NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS esi_employer NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS reimbursements NUMERIC DEFAULT 0;
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS leave_encashment NUMERIC DEFAULT 0;
-
-        CREATE TABLE IF NOT EXISTS expense_claims (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            category TEXT NOT NULL CHECK (category IN ('Travel', 'Food', 'Equipment', 'Other')),
-            amount NUMERIC NOT NULL CHECK (amount > 0),
-            expense_date DATE NOT NULL,
-            description TEXT,
-            receipt_url TEXT,
-            status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
-            reviewer_id UUID REFERENCES employees(id) ON DELETE SET NULL,
-            reviewer_comment TEXT,
-            reviewed_at TIMESTAMP WITH TIME ZONE,
-            reimbursed_payroll_id UUID REFERENCES payroll(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS leave_encashment_requests (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            leave_type TEXT NOT NULL CHECK (leave_type IN ('Casual', 'Sick', 'Earned', 'Comp-Off')),
-            days_requested INT NOT NULL CHECK (days_requested > 0),
-            encashment_amount NUMERIC NOT NULL DEFAULT 0,
-            request_year INT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
-            reviewer_id UUID REFERENCES employees(id) ON DELETE SET NULL,
-            reviewer_comment TEXT,
-            reviewed_at TIMESTAMP WITH TIME ZONE,
-            reimbursed_payroll_id UUID REFERENCES payroll(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        UPDATE payroll
-        SET pf_employee = COALESCE(pf_employee, pf, 0)
-        WHERE (pf_employee IS NULL OR pf_employee = 0)
-          AND COALESCE(pf, 0) > 0;
-
-        CREATE TABLE IF NOT EXISTS payroll_statutory_settings (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            pf_employee_rate NUMERIC NOT NULL,
-            pf_employer_rate NUMERIC NOT NULL,
-            esi_employee_rate NUMERIC NOT NULL,
-            esi_employer_rate NUMERIC NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS payroll_tds_slabs (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT DEFAULT '',
-            income_from NUMERIC NOT NULL,
-            income_to NUMERIC,
-            rate NUMERIC NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        ALTER TABLE payroll_tds_slabs ADD COLUMN IF NOT EXISTS name TEXT DEFAULT '';
-    `);
-
-    payrollColumnsEnsured = true;
-};
 
 const getStatutorySettingsData = async () => {
-    await ensurePayrollColumns();
 
     const settingsRes = await pool.query(
         `SELECT id,
@@ -324,7 +237,6 @@ const computeStatutoryBreakup = ({ grossSalary, settings, slabs, annualTaxableIn
 // ─── Get payroll records ─────────────────────────────────────────
 const getPayroll = async (req, res) => {
     try {
-        await ensurePayrollColumns();
 
         let query = 'SELECT p.*, e.full_name FROM payroll p JOIN employees e ON p.employee_id = e.id';
         let params = [];
@@ -358,9 +270,6 @@ const createPayroll = async (req, res) => {
     } = req.body;
     const client = await pool.connect();
     try {
-        await ensurePayrollColumns();
-        await ensureIncomeTaxSchema();
-        await ensureSalaryRevisionSchema();
 
         await client.query('BEGIN');
 
@@ -578,11 +487,14 @@ const getStatutorySettings = async (req, res) => {
         const settings = await getStatutorySettingsData();
         res.json(settings);
     } catch (err) {
-        console.error('getStatutorySettings error:', err.message);
-        if (err.message && err.message.includes('not configured')) {
-            return res.status(404).json({ error: err.message });
+        console.error('getMyForm16Summary error:', err);
+        if (err.message && err.message.includes('financial_year')) {
+            return res.status(400).json({ error: err.message });
         }
-        res.status(500).json({ error: 'Server error' });
+        if (err.message === 'Employee not found') {
+            return res.status(404).json({ error: 'Employee not found' });
+        }
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 };
 
@@ -601,7 +513,6 @@ const updateStatutorySettings = async (req, res) => {
 
     const client = await pool.connect();
     try {
-        await ensurePayrollColumns();
         await client.query('BEGIN');
 
         const settingsRes = await client.query(
@@ -697,7 +608,6 @@ const updateStatutorySettings = async (req, res) => {
 
 const getMonthlyComplianceReport = async (req, res) => {
     try {
-        await ensurePayrollColumns();
 
         const { month, year } = req.query;
         if (!month || !year) {

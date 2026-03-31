@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let offboardingSchemaEnsured = false;
+
 
 const STANDARD_CHECKLIST = [
     { task_code: 'asset_return', task_title: 'Asset Return', assigned_role: 'IT', sort_order: 1 },
@@ -21,112 +21,7 @@ const normalizeRoleBucket = (value) => {
     return null;
 };
 
-const ensureOffboardingSchema = async () => {
-    if (offboardingSchemaEnsured) return;
 
-    // Execute each SQL statement separately (pool.query only runs first statement in multi-statement batch)
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS offboarding_cases (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            last_working_date DATE NOT NULL,
-            reason TEXT NOT NULL CHECK (reason IN ('resignation', 'termination', 'contract_end')),
-            reason_details TEXT,
-            status TEXT NOT NULL DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'cancelled')),
-            started_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            finalized_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            finalized_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-    `);
-
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS offboarding_checklist_items (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            case_id UUID NOT NULL REFERENCES offboarding_cases(id) ON DELETE CASCADE,
-            task_code TEXT NOT NULL,
-            task_title TEXT NOT NULL,
-            assigned_role TEXT NOT NULL CHECK (assigned_role IN ('IT', 'Finance', 'HR')),
-            assigned_to UUID REFERENCES employees(id) ON DELETE SET NULL,
-            is_cleared BOOLEAN NOT NULL DEFAULT FALSE,
-            cleared_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            cleared_at TIMESTAMP WITH TIME ZONE,
-            notes TEXT,
-            sort_order INTEGER NOT NULL DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            UNIQUE (case_id, task_code)
-        )
-    `);
-
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS offboarding_exit_interviews (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            case_id UUID NOT NULL UNIQUE REFERENCES offboarding_cases(id) ON DELETE CASCADE,
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            reason_for_leaving TEXT NOT NULL,
-            experience_rating INTEGER NOT NULL CHECK (experience_rating >= 1 AND experience_rating <= 5),
-            feedback TEXT,
-            submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-    `);
-
-    /* Backfill/upgrade legacy schema variants safely */
-    await pool.query(`
-        ALTER TABLE offboarding_cases
-            ADD COLUMN IF NOT EXISTS reason_details TEXT,
-            ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'in_progress',
-            ADD COLUMN IF NOT EXISTS started_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            ADD COLUMN IF NOT EXISTS finalized_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMP WITH TIME ZONE,
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    `);
-
-    await pool.query(`
-        ALTER TABLE offboarding_checklist_items
-            ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES employees(id) ON DELETE SET NULL,
-            ADD COLUMN IF NOT EXISTS is_cleared BOOLEAN NOT NULL DEFAULT FALSE,
-            ADD COLUMN IF NOT EXISTS cleared_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMP WITH TIME ZONE,
-            ADD COLUMN IF NOT EXISTS notes TEXT,
-            ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    `);
-
-    await pool.query(`
-        ALTER TABLE offboarding_exit_interviews
-            ADD COLUMN IF NOT EXISTS feedback TEXT,
-            ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    `);
-
-    await pool.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_offboarding_active_case_per_employee
-          ON offboarding_cases(employee_id)
-          WHERE status = 'in_progress'
-    `);
-
-    await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_offboarding_cases_status
-          ON offboarding_cases(status, created_at DESC)
-    `);
-
-    await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_offboarding_checklist_case
-          ON offboarding_checklist_items(case_id, sort_order)
-    `);
-
-    await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_offboarding_checklist_assignee
-          ON offboarding_checklist_items(assigned_to, assigned_role, is_cleared)
-    `);
-
-    offboardingSchemaEnsured = true;
-};
 
 const getActorEmployee = async (client, req) => {
     if (req.user?.employee_uuid) {
@@ -239,7 +134,7 @@ const startOffboarding = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureOffboardingSchema();
+
         await client.query('BEGIN');
 
         const employeeRes = await client.query(
@@ -362,7 +257,7 @@ const startOffboarding = async (req, res) => {
 
 const getCasesForHR = async (req, res) => {
     try {
-        await ensureOffboardingSchema();
+
 
         const status = req.query.status;
         const params = [];
@@ -403,7 +298,7 @@ const getCasesForHR = async (req, res) => {
 
 const getCaseDetailsForHR = async (req, res) => {
     try {
-        await ensureOffboardingSchema();
+
 
         const details = await getCaseByIdInternal(pool, req.params.id);
         if (!details) return res.status(404).json({ error: 'Offboarding case not found' });
@@ -426,7 +321,7 @@ const updateChecklistAssignment = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureOffboardingSchema();
+
         await client.query('BEGIN');
 
         const taskRes = await client.query(
@@ -500,7 +395,7 @@ const markChecklistItem = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureOffboardingSchema();
+
         await client.query('BEGIN');
 
         const currentRes = await client.query(
@@ -562,7 +457,7 @@ const getMyCase = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureOffboardingSchema();
+
 
         const actor = await getActorEmployee(client, req);
         if (!actor) return res.status(404).json({ error: 'Employee not found' });
@@ -633,7 +528,7 @@ const submitExitInterview = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureOffboardingSchema();
+
         await client.query('BEGIN');
 
         const actor = await getActorEmployee(client, req);
@@ -713,7 +608,7 @@ const finalizeOffboarding = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureOffboardingSchema();
+
         await client.query('BEGIN');
 
         const actor = await getActorEmployee(client, req);

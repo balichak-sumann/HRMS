@@ -2,7 +2,7 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let incomeTaxSchemaEnsured = false;
+
 
 const SECTION_CODES = ['80C', 'HRA', 'HOME_LOAN_INTEREST', 'STANDARD_DEDUCTION', 'OTHER'];
 
@@ -91,89 +91,7 @@ const getFinancialYearFromPayrollMonth = (monthRaw, yearRaw) => {
     return `${startYear}-${startYear + 1}`;
 };
 
-const ensureIncomeTaxSchema = async () => {
-    if (incomeTaxSchemaEnsured) return;
 
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS income_tax_declarations (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            financial_year TEXT NOT NULL,
-            version INTEGER NOT NULL DEFAULT 1,
-            status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'reviewed')),
-            submitted_at TIMESTAMP WITH TIME ZONE,
-            reviewed_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        ALTER TABLE income_tax_declarations
-            ADD COLUMN IF NOT EXISTS version INTEGER;
-
-        UPDATE income_tax_declarations
-        SET version = 1
-        WHERE version IS NULL;
-
-        ALTER TABLE income_tax_declarations
-            ALTER COLUMN version SET DEFAULT 1;
-
-        ALTER TABLE income_tax_declarations
-            ALTER COLUMN version SET NOT NULL;
-
-        DO $$
-        BEGIN
-            IF EXISTS (
-                SELECT 1
-                FROM pg_constraint
-                WHERE conname = 'income_tax_declarations_employee_id_financial_year_key'
-                  AND conrelid = 'income_tax_declarations'::regclass
-            ) THEN
-                ALTER TABLE income_tax_declarations
-                    DROP CONSTRAINT income_tax_declarations_employee_id_financial_year_key;
-            END IF;
-        END $$;
-
-        CREATE TABLE IF NOT EXISTS income_tax_declaration_items (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            declaration_id UUID NOT NULL REFERENCES income_tax_declarations(id) ON DELETE CASCADE,
-            section_code TEXT NOT NULL CHECK (section_code IN ('80C', 'HRA', 'HOME_LOAN_INTEREST', 'STANDARD_DEDUCTION', 'OTHER')),
-            item_label TEXT NOT NULL,
-            declared_amount NUMERIC NOT NULL DEFAULT 0,
-            approved_amount NUMERIC,
-            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-            hr_comment TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS income_tax_declaration_proofs (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            item_id UUID NOT NULL REFERENCES income_tax_declaration_items(id) ON DELETE CASCADE,
-            file_path TEXT NOT NULL,
-            file_name TEXT NOT NULL,
-            file_size BIGINT,
-            uploaded_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_income_tax_decl_employee_year
-            ON income_tax_declarations(employee_id, financial_year);
-
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_income_tax_decl_employee_year_version
-            ON income_tax_declarations(employee_id, financial_year, version);
-
-        CREATE INDEX IF NOT EXISTS idx_income_tax_decl_status
-            ON income_tax_declarations(status);
-
-        CREATE INDEX IF NOT EXISTS idx_income_tax_items_declaration
-            ON income_tax_declaration_items(declaration_id, section_code, status);
-
-        CREATE INDEX IF NOT EXISTS idx_income_tax_proofs_item
-            ON income_tax_declaration_proofs(item_id);
-    `);
-
-    incomeTaxSchemaEnsured = true;
-};
 
 const getActorEmployeeId = async (req, client = pool) => {
     if (req.user?.employee_uuid) return req.user.employee_uuid;
@@ -284,7 +202,7 @@ const getMyDeclaration = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureIncomeTaxSchema();
+
 
         const employeeId = await getActorEmployeeId(req, client);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -319,7 +237,7 @@ const getMyDeclaration = async (req, res) => {
 
 const getMyDeclarationsList = async (req, res) => {
     try {
-        await ensureIncomeTaxSchema();
+
 
         const employeeId = await getActorEmployeeId(req);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -358,7 +276,7 @@ const createMyDeclarationVersion = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureIncomeTaxSchema();
+
 
         const employeeId = await getActorEmployeeId(req, client);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -392,7 +310,7 @@ const saveMyDeclaration = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureIncomeTaxSchema();
+
 
         const employeeId = await getActorEmployeeId(req, client);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -500,7 +418,7 @@ const submitMyDeclaration = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureIncomeTaxSchema();
+
 
         const employeeId = await getActorEmployeeId(req, client);
         if (!employeeId) return res.status(404).json({ error: 'Employee not found' });
@@ -569,7 +487,7 @@ const uploadProof = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureIncomeTaxSchema();
+
 
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -610,7 +528,6 @@ const uploadProof = async (req, res) => {
 
 const getDeclarationsForHR = async (req, res) => {
     try {
-        await ensureIncomeTaxSchema();
 
         const financialYear = normalizeFinancialYear(req.query.financial_year);
         const status = req.query.status;
@@ -659,7 +576,7 @@ const getDeclarationsForHR = async (req, res) => {
 
 const getDeclarationDetailsForHR = async (req, res) => {
     try {
-        await ensureIncomeTaxSchema();
+
 
         const details = await getDeclarationWithItems(pool, req.params.id);
         if (!details) return res.status(404).json({ error: 'Declaration not found' });
@@ -675,7 +592,7 @@ const reviewDeclarationItem = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        await ensureIncomeTaxSchema();
+
 
         const { status, comment, approved_amount } = req.body;
         if (!['approved', 'rejected'].includes(status)) {
@@ -751,8 +668,6 @@ const reviewDeclarationItem = async (req, res) => {
 };
 
 const getApprovedDeclarationAmount = async (employeeId, financialYear, client = pool) => {
-    await ensureIncomeTaxSchema();
-
     const result = await client.query(
         `SELECT COALESCE(SUM(COALESCE(i.approved_amount, 0)), 0) AS approved_total
          FROM income_tax_declarations d
@@ -767,8 +682,6 @@ const getApprovedDeclarationAmount = async (employeeId, financialYear, client = 
 };
 
 const getForm16SummaryCore = async (employeeId, financialYear, client = pool) => {
-    await ensureIncomeTaxSchema();
-
     const fy = normalizeFinancialYear(financialYear);
     const [fyStartYear, fyEndYear] = fy.split('-').map(Number);
 
@@ -862,7 +775,7 @@ const getForm16SummaryForHR = async (req, res) => {
 };
 
 module.exports = {
-    ensureIncomeTaxSchema,
+
     getFinancialYearFromPayrollMonth,
     getApprovedDeclarationAmount,
     getMyDeclaration,

@@ -2,38 +2,9 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-let expenseSchemaEnsured = false;
 
-const ensureExpenseSchema = async () => {
-    if (expenseSchemaEnsured) return;
 
-    await pool.query(`
-        ALTER TABLE payroll ADD COLUMN IF NOT EXISTS reimbursements NUMERIC DEFAULT 0;
 
-        CREATE TABLE IF NOT EXISTS expense_claims (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-            category TEXT NOT NULL CHECK (category IN ('Travel', 'Food', 'Equipment', 'Other')),
-            amount NUMERIC NOT NULL CHECK (amount > 0),
-            expense_date DATE NOT NULL,
-            description TEXT,
-            receipt_url TEXT,
-            status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
-            reviewer_id UUID REFERENCES employees(id) ON DELETE SET NULL,
-            reviewer_comment TEXT,
-            reviewed_at TIMESTAMP WITH TIME ZONE,
-            reimbursed_payroll_id UUID REFERENCES payroll(id) ON DELETE SET NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_expense_claims_employee ON expense_claims(employee_id);
-        CREATE INDEX IF NOT EXISTS idx_expense_claims_status ON expense_claims(status);
-        CREATE INDEX IF NOT EXISTS idx_expense_claims_reimbursed ON expense_claims(reimbursed_payroll_id);
-    `);
-
-    expenseSchemaEnsured = true;
-};
 
 const resolveEmployee = async (req) => {
     if (req.user?.employee_uuid) {
@@ -74,7 +45,7 @@ const submitExpenseClaim = async (req, res) => {
     }
 
     try {
-        await ensureExpenseSchema();
+
 
         const employee = await resolveEmployee(req);
         if (!employee) return res.status(404).json({ error: 'Employee not found' });
@@ -98,7 +69,7 @@ const submitExpenseClaim = async (req, res) => {
 
 const getMyExpenseClaims = async (req, res) => {
     try {
-        await ensureExpenseSchema();
+
 
         const employee = await resolveEmployee(req);
         if (!employee) return res.status(404).json({ error: 'Employee not found' });
@@ -121,7 +92,7 @@ const getMyExpenseClaims = async (req, res) => {
 
 const getReviewableClaims = async (req, res) => {
     try {
-        await ensureExpenseSchema();
+
 
         const viewer = await resolveEmployee(req);
         if (!viewer) return res.status(404).json({ error: 'Employee not found' });
@@ -172,7 +143,7 @@ const reviewExpenseClaim = async (req, res) => {
 
     const client = await pool.connect();
     try {
-        await ensureExpenseSchema();
+
 
         const reviewer = await resolveEmployee(req);
         if (!reviewer) return res.status(404).json({ error: 'Reviewer employee not found' });
@@ -253,7 +224,7 @@ const getMonthlyReimbursementSummary = async (req, res) => {
     }
 
     try {
-        await ensureExpenseSchema();
+
 
         const rows = await pool.query(
             `SELECT e.id AS employee_id,
