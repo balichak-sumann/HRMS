@@ -10,39 +10,58 @@ A full-stack HR and collaboration platform with role-based dashboards, employee 
 - Storage: Local uploads directory served by backend
 - PDF/Export: @react-pdf/renderer, html-to-image
 
-## Project Structure
+# HRMS Project Setup
 
-- Frontend app: [src](src)
-- Backend app: [server](server)
-- Database schema: [server/db/init.sql](server/db/init.sql)
-- Dev orchestration script: [scripts/dev-all.js](scripts/dev-all.js)
-- Local setup guide: [SETUP.md](SETUP.md)
+## Scripts
 
-## Core Features
+- `npm run dev:all` — Installs dependencies and starts both frontend and backend servers. Does NOT run any database migrations or setup.
+- `npm run deploy` — For initializing a new/empty database (full schema deploy). Use this for a fresh setup.
+- `npm run migrate` — For applying migrations to an existing database (incremental changes). Use this when updating an existing database schema.
 
-### HR Features
+## Usage
+5. **Start frontend and backend separately:**
+   - To start the frontend only:
+     ```
+     npm run dev
+     ```
+   - To start the backend only:
+     ```
+     cd server
+     npm start
+     ```
 
-- Employee management (create, update, delete, profile)
-- Attendance overview and metrics
-- Leave review and approval workflow
-- Payroll generation and payslip sending
-- Project and task tracking
-- Offer letter generation and status tracking
-- Complaint handling dashboard
-- Audit logs and analytics
+1. **Install dependencies:**
+  ```
+  npm install
+  cd server && npm install
+  ```
+2. **Start servers:**
+  ```
+  npm run dev:all
+  ```
 
-### Employee Features
+3. **Database setup:**
+  - For a new/empty database:
+    ```
+    npm run deploy
+    ```
+  - For updating an existing database:
+    ```
+    npm run migrate
+    ```
 
-- Personal dashboard
-- Attendance check-in/check-out views
-- Apply leave
-- Project participation and reports
-- Payslip viewing
-- ID card access/export
-- Profile and settings
+4. **Seed default profiles (admin, HR, employee):**
+   - Set the required environment variables in your .env file (see server/db/setup.js for details).
+   - Then run:
+     ```
+     npm run seed
+     ```
+   - This will seed the default admin, HR, and employee profiles if the env vars are set.
 
-### Collaboration Features
-
+## Notes
+- Only run one migration tool (Prisma or node-pg-migrate) per database, unless you know what you are doing.
+- If you encounter migration errors, check your database state and migration history.
+- For more details, see the scripts and server/README.md if available.
 - Personal chat and group chat
 - Group member management (add members, leave group)
 - File/image chat uploads

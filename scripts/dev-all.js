@@ -118,17 +118,12 @@ async function main() {
   console.log("[2/6] Installing backend dependencies...");
   await runCommand(["install"], SERVER_DIR, "Backend dependency install");
 
-  console.log("[3/6] Running database setup/migration...");
-  await runCommand(["run", "db:setup"], SERVER_DIR, "Database setup");
-
-  console.log("[4/6] Ensuring required ports are free...");
+  console.log("[3/4] Ensuring required ports are free...");
   await freePort(backendPort, "backend");
   await freePort(frontendPort, "frontend");
 
-  console.log("[5/6] Starting backend...");
+  console.log("[4/4] Starting backend and frontend...");
   const backend = startLongRunningCommand(["start"], SERVER_DIR);
-
-  console.log("[6/6] Starting frontend...");
   const frontend = startLongRunningCommand(["run", "dev"], ROOT_DIR);
 
   const children = [backend, frontend];
