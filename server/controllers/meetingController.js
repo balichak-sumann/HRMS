@@ -5,6 +5,22 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+// Helper to cleanup expired meetings
+const cleanupExpiredMeetings = async () => {
+    try {
+        // Mark meetings as expired if scheduled more than 3 hours ago and nobody ever joined
+        await pool.query(`
+            UPDATE meetings 
+            SET status = 'expired' 
+            WHERE status = 'active' 
+            AND first_person_joined_at IS NULL 
+            AND date_time < NOW() - INTERVAL '3 hours'
+        `);
+    } catch (err) {
+        console.error('[Meeting Cleanup] Error:', err.message);
+    }
+};
+
 // ─── Create meeting ──────────────────────────────────────────────
 const createMeeting = async (req, res) => {
     const { title, agenda, date_time, duration, participants, meeting_type } = req.body;
@@ -101,6 +117,7 @@ const createMeeting = async (req, res) => {
 // ─── Get meetings ────────────────────────────────────────────────
 const getMeetings = async (req, res) => {
     try {
+        await cleanupExpiredMeetings();
         const profileRes = await pool.query(
             `SELECT p.role, e.id as employee_id FROM profiles p
              LEFT JOIN employees e ON p.email = e.email OR p.employee_id = e.employee_id
@@ -109,17 +126,24 @@ const getMeetings = async (req, res) => {
         );
         const userRole = profileRes.rows[0]?.role;
         const myId = profileRes.rows[0]?.employee_id;
+        const { type } = req.query; // 'upcoming' or 'past'
+
+        const statusFilter = type === 'past' 
+            ? "COALESCE(m.status, 'active') IN ('completed', 'expired')" 
+            : "COALESCE(m.status, 'active') NOT IN ('completed', 'expired')";
+        const orderBy = type === 'past' ? "m.date_time DESC" : "m.date_time ASC";
 
         let result;
+        
         if (userRole === 'admin') {
             result = await pool.query(`
                 SELECT m.*, e.full_name as creator_name
                 FROM meetings m
                 JOIN employees e ON m.created_by = e.id
-                WHERE COALESCE(m.status, 'active') != 'completed'
+                WHERE ${statusFilter}
                   AND COALESCE(m.meeting_type, 'scheduled') = 'scheduled'
                   AND NOT (m.title LIKE 'Group Call:%' AND COALESCE(m.agenda, '') = 'Live group discussion')
-                ORDER BY m.date_time ASC
+                ORDER BY ${orderBy}
             `);
         } else {
             if (!myId) return res.json([]);
@@ -129,15 +153,15 @@ const getMeetings = async (req, res) => {
                 JOIN employees e ON m.created_by = e.id
                 LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id
                 WHERE (m.created_by = $1 OR mp.employee_id = $1)
-                  AND COALESCE(m.status, 'active') != 'completed'
+                  AND ${statusFilter}
                   AND COALESCE(m.meeting_type, 'scheduled') = 'scheduled'
                   AND NOT (m.title LIKE 'Group Call:%' AND COALESCE(m.agenda, '') = 'Live group discussion')
-                ORDER BY m.date_time ASC
+                ORDER BY ${orderBy}
             `, [myId]);
         }
         res.json(result.rows);
     } catch (err) {
-        console.error(err.message);
+        console.error('[MeetingController] getMeetings Error:', err.message);
         res.status(500).json({ error: 'Server error' });
     }
 };
@@ -145,6 +169,7 @@ const getMeetings = async (req, res) => {
 // ─── Get meeting by ID ──────────────────────────────────────────
 const getMeetingById = async (req, res) => {
     try {
+        await cleanupExpiredMeetings();
         const result = await pool.query(`
             SELECT m.*, e.full_name as creator_name 
             FROM meetings m 

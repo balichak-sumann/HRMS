@@ -29,6 +29,8 @@ const MeetingsPage = () => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isScheduling, setIsScheduling] = useState(false);
+    const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'past'
     const [formData, setFormData] = useState({
         title: '',
         agenda: '',
@@ -39,13 +41,13 @@ const MeetingsPage = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [activeTab]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const [meetingsData, employeesData] = await Promise.all([
-                api.get('/meetings'),
+                api.get(`/meetings?type=${activeTab}`),
                 api.get('/employees')
             ]);
             setMeetings(meetingsData || []);
@@ -70,6 +72,7 @@ const MeetingsPage = () => {
         }
 
         try {
+            setIsScheduling(true);
             await api.post('/meetings', formData);
             setIsModalOpen(false);
             setFormData({ title: '', agenda: '', date_time: '', duration: 60, participants: [] });
@@ -77,6 +80,8 @@ const MeetingsPage = () => {
             toast.success('Meeting scheduled successfully!');
         } catch (error) {
             toast.error(error.message || 'Failed to schedule meeting');
+        } finally {
+            setIsScheduling(false);
         }
     };
 
@@ -111,6 +116,43 @@ const MeetingsPage = () => {
                 </button>
             </div>
 
+            <div style={{ display: 'flex', gap: '30px', marginBottom: '24px', borderBottom: '1px solid var(--border)' }}>
+                <button
+                    onClick={() => setActiveTab('upcoming')}
+                    style={{
+                        padding: '12px 4px',
+                        border: 'none',
+                        background: 'none',
+                        color: activeTab === 'upcoming' ? 'var(--primary)' : 'var(--text-muted)',
+                        fontWeight: '700',
+                        fontSize: '15px',
+                        cursor: 'pointer',
+                        borderBottom: activeTab === 'upcoming' ? '3px solid var(--primary)' : '3px solid transparent',
+                        transition: 'all 0.2s',
+                        marginBottom: '-1px'
+                    }}
+                >
+                    Upcoming Meetings
+                </button>
+                <button
+                    onClick={() => setActiveTab('past')}
+                    style={{
+                        padding: '12px 4px',
+                        border: 'none',
+                        background: 'none',
+                        color: activeTab === 'past' ? 'var(--primary)' : 'var(--text-muted)',
+                        fontWeight: '700',
+                        fontSize: '15px',
+                        cursor: 'pointer',
+                        borderBottom: activeTab === 'past' ? '3px solid var(--primary)' : '3px solid transparent',
+                        transition: 'all 0.2s',
+                        marginBottom: '-1px'
+                    }}
+                >
+                    Past Meetings
+                </button>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
                 {loading ? (
                     <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '100px' }}>
@@ -121,14 +163,35 @@ const MeetingsPage = () => {
                         <div style={{ padding: '20px', background: '#F8FAFC', borderRadius: '50%', width: 'fit-content', margin: '0 auto 20px' }}>
                             <Video size={48} color="var(--primary)" style={{ opacity: 0.3 }} />
                         </div>
-                        <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>No meetings scheduled</h3>
-                        <p style={{ marginTop: '8px' }}>Launch a new meeting to start collaborating with your team.</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>
+                            {activeTab === 'upcoming' ? 'No meetings scheduled' : 'No past meetings'}
+                        </h3>
+                        <p style={{ marginTop: '8px' }}>
+                            {activeTab === 'upcoming' 
+                                ? 'Launch a new meeting to start collaborating with your team.' 
+                                : 'All your completed meetings will appear here for reference.'}
+                        </p>
                     </div>
                 ) : meetings.map(meeting => (
                     <div key={meeting.id} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: 'var(--primary)' }}></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>{meeting.title}</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>{meeting.title}</h3>
+                                {meeting.status && meeting.status !== 'active' && (
+                                    <span style={{
+                                        fontSize: '10px',
+                                        fontWeight: '800',
+                                        background: meeting.status === 'completed' ? '#DCFCE7' : '#FEE2E2',
+                                        color: meeting.status === 'completed' ? '#166534' : '#991B1B',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        {meeting.status}
+                                    </span>
+                                )}
+                            </div>
                             <span style={{
                                 fontSize: '11px',
                                 fontWeight: '800',
@@ -157,10 +220,16 @@ const MeetingsPage = () => {
                             <button
                                 onClick={() => navigate(`${roleBasePath}/meetings/${meeting.id}`)}
                                 className="btn-primary"
-                                style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', opacity: meeting.status === 'completed' || meeting.status === 'ended' ? 0.5 : 1, pointerEvents: meeting.status === 'completed' || meeting.status === 'ended' ? 'none' : 'auto' }}
-                                disabled={meeting.status === 'completed' || meeting.status === 'ended'}
+                                style={{ 
+                                    padding: '8px 16px', 
+                                    fontSize: '13px', 
+                                    borderRadius: '8px', 
+                                    opacity: ['completed', 'ended', 'expired'].includes(meeting.status) ? 0.5 : 1, 
+                                    pointerEvents: ['completed', 'ended', 'expired'].includes(meeting.status) ? 'none' : 'auto' 
+                                }}
+                                disabled={['completed', 'ended', 'expired'].includes(meeting.status)}
                             >
-                                {meeting.status === 'completed' || meeting.status === 'ended' ? 'Meeting Ended' : 'Join Room'}
+                                {meeting.status === 'expired' ? 'Expired' : (['completed', 'ended'].includes(meeting.status) ? 'Completed' : 'Join Room')}
                                 <ArrowRight size={16} />
                             </button>
                         </div>
@@ -172,7 +241,10 @@ const MeetingsPage = () => {
             {isModalOpen && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
                     <div className="card" style={{ width: '600px', padding: '32px', position: 'relative', border: '1px solid var(--border)' }}>
-                        <button onClick={() => setIsModalOpen(false)} style={{ position: 'absolute', right: '16px', top: '16px', border: '1px solid var(--border)', background: 'var(--input-bg)', cursor: 'pointer', color: 'var(--text-main)', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button onClick={() => {
+                            setIsModalOpen(false);
+                            setFormData({ title: '', agenda: '', date_time: '', duration: 60, participants: [] });
+                        }} style={{ position: 'absolute', right: '16px', top: '16px', border: '1px solid var(--border)', background: 'var(--input-bg)', cursor: 'pointer', color: 'var(--text-main)', borderRadius: '8px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <X size={24} />
                         </button>
 
@@ -246,9 +318,18 @@ const MeetingsPage = () => {
                                 </div>
                             </div>
 
-                            <button type="submit" className="btn-primary" style={{ padding: '12px', borderRadius: '10px', marginTop: '8px' }}>
-                                <Calendar size={20} />
-                                Confirm Schedule
+                            <button type="submit" className="btn-primary" style={{ padding: '12px', borderRadius: '10px', marginTop: '8px' }} disabled={isScheduling}>
+                                {isScheduling ? (
+                                    <>
+                                        <Loader2 size={20} className="animate-spin" />
+                                        Scheduling...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Calendar size={20} />
+                                        Confirm Schedule
+                                    </>
+                                )}
                             </button>
                         </form>
                     </div>

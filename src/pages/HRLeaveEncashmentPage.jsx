@@ -20,10 +20,9 @@ const HRLeaveEncashmentPage = () => {
 
     const fetchPolicy = async () => {
         const data = await api.get('/leave-encashment/policy');
-        if (!data) {
-            throw new Error('Leave encashment policy is not configured yet.');
+        if (data && !data.unconfigured) {
+            setPolicy(data);
         }
-        setPolicy(data);
     };
 
     const fetchRequests = async (nextFilter = filter) => {
@@ -151,6 +150,7 @@ const HRLeaveEncashmentPage = () => {
                             className="input-field"
                             type="number"
                             min="1"
+                            max="100"
                             step="1"
                             value={policy.max_days_per_year}
                             onChange={(e) => setPolicy((prev) => ({ ...prev, max_days_per_year: e.target.value }))}

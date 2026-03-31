@@ -32,6 +32,8 @@ const DrivePage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [contextMenu, setContextMenu] = useState(null); // { x, y, item, isFolder }
     const [showFolderModal, setShowFolderModal] = useState(false);
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     const fileInputRef = useRef(null);
     const menuRef = useRef(null);
@@ -90,17 +92,21 @@ const DrivePage = () => {
         if (currentFolderId) formData.append('folder_id', currentFolderId);
 
         try {
-            setLoading(true);
+            setIsUploading(true);
             const token = localStorage.getItem('token');
             const res = await fetch('/api/drive/upload', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
-            if (res.ok) fetchContents();
-            if (res.ok) fetchStorageUsage();
+            if (res.ok) {
+                await fetchContents();
+                await fetchStorageUsage();
+            }
         } catch (error) {
             console.error('Upload failed:', error);
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -110,6 +116,7 @@ const DrivePage = () => {
 
         const parentId = currentPath.length > 0 ? currentPath[currentPath.length - 1].id : null;
         try {
+            setIsCreatingFolder(true);
             await api.post('/drive/folder', {
                 name,
                 parent_id: parentId,
@@ -121,6 +128,8 @@ const DrivePage = () => {
             fetchContents();
         } catch (error) {
             console.error('Folder creation failed:', error);
+        } finally {
+            setIsCreatingFolder(false);
         }
     };
 
@@ -289,9 +298,18 @@ const DrivePage = () => {
                                 />
                             </div>
                             <button onClick={() => { setNewFolderName(''); setShowFolderModal(true); }} className="btn-secondary" style={{ padding: '10px' }}><FolderPlus size={18} /></button>
-                            <button onClick={() => fileInputRef.current.click()} className="btn-primary" style={{ padding: '10px 20px', borderRadius: '10px' }}>
-                                <Upload size={18} />
-                                Upload
+                            <button onClick={() => fileInputRef.current.click()} className="btn-primary" style={{ padding: '10px 20px', borderRadius: '10px' }} disabled={isUploading}>
+                                {isUploading ? (
+                                    <>
+                                        <Loader2 size={18} className="animate-spin" />
+                                        Uploading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload size={18} />
+                                        Upload
+                                    </>
+                                )}
                             </button>
                             <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleUpload} />
                         </div>
@@ -460,7 +478,16 @@ const DrivePage = () => {
                         />
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                             <button onClick={() => setShowFolderModal(false)} className="btn-secondary" style={{ padding: '10px 20px', borderRadius: '10px' }}>Cancel</button>
-                            <button onClick={handleCreateFolder} className="btn-primary" style={{ padding: '10px 20px', borderRadius: '10px' }} disabled={!newFolderName.trim()}>Create</button>
+                            <button onClick={handleCreateFolder} className="btn-primary" style={{ padding: '10px 20px', borderRadius: '10px' }} disabled={!newFolderName.trim() || isCreatingFolder}>
+                                {isCreatingFolder ? (
+                                    <>
+                                        <Loader2 size={18} className="animate-spin" />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    'Create'
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

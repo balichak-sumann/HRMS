@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 const HRAttendancePage = () => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [departments, setDepartments] = useState([]);
     const [filters, setFilters] = useState({
         date: new Date().toISOString().split('T')[0],
         department: ''
@@ -13,6 +14,19 @@ const HRAttendancePage = () => {
     useEffect(() => {
         fetchAttendance();
     }, [filters]);
+
+    useEffect(() => {
+        fetchDepartments();
+    }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const data = await api.get('/departments');
+            setDepartments(data || []);
+        } catch (err) {
+            console.error('Failed to fetch departments', err);
+        }
+    };
 
     const fetchAttendance = async () => {
         try {
@@ -126,30 +140,33 @@ const HRAttendancePage = () => {
             </div>
 
             {/* Filters */}
-            <div className="card responsive-flex-header" style={{ marginBottom: '24px' }}>
-                <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '8px' }}>DATE</label>
-                    <input
-                        type="date"
-                        value={filters.date}
-                        onChange={e => setFilters({ ...filters, date: e.target.value })}
-                        style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }}
-                        max={new Date().toISOString().split('T')[0]}
-                    />
-                </div>
-                <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '8px' }}>DEPARTMENT</label>
-                    <select
-                        value={filters.department}
-                        onChange={e => setFilters({ ...filters, department: e.target.value })}
-                        style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }}
-                    >
-                        <option value="">All Departments</option>
-                        <option value="Engineering">Engineering</option>
-                        <option value="HR">HR</option>
-                        <option value="Design">Design</option>
-                        <option value="Marketing">Marketing</option>
-                    </select>
+            <div className="card" style={{ marginBottom: '24px', background: 'var(--card-bg)' }}>
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1', minWidth: '240px', maxWidth: '320px' }}>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '0.05em' }}>DATE</label>
+                        <input
+                            type="date"
+                            className="input-field"
+                            value={filters.date}
+                            onChange={e => setFilters({ ...filters, date: e.target.value })}
+                            style={{ width: '100%' }}
+                            max={new Date().toISOString().split('T')[0]}
+                        />
+                    </div>
+                    <div style={{ flex: '1', minWidth: '240px', maxWidth: '320px' }}>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '0.05em' }}>DEPARTMENT</label>
+                        <select
+                            className="input-field"
+                            value={filters.department}
+                            onChange={e => setFilters({ ...filters, department: e.target.value })}
+                            style={{ width: '100%' }}
+                        >
+                            <option value="">All Departments</option>
+                            {departments.map(dep => (
+                                <option key={dep.id || dep.name} value={dep.name}>{dep.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
 

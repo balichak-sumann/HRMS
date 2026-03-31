@@ -156,7 +156,7 @@ const getPolicy = async (req, res) => {
         await ensureEncashmentSchema();
         const policy = await getPolicyInternal(pool);
         if (!policy) {
-            return res.status(404).json({ error: 'Leave encashment policy is not configured' });
+            return res.json({ unconfigured: true });
         }
         res.json(policy);
     } catch (err) {
@@ -184,6 +184,9 @@ const updatePolicy = async (req, res) => {
         const maxDays = Number(max_days_per_year);
         if (!Number.isInteger(maxDays) || maxDays <= 0) {
             return res.status(400).json({ error: 'max_days_per_year must be a positive integer' });
+        }
+        if (maxDays > 100) {
+            return res.status(400).json({ error: 'max_days_per_year cannot exceed 100 days' });
         }
 
         const formula = payout_formula;
@@ -246,16 +249,18 @@ const getMyEncashmentSummary = async (req, res) => {
         const approvedDays = await getApprovedDaysForYear(client, employeeId, year);
 
         const balances = [];
-        for (const leaveType of policy.encashable_leave_types || []) {
-            const available = await getAvailableDaysForType(client, employeeId, year, leaveType);
-            balances.push({ leave_type: leaveType, encashable_days: available });
+        if (policy) {
+            for (const leaveType of policy.encashable_leave_types || []) {
+                const available = await getAvailableDaysForType(client, employeeId, year, leaveType);
+                balances.push({ leave_type: leaveType, encashable_days: available });
+            }
         }
 
         res.json({
             year,
-            policy,
+            policy: policy || null,
             approved_days_this_year: approvedDays,
-            remaining_days_this_year: Math.max(0, Number(policy.max_days_per_year || 0) - approvedDays),
+            remaining_days_this_year: policy ? Math.max(0, Number(policy.max_days_per_year || 0) - approvedDays) : 0,
             balances,
         });
     } catch (err) {
@@ -279,6 +284,9 @@ const createEncashmentRequest = async (req, res) => {
         const days = Number(days_requested);
         if (!Number.isInteger(days) || days <= 0) {
             return res.status(400).json({ error: 'days_requested must be a positive integer' });
+        }
+        if (days > 100) {
+            return res.status(400).json({ error: 'days_requested cannot exceed 100 days' });
         }
 
         const year = new Date().getFullYear();

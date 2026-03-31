@@ -13,12 +13,26 @@ import {
 const HRLeavesPage = () => {
     const [loading, setLoading] = useState(true);
     const [requests, setRequests] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [filter, setFilter] = useState('All');
     const [deptFilter, setDeptFilter] = useState('All');
 
     useEffect(() => {
         fetchRequests();
     }, [filter, deptFilter]);
+
+    useEffect(() => {
+        fetchDepartments();
+    }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const data = await api.get('/departments');
+            setDepartments(data || []);
+        } catch (error) {
+            console.error('Failed to fetch departments:', error.message);
+        }
+    };
 
     const fetchRequests = async () => {
         try {
@@ -72,10 +86,9 @@ const HRLeavesPage = () => {
                             onChange={(e) => setDeptFilter(e.target.value)}
                         >
                             <option value="All">All Departments</option>
-                            <option value="Engineering">Engineering</option>
-                            <option value="Product">Product</option>
-                            <option value="Design">Design</option>
-                            <option value="Operations">Operations</option>
+                            {departments.map((dep) => (
+                                <option key={dep.id || dep.name} value={dep.name}>{dep.name}</option>
+                            ))}
                         </select>
                     </div>
                 </div>

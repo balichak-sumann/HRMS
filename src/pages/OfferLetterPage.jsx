@@ -606,7 +606,8 @@ const OfferLetterPDF = ({ data }) => {
 
 const OfferLetterPage = () => {
     const [history, setHistory] = useState([]);
-    const [selectedIds, setSelectedIds] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [loading, setLoading] = useState(false);
     const [showErrors, setShowErrors] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
@@ -623,8 +624,18 @@ const OfferLetterPage = () => {
     });
 
     useEffect(() => {
-        fetchHistory();
+        fetchCandidates();
+        fetchDepartments();
     }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const data = await api.get('/departments');
+            setDepartments(data || []);
+        } catch (err) {
+            console.error('Failed to fetch departments', err);
+        }
+    };
 
     useEffect(() => {
         let isCancelled = false;
@@ -804,11 +815,10 @@ const OfferLetterPage = () => {
                                     value={formData.department}
                                     onChange={e => setFormData({ ...formData, department: e.target.value })}
                                 >
-                                    <option>IT</option>
-                                    <option>Engineering</option>
-                                    <option>Design</option>
-                                    <option>Marketing</option>
-                                    <option>HR</option>
+                                    <option value="">Select Department</option>
+                                    {departments.map(dep => (
+                                        <option key={dep.id || dep.name} value={dep.name}>{dep.name}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div>

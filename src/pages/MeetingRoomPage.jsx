@@ -47,6 +47,7 @@ const MeetingRoomPage = () => {
     const [showAddMembersModal, setShowAddMembersModal] = useState(false);
     const [availableEmployees, setAvailableEmployees] = useState([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
+    const [addingMemberId, setAddingMemberId] = useState(null);
     const socket = useRef(null);
     const chatEndRef = useRef(null);
     const [localStream, setLocalStream] = useState(null);
@@ -516,38 +517,7 @@ const MeetingRoomPage = () => {
         try {
             setLoadingEmployees(true);
             const employees = await api.get('/employees');
-            
-            // Get current participant IDs (use direct id field from participants)
-            const currentParticipantIds = new Set();
-            
-            // Add all participants from meeting.participants
-            if (meeting?.participants && Array.isArray(meeting.participants)) {
-                meeting.participants.forEach(p => {
-                    if (p.id) currentParticipantIds.add(p.id);
-                    if (p.employee_uuid) currentParticipantIds.add(p.employee_uuid);
-                });
-            }
-            
-            // Add meeting creator
-            if (meeting?.created_by) {
-                currentParticipantIds.add(meeting.created_by);
-            }
-            
-            // Add self
-            if (user?.id) currentParticipantIds.add(user.id);
-            if (user?.employee_uuid) currentParticipantIds.add(user.employee_uuid);
-            
-            console.log('[Meeting] Current participants:', currentParticipantIds);
-            console.log('[Meeting] All employees:', employees);
-            
-            // Filter employees not in the meeting
-            const available = employees.filter(emp => {
-                const empId = emp.id || emp.employee_uuid;
-                return !currentParticipantIds.has(empId);
-            });
-            
-            console.log('[Meeting] Available to add:', available);
-            setAvailableEmployees(available);
+            setAvailableEmployees(employees || []);
         } catch (error) {
             console.error('Error fetching available employees:', error);
             alert('Failed to load available employees');
@@ -558,6 +528,7 @@ const MeetingRoomPage = () => {
 
     const handleAddMember = async (employeeId, employeeName) => {
         try {
+            setAddingMemberId(employeeId);
             console.log('[Meeting] Adding member:', employeeId, employeeName);
             const response = await api.post(`/meetings/${id}/add-participant`, {
                 employee_id: employeeId 
@@ -587,6 +558,8 @@ const MeetingRoomPage = () => {
         } catch (error) {
             console.error('Error adding member:', error);
             alert('Failed to add member to meeting');
+        } finally {
+            setAddingMemberId(null);
         }
     };
 
@@ -612,6 +585,8 @@ const MeetingRoomPage = () => {
     };
 
     const fetchMeetingDetails = async () => {
+        setLoading(true);
+        setMeeting(null);
         try {
             const data = await api.get(`/meetings/${id}`);
             if (data.status === 'completed') {
@@ -1011,10 +986,32 @@ const MeetingRoomPage = () => {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() => handleAddMember(emp.id, emp.full_name)}
-                                            style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                                            onClick={() => !meeting?.participants?.find(p => p.id === emp.id || p.employee_uuid === emp.id) && handleAddMember(emp.id, emp.full_name)}
+                                            disabled={addingMemberId === emp.id || !!meeting?.participants?.find(p => p.id === emp.id || p.employee_uuid === emp.id) || meeting?.created_by === emp.id}
+                                            style={{ 
+                                                padding: '6px 12px', 
+                                                borderRadius: '6px', 
+                                                border: 'none', 
+                                                background: (meeting?.participants?.find(p => p.id === emp.id || p.employee_uuid === emp.id) || meeting?.created_by === emp.id) ? '#94A3B8' : 'var(--primary)', 
+                                                color: 'white', 
+                                                fontSize: '12px', 
+                                                fontWeight: '700', 
+                                                cursor: (addingMemberId === emp.id || !!meeting?.participants?.find(p => p.id === emp.id || p.employee_uuid === emp.id) || meeting?.created_by === emp.id) ? 'not-allowed' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
                                         >
-                                            Add
+                                            {addingMemberId === emp.id ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Adding...
+                                                </>
+                                            ) : (meeting?.participants?.find(p => p.id === emp.id || p.employee_uuid === emp.id) || meeting?.created_by === emp.id) ? (
+                                                'Added'
+                                            ) : (
+                                                'Add'
+                                            )}
                                         </button>
                                     </div>
                                 ))

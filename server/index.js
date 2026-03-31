@@ -79,7 +79,7 @@ const onlineUsers = new Map(); // userId -> socketId
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    socket.on('join_room', (data) => {
+    socket.on('join_room', async (data) => {
         // data can be a string (legacy) or an object { roomId, userId, name }
         const roomId = typeof data === 'string' ? data : data.roomId;
         const userId = typeof data === 'string' ? socket.userId : data.userId;
@@ -98,6 +98,15 @@ io.on('connection', (socket) => {
                 socketId: socket.id,
                 name: name || socket.userName
             });
+
+            // If first person joining, record it
+            const meetingId = roomId.replace('meeting_', '');
+            try {
+                // Only update if NULL
+                await pool.query('UPDATE meetings SET first_person_joined_at = COALESCE(first_person_joined_at, NOW()) WHERE id = $1', [meetingId]);
+            } catch (err) {
+                console.error(`[Socket] Error updating first_person_joined_at for ${meetingId}:`, err.message);
+            }
         }
     });
 
@@ -125,14 +134,20 @@ io.on('connection', (socket) => {
         socket.to(data.roomId).emit('receive_meeting_chat', data);
     });
 
-    socket.on('leave_room', (data) => {
+    socket.on('leave_room', async (data) => {
         const roomId = typeof data === 'string' ? data : data?.roomId;
         const userId = typeof data === 'object' ? data?.userId : socket.userId;
         if (!roomId) return;
 
         socket.leave(roomId);
-        if (roomId.startsWith('meeting_') && userId) {
-            socket.to(roomId).emit('user_left', userId);
+        if (roomId.startsWith('meeting_')) {
+            if (userId) socket.to(roomId).emit('user_left', userId);
+
+            // Check if room is empty
+            const room = io.sockets.adapter.rooms.get(roomId);
+            if (!room || room.size === 0) {
+                console.log(`[Socket] Meeting room ${roomId} is now empty.`);
+            }
         }
     });
 
@@ -172,13 +187,19 @@ io.on('connection', (socket) => {
         io.to(data.to).emit('call_ended');
     });
 
-    socket.on('disconnecting', () => {
+    socket.on('disconnecting', async () => {
         if (!socket.userId) return;
 
         // Notify meeting rooms before socket fully leaves them.
         for (const roomId of socket.rooms) {
             if (roomId.startsWith('meeting_')) {
                 socket.to(roomId).emit('user_left', socket.userId);
+
+                // Check if this is the last person leaving
+                const room = io.sockets.adapter.rooms.get(roomId);
+                if (room && room.size === 1) {
+                    console.log(`[Socket] Last person leaving room ${roomId}.`);
+                }
             }
         }
     });

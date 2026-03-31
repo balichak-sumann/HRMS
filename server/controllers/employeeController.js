@@ -865,6 +865,11 @@ const deleteEmployee = async (req, res) => {
             status: 'inactive'
         });
 
+        // Notify the user over WebSocket for immediate logout
+        if (req.io) {
+            req.io.to(id).emit('account_deactivated');
+        }
+
         await client.query('COMMIT');
         return res.json({ message: 'Employee marked inactive successfully' });
     } catch (err) {

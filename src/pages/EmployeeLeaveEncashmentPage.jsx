@@ -132,7 +132,7 @@ const EmployeeLeaveEncashmentPage = () => {
                             className="input-field"
                             type="number"
                             min="1"
-                            max={maxRequestableDays || undefined}
+                            max={Math.min(100, maxRequestableDays || 0) || 100}
                             step="1"
                             value={form.days_requested}
                             onChange={(e) => setForm((prev) => ({ ...prev, days_requested: e.target.value }))}

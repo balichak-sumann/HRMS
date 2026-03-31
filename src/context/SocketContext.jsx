@@ -61,6 +61,13 @@ export const SocketProvider = ({ children }) => {
             });
         });
 
+        socket.current.on('account_deactivated', () => {
+            console.warn('[Socket] ACCOUNT_DEACTIVATED received. Logging out...');
+            localStorage.removeItem('token');
+            alert('Your account has been deactivated. You will be logged out now.');
+            window.location.href = '/login';
+        });
+
         return () => {
             if (socket.current) {
                 socket.current.disconnect();
