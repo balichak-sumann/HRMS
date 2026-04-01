@@ -207,7 +207,7 @@ const PageBackground = () => (
     <Image src="/logo.png" style={styles.pageBgLogo} fixed />
 );
 
-const OfferLetterPDF = ({ data }) => {
+const OfferLetterPDF = ({ data, settings = {} }) => {
     const role = data.role || 'Software Developer - L1';
     const positionTitle = data.position_title || role.split('-')[0].trim() || 'Software Developer';
     const candidateName = data.candidate_name || 'Candidate Name';
@@ -220,18 +220,22 @@ const OfferLetterPDF = ({ data }) => {
     const hasPaidCtc = annualCtc > 0;
     const ctcText = toInr(annualCtc);
 
-    // Match screenshot logic: Gross = Monthly CTC - 1834 (PF + Insurance)
+    // Match screenshot logic: Gross = Monthly CTC - (Fixed PF + Fixed Insurance)
     const monthlyCtc = hasPaidCtc ? Math.round(annualCtc / 12) : 0;
-    const employeePfMonth = hasPaidCtc ? 1500 : 0;
-    const insuranceMonth = hasPaidCtc ? 334 : 0;
-    const professionalTaxMonth = hasPaidCtc ? 200 : 0; // Standard P Tax
+    const employeePfMonth = hasPaidCtc ? (Number(settings.fixed_pf_deduction) || 1500) : 0;
+    const insuranceMonth = hasPaidCtc ? (Number(settings.fixed_insurance_deduction) || 334) : 0;
+    const professionalTaxMonth = hasPaidCtc ? (Number(settings.fixed_ptax_deduction) || 200) : 0; 
     
     const grossMonth = hasPaidCtc ? Math.max(0, monthlyCtc - employeePfMonth - insuranceMonth) : 0;
     
-    // Components based on 5/9 logic from screenshot
-    const basicPayMonth = hasPaidCtc ? Math.round((grossMonth * 5) / 9) : 0;
-    const hraMonth = hasPaidCtc ? Math.round(basicPayMonth / 2) : 0;
-    const conveyanceMonth = hasPaidCtc ? 1500 : 0; // Fixed
+    // Components based on dynamic settings
+    const bRatio = Number(settings.basic_ratio) || 0.5555;
+    const hRatio = Number(settings.hra_ratio) || 0.5;
+    const convAmount = Number(settings.conveyance_amount) || 1500;
+
+    const basicPayMonth = hasPaidCtc ? Math.round(grossMonth * bRatio) : 0;
+    const hraMonth = hasPaidCtc ? Math.round(basicPayMonth * hRatio) : 0;
+    const conveyanceMonth = hasPaidCtc ? convAmount : 0; 
     const specialAllowanceMonth = hasPaidCtc ? Math.max(0, grossMonth - basicPayMonth - hraMonth - conveyanceMonth) : 0;
 
     return (
@@ -612,6 +616,7 @@ const OfferLetterPage = () => {
     const [showErrors, setShowErrors] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [previewUrl, setPreviewUrl] = useState('');
+    const [statutorySettings, setStatutorySettings] = useState(null);
     const [formData, setFormData] = useState({
         candidate_name: '',
         email: '',
@@ -627,7 +632,17 @@ const OfferLetterPage = () => {
     useEffect(() => {
         fetchCandidates();
         fetchDepartments();
+        fetchStatutorySettings();
     }, []);
+
+    const fetchStatutorySettings = async () => {
+        try {
+            const data = await api.get('/payroll/statutory-settings');
+            setStatutorySettings(data || null);
+        } catch (err) {
+            console.error('Failed to fetch statutory settings', err);
+        }
+    };
 
     const fetchDepartments = async () => {
         try {
@@ -643,7 +658,7 @@ const OfferLetterPage = () => {
 
         const buildPreview = async () => {
             try {
-                const blob = await pdf(<OfferLetterPDF data={formData} />).toBlob();
+                const blob = await pdf(<OfferLetterPDF data={formData} settings={statutorySettings?.settings} />).toBlob();
                 if (isCancelled) return;
 
                 const nextUrl = URL.createObjectURL(blob);
@@ -692,7 +707,7 @@ const OfferLetterPage = () => {
 
         try {
             setLoading(true);
-            const generatedBlob = await pdf(<OfferLetterPDF data={formData} />).toBlob();
+            const generatedBlob = await pdf(<OfferLetterPDF data={formData} settings={statutorySettings?.settings} />).toBlob();
             const payload = new FormData();
             payload.append('candidate_name', formData.candidate_name || '');
             payload.append('email', normalizedEmail);

@@ -12,10 +12,14 @@ import {
     Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useLocation } from 'react-router-dom';
 
 const HRPayrollEmployeePage = () => {
     const { employeeId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const isHr = location.pathname.startsWith('/hr');
+    const basePath = isHr ? '/hr' : '/admin';
 
     const [selectedEmp, setSelectedEmp] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -141,16 +145,24 @@ const HRPayrollEmployeePage = () => {
         const annualSalary = Number.isFinite(annualSalaryInput) && annualSalaryInput > 0 ? annualSalaryInput : 0;
         const monthlyCtc = Math.round(annualSalary / 12);
         
-        // Match screenshot logic: Gross = CTC - 1834 (PF + Insurance)
-        const gross = annualSalary > 0 ? Math.max(0, monthlyCtc - 1834) : 0;
+        const settings = statutorySettings?.settings || {};
+        const pfDef = Number(settings.fixed_pf_deduction) || 1500;
+        const insDef = Number(settings.fixed_insurance_deduction) || 334;
+        const basicRatio = Number(settings.basic_ratio) || 0.5555;
+        const hraRatio = Number(settings.hra_ratio) || 0.5;
+        const convAmount = Number(settings.conveyance_amount) || 1500;
+        const ptaxAmount = Number(settings.fixed_ptax_deduction) || 200;
+
+        // Gross = CTC - (PF + Insurance)
+        const gross = annualSalary > 0 ? Math.max(0, monthlyCtc - (pfDef + insDef)) : 0;
         
-        // Components based on 5/9 logic from screenshot
-        const basic = annualSalary > 0 ? Math.round((gross * 5) / 9) : 0;
-        const hra = Math.round(basic / 2);
-        const conveyance = annualSalary > 0 ? 1500 : 0;
+        // Components based on dynamic logic
+        const basic = annualSalary > 0 ? Math.round(gross * basicRatio) : 0;
+        const hra = Math.round(basic * hraRatio);
+        const conveyance = annualSalary > 0 ? convAmount : 0;
         const specialAllowance = annualSalary > 0 ? Math.max(0, gross - basic - hra - conveyance) : 0;
 
-        const ptax = annualSalary > 0 ? 200 : 0; // Default P Tax
+        const ptax = annualSalary > 0 ? ptaxAmount : 0; // Dynamic P Tax
         const otherDeduction = 0;
 
         return {
@@ -165,8 +177,16 @@ const HRPayrollEmployeePage = () => {
             pan_no: employee.pan || '',
             bank_account: employee.bank_account || '',
             bank_name: employee.bank_name || '',
+            // Monthly Base Values
+            base_basic_salary: basic,
+            base_hra: hra,
+            base_conveyance: conveyance,
+            base_special_allowance: specialAllowance,
+            // Prorated Payable Values (Initially same as base)
             basic_salary: basic,
-            hra,
+            hra: hra,
+            conveyance: conveyance,
+            specialAllowance: specialAllowance,
             allowances: conveyance + specialAllowance,
             pf: 0,
             pf_employee: 0,
@@ -177,8 +197,6 @@ const HRPayrollEmployeePage = () => {
             gross_salary: gross,
             deductions: ptax,
             net_salary: gross - ptax,
-            conveyance,
-            specialAllowance,
             ptax,
             otherDeduction,
             created_at: new Date().toISOString()
@@ -186,20 +204,25 @@ const HRPayrollEmployeePage = () => {
     };
 
     const recalculatePayslip = (current) => {
-        const basic = Number(current.basic_salary) || 0;
-        const hra = Number(current.hra) || 0;
-        const conveyance = Number(current.conveyance) || 0;
-        const specialAllowance = Number(current.specialAllowance) || 0;
+        const baseBasic = Number(current.base_basic_salary) || 0;
+        const baseHra = Number(current.base_hra) || 0;
+        const baseConveyance = Number(current.base_conveyance) || 0;
+        const baseSpecial = Number(current.base_special_allowance) || 0;
+
         const otherDeduction = Number(current.otherDeduction ?? current.tds) || 0;
         const ptax = current.ptax != null && current.ptax !== '' ? Number(current.ptax) : 0;
-        const processedDays = Number(current.processed_days) || 0;
-        const paidDays = Number(current.paid_days) || 0;
+        
+        const processedDays = Number(current.processed_days) || 30;
+        const paidDays = current.paid_days === undefined || current.paid_days === null ? processedDays : Number(current.paid_days);
         const factor = processedDays > 0 ? Math.min(paidDays / processedDays, 1) : 0;
 
+        // Prorate all Earnings
+        const basic_salary = Math.round(baseBasic * factor);
+        const hra = Math.round(baseHra * factor);
+        const conveyance = Math.round(baseConveyance * factor);
+        const specialAllowance = Math.round(baseSpecial * factor);
         const allowances = conveyance + specialAllowance;
-        const baseGross = basic + hra + allowances;
-        const gross_salary = Math.round(baseGross * factor);
-        const effectiveOtherDeduction = round2(otherDeduction);
+        const gross_salary = basic_salary + hra + allowances;
 
         const pfEmployeeRate = Number(statutorySettings?.settings?.pf_employee_rate) || 0;
         const pfEmployerRate = Number(statutorySettings?.settings?.pf_employer_rate) || 0;
@@ -211,14 +234,19 @@ const HRPayrollEmployeePage = () => {
         const pf_employer = round2(gross_salary * (pfEmployerRate / 100));
         const esi_employee = round2(gross_salary * (esiEmployeeRate / 100));
         const esi_employer = round2(gross_salary * (esiEmployerRate / 100));
+        
         const annualTds = computeAnnualTds(gross_salary * 12, slabs);
         const tds = round2(annualTds / 12);
 
-        const deductions = round2(pf_employee + esi_employee + tds + ptax + effectiveOtherDeduction);
-        const net_salary = gross_salary - deductions;
+        const deductions = round2(pf_employee + esi_employee + tds + ptax + round2(otherDeduction));
+        const net_salary = round2(gross_salary - deductions);
 
         return {
             ...current,
+            basic_salary,
+            hra,
+            conveyance,
+            specialAllowance,
             allowances,
             pf: pf_employee,
             pf_employee,
@@ -274,11 +302,15 @@ const HRPayrollEmployeePage = () => {
     const generatePayslip = async () => {
         if (!selectedEmp || !payslip) return;
 
-        // Client-side validation — no popups, just block submission
-        const basic = Number(payslip.basic_salary) || 0;
-        const gross = Number(payslip.gross_salary) || 0;
-        if (basic <= 0 || gross <= 0) {
-            setValidationErrors({ basic_salary: basic <= 0, gross_salary: gross <= 0 });
+        // Client-side validation — check Base Monthly values instead of Prorated
+        const baseBasic = Number(payslip.base_basic_salary) || 0;
+        const h = Number(payslip.base_hra) || 0;
+        const c = Number(payslip.base_conveyance) || 0;
+        const s = Number(payslip.base_special_allowance) || 0;
+        const baseGross = baseBasic + h + c + s;
+        
+        if (baseBasic <= 0 || baseGross <= 0) {
+            setValidationErrors({ basic_salary: baseBasic <= 0 });
             return;
         }
         setValidationErrors({});
@@ -367,7 +399,7 @@ const HRPayrollEmployeePage = () => {
         <>
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button className="btn-secondary" onClick={() => navigate('/hr/payroll')} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: 'fit-content' }}>
+                    <button className="btn-secondary" onClick={() => navigate(`${basePath}/payroll`)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: 'fit-content' }}>
                         <ArrowLeft size={16} /> Back to Employee List
                     </button>
                     <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -410,25 +442,37 @@ const HRPayrollEmployeePage = () => {
 
                         <div className="payroll-breakdown" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px', padding: '24px' }}>
                             <div>
-                                <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', marginBottom: '12px' }}>EARNINGS</p>
+                                <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', marginBottom: '12px' }}>EARNINGS (Base Monthly)</p>
                                 <div className="pay-row pay-row-editable">
                                 <span>Basic Salary <span style={{ color: '#EF4444' }}>*</span></span>
-                                    <input type="number" value={payslip.basic_salary} onChange={(e) => { updateNumericField('basic_salary', e.target.value); setValidationErrors((v) => ({ ...v, basic_salary: false })); }} style={{ width: '100%', textAlign: 'right', border: validationErrors.basic_salary ? '2px solid #EF4444' : undefined }} className="input-field" />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
+                                        <input type="number" value={payslip.base_basic_salary} onChange={(e) => { updateNumericField('base_basic_salary', e.target.value); setValidationErrors((v) => ({ ...v, basic_salary: false })); }} style={{ width: '100%', textAlign: 'right', border: validationErrors.basic_salary ? '2px solid #EF4444' : undefined }} className="input-field" />
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.basic_salary}</span>
+                                    </div>
                                     {validationErrors.basic_salary && <p style={{ color: '#EF4444', fontSize: '11px', margin: '2px 0 0', gridColumn: '1 / -1' }}>Basic Salary is required</p>}
                                 </div>
                                 <div className="pay-row pay-row-editable">
                                     <span>HRA <span style={{ color: '#EF4444' }}>*</span></span>
-                                    <input type="number" value={payslip.hra} onChange={(e) => updateNumericField('hra', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
+                                        <input type="number" value={payslip.base_hra} onChange={(e) => updateNumericField('base_hra', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.hra}</span>
+                                    </div>
                                 </div>
                                 <div className="pay-row pay-row-editable">
                                     <span>Conveyance</span>
-                                    <input type="number" value={payslip.conveyance} onChange={(e) => updateNumericField('conveyance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
+                                        <input type="number" value={payslip.base_conveyance} onChange={(e) => updateNumericField('base_conveyance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.conveyance}</span>
+                                    </div>
                                 </div>
                                 <div className="pay-row pay-row-editable">
                                     <span>Special Allowance</span>
-                                    <input type="number" value={payslip.specialAllowance} onChange={(e) => updateNumericField('specialAllowance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
+                                        <input type="number" value={payslip.base_special_allowance} onChange={(e) => updateNumericField('base_special_allowance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.specialAllowance}</span>
+                                    </div>
                                 </div>
-                                <div className="pay-row total"><span>Gross Total</span> <span>₹{payslip.gross_salary}</span></div>
+                                <div className="pay-row total"><span>Gross Total (Payable)</span> <span>₹{payslip.gross_salary}</span></div>
                             </div>
                             <div>
                                 <p style={{ fontSize: '13px', fontWeight: '700', color: '#EF4444', marginBottom: '12px' }}>DEDUCTIONS</p>
@@ -543,9 +587,14 @@ const HRPayrollEmployeePage = () => {
                     </div>
 
                     <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
-                        <button id="confirm-save-btn" onClick={generatePayslip} disabled={generating} className={generating ? 'generating' : 'normal'}>
-                            {generating ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
-                            {generating ? 'Generating...' : 'Confirm & Save Payslip'}
+                        <button 
+                            id="confirm-save-btn" 
+                            onClick={generatePayslip} 
+                            disabled={generating || !!generatedPayrollMeta} 
+                            className={generatedPayrollMeta ? 'generated-success' : generating ? 'generating' : 'normal'}
+                        >
+                            {generating ? <Loader2 className="animate-spin" size={18} /> : generatedPayrollMeta ? <CheckCircle size={18} /> : <CheckCircle size={18} />}
+                            {generating ? 'Generating...' : generatedPayrollMeta ? 'Payslip Generated' : 'Confirm & Save Payslip'}
                         </button>
 
                         <button

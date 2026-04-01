@@ -2,9 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Search, Wallet, Settings, FileText } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 const HRPayrollPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const isHr = location.pathname.startsWith('/hr');
+    const basePath = isHr ? '/hr' : '/admin';
+
     const [employees, setEmployees] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
@@ -39,10 +44,10 @@ const HRPayrollPage = () => {
                     Select an employee to open full payroll details on a dedicated page.
                 </p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                    <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={() => navigate('/hr/payroll/statutory-settings')}>
+                    <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={() => navigate(`${basePath}/payroll/statutory-settings`)}>
                         <Settings size={16} /> Statutory Settings
                     </button>
-                    <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={() => navigate('/hr/payroll/statutory-compliance')}>
+                    <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={() => navigate(`${basePath}/payroll/statutory-compliance`)}>
                         <FileText size={16} /> Compliance Report
                     </button>
                 </div>
@@ -72,7 +77,7 @@ const HRPayrollPage = () => {
                         filteredEmployees.map(emp => (
                             <div
                                 key={emp.id}
-                                onClick={() => navigate(`/hr/payroll/${emp.id}`)}
+                                onClick={() => navigate(`${basePath}/payroll/${emp.id}`)}
                                 style={{
                                     padding: '16px 20px',
                                     display: 'flex',

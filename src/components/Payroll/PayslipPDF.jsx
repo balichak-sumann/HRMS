@@ -285,10 +285,10 @@ const PayslipPDF = ({ payslip, employee }) => {
     const basic = Number(payslip.basic_salary) || 0;
     const hra = Number(payslip.hra) || 0;
     const storedAllowances = Number(payslip.allowances) || 0;
-    const conveyance = Number(payslip.conveyance) || (storedAllowances > 0 ? Math.floor(storedAllowances * 0.285) : 0);
-    const specialAllowance = Number(payslip.specialAllowance ?? payslip.special_allowance) || (storedAllowances > 0 ? Math.ceil(storedAllowances * 0.715) : 0);
+    const conveyance = Number(payslip.conveyance) || 0;
+    const specialAllowance = Number(payslip.specialAllowance ?? payslip.special_allowance) || 0;
     const leaveEncashment = Number(payslip.leave_encashment) || 0;
-    const grossPay = Number(payslip.gross_salary) || (basic + hra + conveyance + specialAllowance);
+    const grossPay = Number(payslip.gross_salary) || (basic + hra + conveyance + specialAllowance + leaveEncashment);
 
     const pfEmployee = Number(payslip.pf_employee ?? payslip.pf) || 0;
     const esiEmployee = Number(payslip.esi_employee) || 0;
@@ -301,7 +301,7 @@ const PayslipPDF = ({ payslip, employee }) => {
     const totalDeductions = persistedDeductions || round2(statutoryDeductions + legacyOtherDeduction);
 
     // Net Pay based strictly on the split above to ensure math is perfect
-    const netPay = Number(payslip.net_salary) || (grossPay - totalDeductions);
+    const netPay = round2(grossPay - totalDeductions);
     const netWords = numberToWords(netPay);
 
     return (

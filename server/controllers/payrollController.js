@@ -139,6 +139,12 @@ const getStatutorySettingsData = async () => {
                 pf_employer_rate,
                 esi_employee_rate,
                 esi_employer_rate,
+                basic_ratio,
+                hra_ratio,
+                conveyance_amount,
+                fixed_pf_deduction,
+                fixed_insurance_deduction,
+                fixed_ptax_deduction,
                 updated_at
          FROM payroll_statutory_settings
          ORDER BY updated_at DESC
@@ -504,6 +510,12 @@ const updateStatutorySettings = async (req, res) => {
         pf_employer_rate,
         esi_employee_rate,
         esi_employer_rate,
+        basic_ratio,
+        hra_ratio,
+        conveyance_amount,
+        fixed_pf_deduction,
+        fixed_insurance_deduction,
+        fixed_ptax_deduction,
         tds_slabs = [],
     } = req.body;
 
@@ -528,6 +540,13 @@ const updateStatutorySettings = async (req, res) => {
         const parsedPfEmployerRate = Number(pf_employer_rate);
         const parsedEsiEmployeeRate = Number(esi_employee_rate);
         const parsedEsiEmployerRate = Number(esi_employer_rate);
+        
+        const parsedBasicRatio = toNumber(basic_ratio, 0.5555);
+        const parsedHraRatio = toNumber(hra_ratio, 0.5);
+        const parsedConveyance = toNumber(conveyance_amount, 1500);
+        const parsedFixedPf = toNumber(fixed_pf_deduction, 1500);
+        const parsedFixedInsurance = toNumber(fixed_insurance_deduction, 334);
+        const parsedFixedPtax = toNumber(fixed_ptax_deduction, 200);
 
         if (![parsedPfEmployeeRate, parsedPfEmployerRate, parsedEsiEmployeeRate, parsedEsiEmployerRate].every((v) => Number.isFinite(v) && v >= 0)) {
             await client.query('ROLLBACK');
@@ -537,16 +556,21 @@ const updateStatutorySettings = async (req, res) => {
         if (!settingsId) {
             await client.query(
                 `INSERT INTO payroll_statutory_settings (
-                    pf_employee_rate,
-                    pf_employer_rate,
-                    esi_employee_rate,
-                    esi_employer_rate
-                ) VALUES ($1, $2, $3, $4)`,
+                    pf_employee_rate, pf_employer_rate, esi_employee_rate, esi_employer_rate,
+                    basic_ratio, hra_ratio, conveyance_amount, fixed_pf_deduction, 
+                    fixed_insurance_deduction, fixed_ptax_deduction
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
                 [
                     parsedPfEmployeeRate,
                     parsedPfEmployerRate,
                     parsedEsiEmployeeRate,
                     parsedEsiEmployerRate,
+                    parsedBasicRatio,
+                    parsedHraRatio,
+                    parsedConveyance,
+                    parsedFixedPf,
+                    parsedFixedInsurance,
+                    parsedFixedPtax,
                 ]
             );
         } else {
@@ -556,13 +580,25 @@ const updateStatutorySettings = async (req, res) => {
                      pf_employer_rate = $2,
                      esi_employee_rate = $3,
                      esi_employer_rate = $4,
+                     basic_ratio = $5,
+                     hra_ratio = $6,
+                     conveyance_amount = $7,
+                     fixed_pf_deduction = $8,
+                     fixed_insurance_deduction = $9,
+                     fixed_ptax_deduction = $10,
                      updated_at = NOW()
-                 WHERE id = $5`,
+                 WHERE id = $11`,
                 [
                     parsedPfEmployeeRate,
                     parsedPfEmployerRate,
                     parsedEsiEmployeeRate,
                     parsedEsiEmployerRate,
+                    parsedBasicRatio,
+                    parsedHraRatio,
+                    parsedConveyance,
+                    parsedFixedPf,
+                    parsedFixedInsurance,
+                    parsedFixedPtax,
                     settingsId,
                 ]
             );

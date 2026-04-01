@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { Loader2, PlusCircle, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const emptySlab = () => ({ name: '', income_from: 0, income_to: '', rate: 0 });
 
@@ -12,6 +13,8 @@ const formatInr = (value) => {
 };
 
 const HRStatutorySettingsPage = () => {
+    const { profile } = useAuth();
+    const isAdmin = profile?.role === 'admin';
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
@@ -19,6 +22,12 @@ const HRStatutorySettingsPage = () => {
         pf_employer_rate: '',
         esi_employee_rate: '',
         esi_employer_rate: '',
+        basic_ratio: 0.5555,
+        hra_ratio: 0.5,
+        conveyance_amount: 1500,
+        fixed_pf_deduction: 1500,
+        fixed_insurance_deduction: 334,
+        fixed_ptax_deduction: 200,
         tds_slabs: [emptySlab()]
     });
 
@@ -35,6 +44,12 @@ const HRStatutorySettingsPage = () => {
                 pf_employer_rate: Number(data.settings.pf_employer_rate),
                 esi_employee_rate: Number(data.settings.esi_employee_rate),
                 esi_employer_rate: Number(data.settings.esi_employer_rate),
+                basic_ratio: Number(data.settings.basic_ratio) || 0.5555,
+                hra_ratio: Number(data.settings.hra_ratio) || 0.5,
+                conveyance_amount: Number(data.settings.conveyance_amount) || 0,
+                fixed_pf_deduction: Number(data.settings.fixed_pf_deduction) || 0,
+                fixed_insurance_deduction: Number(data.settings.fixed_insurance_deduction) || 0,
+                fixed_ptax_deduction: Number(data.settings.fixed_ptax_deduction) || 0,
                 tds_slabs: (data?.tds_slabs || []).length
                     ? data.tds_slabs.map((slab) => ({
                         name: slab.name || '',
@@ -101,6 +116,12 @@ const HRStatutorySettingsPage = () => {
                 pf_employer_rate: Number(form.pf_employer_rate) || 0,
                 esi_employee_rate: Number(form.esi_employee_rate) || 0,
                 esi_employer_rate: Number(form.esi_employer_rate) || 0,
+                basic_ratio: Number(form.basic_ratio) || 0,
+                hra_ratio: Number(form.hra_ratio) || 0,
+                conveyance_amount: Number(form.conveyance_amount) || 0,
+                fixed_pf_deduction: Number(form.fixed_pf_deduction) || 0,
+                fixed_insurance_deduction: Number(form.fixed_insurance_deduction) || 0,
+                fixed_ptax_deduction: Number(form.fixed_ptax_deduction) || 0,
                 tds_slabs: form.tds_slabs
                     .map((slab) => ({
                         name: (slab.name || '').trim(),
@@ -140,6 +161,38 @@ const HRStatutorySettingsPage = () => {
             </div>
 
             <form className="card" style={{ padding: '20px', display: 'grid', gap: '16px' }} onSubmit={saveSettings}>
+                {isAdmin && (
+                    <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                        <h3 style={{ fontSize: '17px', marginBottom: '16px' }}>Salary Breakdown Settings</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Basic Salary Ratio (of Gross)</label>
+                                <input className="input-field" type="number" step="0.0001" value={form.basic_ratio} onChange={(e) => setForm((prev) => ({ ...prev, basic_ratio: e.target.value }))} placeholder="e.g. 0.5555 for 5/9" />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>HRA Ratio (of Basic)</label>
+                                <input className="input-field" type="number" step="0.01" value={form.hra_ratio} onChange={(e) => setForm((prev) => ({ ...prev, hra_ratio: e.target.value }))} placeholder="e.g. 0.5 for 50%" />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Fixed Conveyance (Monthly)</label>
+                                <input className="input-field" type="number" value={form.conveyance_amount} onChange={(e) => setForm((prev) => ({ ...prev, conveyance_amount: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Fixed PF Deduction (Monthly)</label>
+                                <input className="input-field" type="number" value={form.fixed_pf_deduction} onChange={(e) => setForm((prev) => ({ ...prev, fixed_pf_deduction: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Fixed Insurance (Monthly)</label>
+                                <input className="input-field" type="number" value={form.fixed_insurance_deduction} onChange={(e) => setForm((prev) => ({ ...prev, fixed_insurance_deduction: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Fixed P Tax (Monthly)</label>
+                                <input className="input-field" type="number" value={form.fixed_ptax_deduction} onChange={(e) => setForm((prev) => ({ ...prev, fixed_ptax_deduction: e.target.value }))} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div>
                     <h3 style={{ fontSize: '17px', marginBottom: '10px' }}>Contribution Rates (%)</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
