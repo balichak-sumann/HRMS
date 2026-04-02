@@ -30,6 +30,13 @@ const LoginPage = () => {
         setLoading(true);
         setError(null);
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Invalid email address');
+            setLoading(false);
+            return;
+        }
+
         try {
             const expectedRole = role === 'admin'
                 ? ['admin', 'hr']
@@ -152,7 +159,7 @@ const LoginPage = () => {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>

@@ -49,6 +49,7 @@ const EmployeeAttendancePage = () => {
     const [loading, setLoading] = useState(true);
     const [activeDuration, setActiveDuration] = useState(0);
     const [currentShift, setCurrentShift] = useState(null);
+    const [leaves, setLeaves] = useState([]);
     const [viewport, setViewport] = useState({
         width: window.innerWidth,
         height: window.innerHeight
@@ -61,8 +62,17 @@ const EmployeeAttendancePage = () => {
     // Check if selected day matches any holiday
     const selectedHoliday = holidays.find(h => h.date === selectedDate);
 
-    const isRestrictedDay = isWeekend || selectedHoliday;
-    const restrictReason = selectedHoliday ? selectedHoliday.name : (isWeekend ? 'Weekend' : '');
+    // Check if selected day falls within any approved leave
+    const selectedLeave = leaves.find(l => 
+        l.status === 'Approved' && 
+        selectedDate >= l.start_date.slice(0,10) && 
+        selectedDate <= l.end_date.slice(0,10)
+    );
+
+    const isRestrictedDay = isWeekend || selectedHoliday || selectedLeave;
+    const restrictReason = selectedHoliday ? selectedHoliday.name : 
+                          selectedLeave ? 'On Leave' : 
+                          (isWeekend ? 'Weekend' : '');
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -123,6 +133,13 @@ const EmployeeAttendancePage = () => {
             setHolidays(hData || []);
         } catch (err) {
             console.error('Failed to fetch holidays', err);
+        }
+
+        try {
+            const lData = await api.get('/leaves');
+            setLeaves(lData || []);
+        } catch (err) {
+            console.error('Failed to fetch leaves', err);
         } finally {
             setLoading(false);
         }
@@ -249,14 +266,24 @@ const EmployeeAttendancePage = () => {
 
     const getStatusColor = (dateString) => {
         const record = attendance.find(rec => rec.check_in.startsWith(dateString));
-        if (!record) return 'var(--input-bg)';
-        switch (record.status) {
-            case 'Present': return 'var(--status-approved-text)';
-            case 'Late': return 'var(--status-pending-text)';
-            case 'On Leave': return 'var(--status-rejected-text)';
-            case 'Half-Day': return 'var(--primary)';
-            default: return 'var(--status-approved-text)';
+        if (record) {
+            switch (record.status) {
+                case 'Present': return 'var(--status-approved-text)';
+                case 'Late': return 'var(--status-pending-text)';
+                case 'On Leave': return 'var(--status-rejected-text)';
+                case 'Half-Day': return 'var(--primary)';
+                default: return 'var(--status-approved-text)';
+            }
         }
+        
+        const leaveRecord = leaves.find(l => 
+            l.status === 'Approved' && 
+            dateString >= l.start_date.slice(0,10) && 
+            dateString <= l.end_date.slice(0,10)
+        );
+        if (leaveRecord) return 'var(--status-rejected-text)';
+
+        return 'var(--input-bg)';
     };
 
     return (

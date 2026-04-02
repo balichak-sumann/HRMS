@@ -100,7 +100,47 @@ const CalendarPage = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <div className="card" style={{ padding: '24px' }}>
                         <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <PartyPopper size={18} color="#EF4444" /> Upcoming Events
+                            <PartyPopper size={18} color="#F59E0B" /> Company Holidays ({new Date().getFullYear()})
+                        </h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {holidays.filter(h => h.type === 'Company' && new Date(h.date).getFullYear() === new Date().getFullYear())
+                                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                                .map((holiday) => (
+                                    <div key={holiday.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--input-bg)', borderRadius: '8px' }}>
+                                        <div style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            background: 'var(--card-bg)',
+                                            color: 'var(--text-main)',
+                                            borderRadius: '8px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            border: '1px solid #F59E0B'
+                                        }}>
+                                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#B45309', textTransform: 'uppercase' }}>
+                                                {new Date(holiday.date).toLocaleString('default', { month: 'short' })}
+                                            </span>
+                                            <span style={{ fontSize: '14px', fontWeight: '800' }}>
+                                                {new Date(holiday.date).getDate()}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: '14px', fontWeight: '600' }}>{holiday.name}</p>
+                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{holiday.label || 'Company Holiday'}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            {holidays.filter(h => h.type === 'Company' && new Date(h.date).getFullYear() === new Date().getFullYear()).length === 0 && !loading && (
+                                <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', padding: '20px' }}>No company holidays scheduled.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="card" style={{ padding: '24px' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CalendarIcon size={18} color="#EF4444" /> Upcoming Public Events
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {upcomingHolidays.map((holiday) => (
@@ -183,6 +223,7 @@ const CalendarPage = () => {
                                     onChange={e => setFormData({ ...formData, type: e.target.value })}
                                 >
                                     <option value="National">National Holiday</option>
+                                    <option value="Company">Company Holiday</option>
                                     <option value="Custom">Custom Event</option>
                                 </select>
                             </div>

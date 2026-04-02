@@ -74,6 +74,26 @@ const checkIn = async (req, res) => {
             return res.status(400).json({ error: 'Check-in is disabled on Saturday and Sunday by default.' });
         }
 
+        // Check for approved leave on this date
+        const leaveCheck = await pool.query(
+            "SELECT id FROM leaves WHERE employee_id = $1 AND status = 'Approved' AND $2::date BETWEEN start_date AND end_date",
+            [employee_id, attendanceDate]
+        );
+
+        if (leaveCheck.rows.length > 0) {
+            return res.status(400).json({ error: 'Check-in is disabled because you have an approved leave for this date.' });
+        }
+
+        // Check for holidays on this date
+        const holidayCheck = await pool.query(
+            "SELECT name FROM holidays WHERE date = $1::date",
+            [attendanceDate]
+        );
+
+        if (holidayCheck.rows.length > 0) {
+            return res.status(400).json({ error: `Check-in is disabled today due to the holiday: ${holidayCheck.rows[0].name}.` });
+        }
+
         console.log('[Attendance Check-In] Final employee_id:', employee_id);
 
         const { location } = req.body;

@@ -79,14 +79,19 @@ const createMeeting = async (req, res) => {
                             [participant.profile_id, 'Meeting Invite', notifMsg, 'meeting']
                         );
                         req.io.to(participant.profile_id).emit('notification_created', notification.rows[0]);
-                        req.io.to(participant.profile_id).emit('meeting_invite', {
-                            meetingId: meeting.id,
-                            title,
-                            agenda,
-                            date_time,
-                            message: notifMsg,
-                            inviterName: creator_name || 'Admin',
-                        });
+                        
+                        // Only trigger the "Join Now" popup (meeting_invite) if meeting is starting within 5 minutes (or is instant)
+                        const startsIn = date_time ? (new Date(date_time).getTime() - Date.now()) : 0;
+                        if (meeting_type === 'instant' || startsIn <= 5 * 60 * 1000) {
+                            req.io.to(participant.profile_id).emit('meeting_invite', {
+                                meetingId: meeting.id,
+                                title,
+                                agenda,
+                                date_time,
+                                message: notifMsg,
+                                inviterName: creator_name || 'Admin',
+                            });
+                        }
                     }
                     // Email
                     if (participant.email) {
@@ -277,14 +282,19 @@ const addParticipant = async (req, res) => {
             // Socket notification
             if (req.io) {
                 req.io.to(profileId).emit('notification_created', notification.rows[0]);
-                req.io.to(profileId).emit('meeting_invite', {
-                    meetingId: meeting.id,
-                    title: meeting.title,
-                    agenda: meeting.agenda,
-                    date_time: meeting.date_time,
-                    message: inviteMessage,
-                    inviterName,
-                });
+                
+                // Only trigger the "Join Now" popup (meeting_invite) if meeting is starting within 5 minutes
+                const startsIn = meeting.date_time ? (new Date(meeting.date_time).getTime() - Date.now()) : 0;
+                if (meeting.meeting_type === 'instant' || startsIn <= 5 * 60 * 1000) {
+                    req.io.to(profileId).emit('meeting_invite', {
+                        meetingId: meeting.id,
+                        title: meeting.title,
+                        agenda: meeting.agenda,
+                        date_time: meeting.date_time,
+                        message: inviteMessage,
+                        inviterName,
+                    });
+                }
             }
 
             // Email

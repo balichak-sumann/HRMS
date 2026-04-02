@@ -37,6 +37,7 @@ const MeetingRoomPage = () => {
     const roleBasePath = getRoleBasePath(profile?.role);
     const [meeting, setMeeting] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [startTimeError, setStartTimeError] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isCamOff, setIsCamOff] = useState(false);
     const [isSharing, setIsSharing] = useState(false);
@@ -594,6 +595,14 @@ const MeetingRoomPage = () => {
                 navigate(`${roleBasePath}/meetings`);
                 return;
             }
+
+            // Enforce start time (allow joining 15 minutes early)
+            const startTime = new Date(data.date_time).getTime();
+            const now = Date.now();
+            if (now < startTime - 15 * 60 * 1000) {
+                setStartTimeError(data.date_time);
+            }
+
             setMeeting(data);
         } catch (error) {
             console.error('Error fetching meeting:', error);
@@ -622,6 +631,26 @@ const MeetingRoomPage = () => {
             <Loader2 size={40} className="animate-spin" color="var(--primary)" />
         </div>
     </>;
+
+    if (startTimeError) {
+        return (
+            <div style={{ height: 'calc(100vh - 140px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border)', padding: '40px', textAlign: 'center' }}>
+                <div style={{ maxWidth: '400px' }}>
+                    <div style={{ padding: '20px', background: '#FEF3C7', borderRadius: '50%', width: 'fit-content', margin: '0 auto 24px' }}>
+                        <Clock size={48} color="#D97706" />
+                    </div>
+                    <h2 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '12px' }}>Meeting hasn't started yet</h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '16px', marginBottom: '32px', lineHeight: '1.6' }}>
+                        This meeting is scheduled for <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>{new Date(startTimeError).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>. 
+                        You can join up to 15 minutes before the start time.
+                    </p>
+                    <button onClick={() => navigate(`${roleBasePath}/meetings`)} className="btn-primary" style={{ width: '100%', borderRadius: '10px' }}>
+                        Back to Meetings
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>

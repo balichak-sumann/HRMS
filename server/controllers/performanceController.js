@@ -232,8 +232,12 @@ const getGoals = async (req, res) => {
 const submitSelfAppraisal = async (req, res) => {
     const { cycle_id, overall_comment, items = [] } = req.body;
 
-    if (!cycle_id || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: 'cycle_id and appraisal items are required' });
+    if (!cycle_id || !Array.isArray(items)) {
+        return res.status(400).json({ error: 'cycle_id and items array are required' });
+    }
+
+    if (items.length === 0 && (!overall_comment || !overall_comment.trim())) {
+        return res.status(400).json({ error: 'Either goal ratings or an overall comment is required' });
     }
 
     const client = await pool.connect();
@@ -279,8 +283,12 @@ const submitSelfAppraisal = async (req, res) => {
 const submitManagerAppraisal = async (req, res) => {
     const { cycle_id, employee_id, feedback, items = [] } = req.body;
 
-    if (!cycle_id || !employee_id || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: 'cycle_id, employee_id and items are required' });
+    if (!cycle_id || !employee_id || !Array.isArray(items)) {
+        return res.status(400).json({ error: 'cycle_id, employee_id and items array are required' });
+    }
+
+    if (items.length === 0 && (!feedback || !feedback.trim())) {
+        return res.status(400).json({ error: 'Either goal ratings or manager feedback is required' });
     }
 
     const client = await pool.connect();
@@ -317,7 +325,9 @@ const submitManagerAppraisal = async (req, res) => {
         await client.query('COMMIT');
         res.json({ message: 'Manager appraisal submitted successfully' });
     } catch (err) {
+        console.error('submitManagerAppraisal error:', err.message, err.stack);
         await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to submit appraisal: ' + err.message });
     } finally {
         client.release();
     }
@@ -428,24 +438,38 @@ const getHRDashboard = async (req, res) => {
 
 
         const rows = await pool.query(
-            `SELECT ap.cycle_id,
+            `WITH goal_stats AS (
+                SELECT cycle_id, employee_id, COUNT(*)::int AS goals_count
+                FROM goals
+                GROUP BY cycle_id, employee_id
+            ),
+            self_stats AS (
+                SELECT sa.cycle_id, sa.employee_id, sa.id AS sa_id,
+                       ROUND(AVG(sai.rating)::numeric, 2) AS self_avg
+                FROM self_appraisals sa
+                LEFT JOIN self_appraisal_items sai ON sai.self_appraisal_id = sa.id
+                GROUP BY sa.cycle_id, sa.employee_id, sa.id
+            ),
+            manager_stats AS (
+                SELECT ma.cycle_id, ma.employee_id, ma.id AS ma_id,
+                       ROUND(AVG(mai.rating)::numeric, 2) AS manager_avg
+                FROM manager_appraisals ma
+                LEFT JOIN manager_appraisal_items mai ON mai.manager_appraisal_id = ma.id
+                GROUP BY ma.cycle_id, ma.employee_id, ma.id
+            )
+            SELECT ap.cycle_id,
                     e.id AS employee_id,
                     e.full_name,
-                    COUNT(DISTINCT g.id)::int AS goals_count,
-                    CASE WHEN sa.id IS NULL THEN FALSE ELSE TRUE END AS self_submitted,
-                    CASE WHEN ma.id IS NULL THEN FALSE ELSE TRUE END AS manager_submitted,
-                    ROUND(AVG(sai.rating)::numeric, 2) AS self_avg,
-                    ROUND(AVG(mai.rating)::numeric, 2) AS manager_avg,
-                    ROUND(AVG(pf.rating)::numeric, 2) AS peer_avg
+                    COALESCE(gs.goals_count, 0) AS goals_count,
+                    CASE WHEN ss.sa_id IS NULL THEN FALSE ELSE TRUE END AS self_submitted,
+                    CASE WHEN ms.ma_id IS NULL THEN FALSE ELSE TRUE END AS manager_submitted,
+                    ss.self_avg,
+                    ms.manager_avg
              FROM appraisal_participants ap
              JOIN employees e ON e.id = ap.employee_id
-             LEFT JOIN goals g ON g.cycle_id = ap.cycle_id AND g.employee_id = e.id
-             LEFT JOIN self_appraisals sa ON sa.cycle_id = ap.cycle_id AND sa.employee_id = e.id
-             LEFT JOIN self_appraisal_items sai ON sai.self_appraisal_id = sa.id
-             LEFT JOIN manager_appraisals ma ON ma.cycle_id = ap.cycle_id AND ma.employee_id = e.id
-             LEFT JOIN manager_appraisal_items mai ON mai.manager_appraisal_id = ma.id
-             LEFT JOIN peer_feedback pf ON pf.cycle_id = ap.cycle_id AND pf.employee_id = e.id
-             GROUP BY ap.cycle_id, e.id, e.full_name, sa.id, ma.id
+             LEFT JOIN goal_stats gs ON gs.cycle_id = ap.cycle_id AND gs.employee_id = e.id
+             LEFT JOIN self_stats ss ON ss.cycle_id = ap.cycle_id AND ss.employee_id = e.id
+             LEFT JOIN manager_stats ms ON ms.cycle_id = ap.cycle_id AND ms.employee_id = e.id
              ORDER BY e.full_name ASC`
         );
 
@@ -453,7 +477,7 @@ const getHRDashboard = async (req, res) => {
             const employees = rows.rows
                 .filter((r) => r.cycle_id === cycle.id)
                 .map((r) => {
-                    const values = [r.self_avg, r.manager_avg, r.peer_avg].filter((v) => v !== null);
+                    const values = [r.self_avg, r.manager_avg].filter((v) => v !== null);
                     const avg_score = values.length ? Number((values.reduce((a, b) => a + Number(b), 0) / values.length).toFixed(2)) : null;
                     return {
                         employee_id: r.employee_id,
@@ -463,7 +487,6 @@ const getHRDashboard = async (req, res) => {
                         manager_submitted: r.manager_submitted,
                         self_avg: r.self_avg,
                         manager_avg: r.manager_avg,
-                        peer_avg: r.peer_avg,
                         avg_score
                     };
                 });
@@ -536,16 +559,6 @@ const getMyOverview = async (req, res) => {
             [cycle.id, me.id]
         );
 
-        const peerFeedback = await pool.query(
-            `SELECT pf.id, pf.rating, pf.comment, pf.is_anonymous, pf.created_at,
-                    CASE WHEN pf.is_anonymous THEN 'Anonymous' ELSE e.full_name END AS reviewer_name
-             FROM peer_feedback pf
-             JOIN employees e ON e.id = pf.reviewer_id
-             WHERE pf.cycle_id = $1 AND pf.employee_id = $2
-             ORDER BY pf.created_at DESC`,
-            [cycle.id, me.id]
-        );
-
         const isManager = await hasDirectReports(me.id);
         let team = [];
         let teamGoals = {};
@@ -585,26 +598,14 @@ const getMyOverview = async (req, res) => {
             }
         }
 
-                const cycleParticipants = await pool.query(
-                        `SELECT DISTINCT e.id, e.full_name
-                         FROM employees e
-                         WHERE e.id != $1
-                             AND COALESCE(LOWER(e.status), 'active') = 'active'
-                             AND COALESCE(LOWER(e.role), 'employee') NOT IN ('hr', 'admin')
-                         ORDER BY e.full_name`,
-                        [me.id]
-                );
-
-        res.json({
+                res.json({
             current_cycle: cycle,
             goals: goals.rows,
             self_appraisal: selfAppraisal.rows[0] || null,
             manager_appraisal: managerAppraisal.rows[0] || null,
-            peer_feedback: peerFeedback.rows,
             is_manager: isManager,
             team,
-            team_goals: teamGoals,
-            cycle_participants: cycleParticipants.rows
+            team_goals: teamGoals
         });
     } catch (err) {
         console.error('getMyOverview error:', err.message);

@@ -35,7 +35,7 @@ const HolidayCalendar = ({ holidays, onHolidaysChange }) => {
                 </div>
 
                 <div style={{ display: 'flex', background: '#F3F4F6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
-                    {['All', 'National', 'Custom'].map(type => (
+                    {['All', 'National', 'Company', 'Custom'].map(type => (
                         <button
                             key={type}
                             onClick={() => setFilter(type)}
@@ -108,22 +108,30 @@ const HolidayCalendar = ({ holidays, onHolidaysChange }) => {
                     display: 'flex',
                     flexDirection: 'column'
                 }}>
-                    <span style={{
-                        fontSize: '13px',
-                        fontWeight: isToday ? '700' : '500',
-                        color: isToday ? 'var(--primary)' : 'var(--text-main)',
-                        padding: '0 8px',
+                    <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: isToday ? 'var(--primary)' : 'transparent',
+                        color: isToday ? 'white' : 'var(--text-main)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                        fontWeight: isToday ? '800' : '600',
+                        marginLeft: '8px',
                         marginBottom: '6px'
                     }}>
                         {d}
-                    </span>
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
                         {dayHolidays.map((h, i) => {
                             const isNational = h.type === 'National';
+                            const isCompany = h.type === 'Company';
                             return (
                                 <div key={i} style={{
-                                    background: isNational ? '#FEE2E2' : '#DBEAFE',
-                                    color: isNational ? '#991B1B' : '#1E40AF',
+                                    background: isNational ? '#FEE2E2' : (isCompany ? '#FEF3C7' : '#DBEAFE'),
+                                    color: isNational ? '#991B1B' : (isCompany ? '#92400E' : '#1E40AF'),
                                     fontSize: '10px',
                                     padding: '3px 8px',
                                     fontWeight: '600',
@@ -133,7 +141,7 @@ const HolidayCalendar = ({ holidays, onHolidaysChange }) => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    borderLeft: `3px solid ${isNational ? '#EF4444' : '#3B82F6'}`,
+                                    borderLeft: `3px solid ${isNational ? '#EF4444' : (isCompany ? '#F59E0B' : '#3B82F6')}`,
                                     margin: '0 2px'
                                 }} title={h.name}>
                                     <span>{h.name}</span>

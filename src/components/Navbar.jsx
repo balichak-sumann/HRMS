@@ -186,15 +186,27 @@ const Navbar = ({ onMenuClick, isMobile }) => {
         socketRef.current.on('meeting_invite', (payload) => {
             if (payload?.targetUserId && payload.targetUserId !== profile.employee_uuid) return;
 
-            // NOTE: Do NOT call pushRealtimeNotification here.
-            // The 'notification_created' event already adds the bell notification.
-            // This handler only shows the join dialog.
-
             if (!payload?.meetingId) return;
 
-            const accept = window.confirm(`${payload?.message || 'You have a meeting invite.'}\n\nJoin now?`);
-            if (accept) {
-                navigate(`${getRoleBasePath(profile?.role)}/meetings/${payload.meetingId}`);
+            const startTime = new Date(payload.date_time).getTime();
+            const now = Date.now();
+            const startsInMs = startTime - now;
+
+            const showPopup = () => {
+                const accept = window.confirm(`${payload?.message || 'You have a meeting invite.'}\n\nJoin now?`);
+                if (accept) {
+                    navigate(`${getRoleBasePath(profile?.role)}/meetings/${payload.meetingId}`);
+                }
+            };
+
+            // If meeting starts within 5 minutes (or was in the past 15 mins), show now
+            if (startsInMs <= 5 * 60 * 1000 && startsInMs >= -15 * 60 * 1000) {
+                showPopup();
+            } 
+            // If meeting starts later today (within 12 hours), schedule the popup
+            else if (startsInMs > 0 && startsInMs < 12 * 60 * 60 * 1000) {
+                console.log(`[Meeting] Scheduling join popup in ${Math.round(startsInMs / 60000)} minutes`);
+                setTimeout(showPopup, startsInMs);
             }
         });
 

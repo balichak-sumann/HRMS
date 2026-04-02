@@ -19,9 +19,9 @@ router.get('/goals', performanceController.getGoals);
 router.post('/goals', authorize(['employee']), performanceController.createGoal);
 router.patch('/goals/:id/progress', authorize(['employee']), performanceController.updateGoalProgress);
 
-router.post('/self-appraisal', authorize(['employee']), performanceController.submitSelfAppraisal);
-router.post('/manager-appraisal', authorize(['employee']), performanceController.submitManagerAppraisal);
-router.post('/respond', authorize(['employee']), performanceController.respondToAppraisal);
+router.post('/self-appraisal', authorize(['employee', 'hr']), performanceController.submitSelfAppraisal);
+router.post('/manager-appraisal', authorize(['employee', 'hr']), performanceController.submitManagerAppraisal);
+router.post('/respond', authorize(['employee', 'hr']), performanceController.respondToAppraisal);
 
 router.post('/peer-feedback', authorize(['employee']), performanceController.submitPeerFeedback);
 router.get('/peer-feedback', performanceController.getPeerFeedback);

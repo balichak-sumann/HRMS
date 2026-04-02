@@ -20,7 +20,8 @@ const getHolidays = async (req, res) => {
 
         for (const year of [currentYear, nextYear]) {
             if (!existingYears.includes(year)) {
-                console.log(`Fetching holidays for ${year} from API...`);
+                console.log(`Attempting to fetch holidays for ${year} from API...`);
+                let fetchedFromApi = false;
                 try {
                     const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/IN`);
                     if (response.status === 200) {
@@ -31,11 +32,28 @@ const getHolidays = async (req, res) => {
                                 [h.localName, h.date, 'National']
                             );
                         }
-                    } else if (response.status === 204) {
-                        console.log(`No holiday data found for ${year} (Status 204)`);
+                        fetchedFromApi = true;
                     }
                 } catch (apiErr) {
                     console.error(`Failed to fetch holidays for ${year}:`, apiErr);
+                }
+
+                // Fallback for India if API fails or returns no data
+                if (!fetchedFromApi) {
+                    console.log(`Using static fallback for India holidays in ${year}`);
+                    const staticHolidays = [
+                        { name: "New Year's Day", date: `${year}-01-01` },
+                        { name: "Republic Day", date: `${year}-01-26` },
+                        { name: "Independence Day", date: `${year}-08-15` },
+                        { name: "Gandhi Jayanti", date: `${year}-10-02` },
+                        { name: "Christmas Day", date: `${year}-12-25` }
+                    ];
+                    for (const h of staticHolidays) {
+                        await pool.query(
+                            'INSERT INTO holidays (name, date, type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                            [h.name, h.date, 'National']
+                        );
+                    }
                 }
             }
         }

@@ -10,7 +10,6 @@ const EmployeePerformancePage = () => {
     const [selfItems, setSelfItems] = useState([]);
     const [selfComment, setSelfComment] = useState('');
 
-    const [peerForm, setPeerForm] = useState({ employee_id: '', rating: 3, comment: '', is_anonymous: false });
 
     const [managerTarget, setManagerTarget] = useState('');
     const [managerFeedback, setManagerFeedback] = useState('');
@@ -24,7 +23,6 @@ const EmployeePerformancePage = () => {
             const data = await api.get('/performance/my-overview');
             setOverview(data);
             setSelfItems((data?.goals || []).map((g) => ({ goal_id: g.id, rating: 3, comment: '' })));
-            setPeerForm((prev) => ({ ...prev, employee_id: data?.cycle_participants?.[0]?.id || '' }));
             setManagerTarget(data?.team?.[0]?.id || '');
         } catch (error) {
             console.error('Failed to fetch performance overview', error);
@@ -83,20 +81,6 @@ const EmployeePerformancePage = () => {
         }
     };
 
-    const submitPeer = async (e) => {
-        e.preventDefault();
-        try {
-            await api.post('/performance/peer-feedback', {
-                cycle_id: overview.current_cycle.id,
-                ...peerForm
-            });
-            setPeerForm({ employee_id: overview?.cycle_participants?.[0]?.id || '', rating: 3, comment: '', is_anonymous: false });
-            await fetchOverview();
-        } catch (error) {
-            console.error('Peer feedback failed', error);
-            alert('Failed to submit peer feedback');
-        }
-    };
 
     const managerGoals = useMemo(() => {
         if (!managerTarget || !overview?.current_cycle?.id) return [];
@@ -106,6 +90,22 @@ const EmployeePerformancePage = () => {
     useEffect(() => {
         setManagerItems(managerGoals.map((g) => ({ goal_id: g.id, rating: 3, comment: '' })));
     }, [managerGoals]);
+
+    const submitSelf = async () => {
+        if (!overview?.current_cycle?.id) return;
+        try {
+            await api.post('/performance/self-appraisal', {
+                cycle_id: overview.current_cycle.id,
+                overall_comment: selfComment,
+                items: selfItems
+            });
+            setSelfComment('');
+            await fetchOverview();
+        } catch (error) {
+            console.error('Self appraisal failed', error);
+            alert('Failed to submit self appraisal');
+        }
+    };
 
     const submitManager = async () => {
         if (!managerTarget) return;
@@ -179,6 +179,85 @@ const EmployeePerformancePage = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <PlusCircle size={18} color="var(--primary)" /> Self-Appraisal
+                </h3>
+                
+                {overview.self_appraisal ? (
+                    <div style={{ padding: '16px', background: 'rgba(22, 163, 74, 0.05)', borderRadius: '12px', border: '1px solid rgba(22, 163, 74, 0.2)' }}>
+                        <p style={{ fontSize: '14px', color: '#16A349', fontWeight: '700', marginBottom: '8px' }}>✓ SELF-APPRAISAL SUBMITTED</p>
+                        <p style={{ fontSize: '14px', color: 'var(--text-main)', fontStyle: 'italic' }}>"{overview.self_appraisal.overall_comment || 'No comment provided.'}"</p>
+                        {overview.self_appraisal.items?.length > 0 && (
+                            <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
+                                {overview.self_appraisal.items.map((item, idx) => {
+                                    const goal = overview.goals?.find(g => g.id === item.goal_id);
+                                    return (
+                                        <div key={idx} style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                                            <span>{goal?.title || 'Goal'}</span>
+                                            <span style={{ fontWeight: '700' }}>{item.rating} / 5</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gap: '16px' }}>
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Rate your own performance on your goals and provide overall feedback for this cycle.</p>
+                        
+                        {(overview.goals || []).map((goal, idx) => (
+                            <div key={goal.id} style={{ padding: '12px', border: '1px solid #F1F5F9', borderRadius: '8px' }}>
+                                <p style={{ fontWeight: '600', fontSize: '14px', marginBottom: '8px' }}>{goal.title}</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '10px' }}>
+                                    <select 
+                                        className="input-field" 
+                                        value={selfItems[idx]?.rating || 3} 
+                                        onChange={(e) => {
+                                            const next = [...selfItems];
+                                            next[idx] = { ...next[idx], goal_id: goal.id, rating: Number(e.target.value) };
+                                            setSelfItems(next);
+                                        }}
+                                    >
+                                        {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n} / 5</option>)}
+                                    </select>
+                                    <input 
+                                        className="input-field" 
+                                        placeholder="Self-comment on this goal" 
+                                        value={selfItems[idx]?.comment || ''}
+                                        onChange={(e) => {
+                                            const next = [...selfItems];
+                                            next[idx] = { ...next[idx], goal_id: goal.id, comment: e.target.value };
+                                            setSelfItems(next);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+
+                        <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '6px' }}>OVERALL SELF-COMMENT</label>
+                            <textarea 
+                                className="input-field" 
+                                rows="3" 
+                                placeholder="Summarize your performance during this cycle..."
+                                value={selfComment}
+                                onChange={(e) => setSelfComment(e.target.value)}
+                            />
+                        </div>
+
+                        <button 
+                            className="btn-primary" 
+                            onClick={submitSelf}
+                            style={{ borderRadius: '8px', alignSelf: 'flex-start' }}
+                            disabled={(overview.goals || []).length === 0 && !selfComment.trim()}
+                        >
+                            <Save size={16} /> Submit Self-Appraisal
+                        </button>
                     </div>
                 )}
             </div>
@@ -259,26 +338,6 @@ const EmployeePerformancePage = () => {
                 )}
             </div>
 
-            <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>360 Peer Feedback</h3>
-                <form onSubmit={submitPeer} style={{ display: 'grid', gridTemplateColumns: '1.1fr 120px 1.6fr auto', gap: '8px', marginBottom: '10px' }}>
-                    <select className="input-field" value={peerForm.employee_id} onChange={(e) => setPeerForm({ ...peerForm, employee_id: e.target.value })} required>
-                        <option value="" disabled>Select peer</option>
-                        {(overview.cycle_participants || []).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                    </select>
-                    <select className="input-field" value={peerForm.rating} onChange={(e) => setPeerForm({ ...peerForm, rating: Number(e.target.value) })}>
-                        {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}/5</option>)}
-                    </select>
-                    <input className="input-field" placeholder="Feedback comment" value={peerForm.comment} onChange={(e) => setPeerForm({ ...peerForm, comment: e.target.value })} />
-                    <button type="submit" className="btn-primary" style={{ borderRadius: '8px' }} disabled={!peerForm.employee_id}>Submit</button>
-                </form>
-                {(!overview.cycle_participants || overview.cycle_participants.length === 0) && (
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No eligible peers found right now.</p>
-                )}
-                <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input type="checkbox" checked={peerForm.is_anonymous} onChange={(e) => setPeerForm({ ...peerForm, is_anonymous: e.target.checked })} /> Submit anonymously
-                </label>
-            </div>
 
             {overview.is_manager && (
                 <div className="card" style={{ padding: '20px' }}>
