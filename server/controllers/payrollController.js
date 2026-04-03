@@ -77,24 +77,14 @@ const getMonthBounds = (month, year) => {
     };
 };
 
-const getWorkingDays = (month, year) => {
+const getDaysInMonth = (month, year) => {
     const { monthNumber, yearNumber } = getMonthBounds(month, year);
-    const daysInMonth = new Date(yearNumber, monthNumber, 0).getDate();
-    let workingDays = 0;
-
-    for (let day = 1; day <= daysInMonth; day += 1) {
-        const weekday = new Date(yearNumber, monthNumber - 1, day).getDay();
-        if (weekday !== 0 && weekday !== 6) {
-            workingDays += 1;
-        }
-    }
-
-    return workingDays;
+    return new Date(yearNumber, monthNumber, 0).getDate();
 };
 
 const getAttendanceSummary = async (employeeId, month, year) => {
     const { startDate, endDate } = getMonthBounds(month, year);
-    const processedDays = getWorkingDays(month, year);
+    const processedDays = getDaysInMonth(month, year);
 
     const result = await pool.query(
         `SELECT
@@ -112,7 +102,6 @@ const getAttendanceSummary = async (employeeId, month, year) => {
             FROM attendance
             WHERE employee_id = $1
               AND DATE(check_in) BETWEEN $2::date AND $3::date
-              AND EXTRACT(DOW FROM check_in) NOT IN (0, 6)
             GROUP BY DATE(check_in)
          ) t`,
         [employeeId, startDate, endDate]
@@ -143,6 +132,7 @@ const getStatutorySettingsData = async () => {
                 hra_ratio,
                 conveyance_amount,
                 fixed_pf_deduction,
+                fixed_employer_pf_deduction,
                 fixed_insurance_deduction,
                 fixed_ptax_deduction,
                 updated_at
@@ -353,6 +343,11 @@ const createPayroll = async (req, res) => {
             annualTaxableIncome,
         });
 
+        const fixedEmployeePf = round2(toNumber(statutory.settings?.fixed_pf_deduction));
+        const fixedEmployerPf = fixedEmployeePf;
+        const fixedInsurance = round2(toNumber(statutory.settings?.fixed_insurance_deduction));
+        const totalFixedDeductions = round2(fixedEmployeePf + fixedEmployerPf + fixedInsurance);
+
         const approvedClaimsRes = await client.query(
             `SELECT id, amount
              FROM expense_claims
@@ -384,10 +379,10 @@ const createPayroll = async (req, res) => {
         );
 
         const totalDeductions = round2(
+            totalFixedDeductions
+            +
             proratedPtax
             + proratedOtherDeduction
-            + statutoryBreakup.pf_employee
-            + statutoryBreakup.esi_employee
             + statutoryBreakup.tds
         );
         const totalGross = round2(proratedGross + reimbursements + leaveEncashment);
@@ -411,11 +406,11 @@ const createPayroll = async (req, res) => {
                 employee_id, month, year, emp_code, designation, department, location,
                 attendance.processedDays, attendance.paidDays, pan_no, bank_account, bank_name,
                 proratedBasic, proratedHra, proratedConveyance, proratedSpecialAllowance, proratedAllowances,
-                statutoryBreakup.pf_employee,
-                statutoryBreakup.pf_employee,
-                statutoryBreakup.pf_employer,
-                statutoryBreakup.esi_employee,
-                statutoryBreakup.esi_employer,
+                0,
+                0,
+                0,
+                0,
+                0,
                 proratedPtax,
                 statutoryBreakup.tds,
                 reimbursements,
@@ -455,6 +450,12 @@ const createPayroll = async (req, res) => {
             financial_year: financialYear,
             approved_declaration_amount: approvedDeclarationAmount,
             annual_taxable_income: annualTaxableIncome,
+            fixed_deductions: {
+                employee_pf: fixedEmployeePf,
+                employer_pf: fixedEmployerPf,
+                insurance: fixedInsurance,
+                total: totalFixedDeductions,
+            },
             salary_revision_applied: approvedRevision
                 ? {
                     revision_id: approvedRevision.id,
@@ -541,11 +542,12 @@ const updateStatutorySettings = async (req, res) => {
         const parsedEsiEmployeeRate = Number(esi_employee_rate);
         const parsedEsiEmployerRate = Number(esi_employer_rate);
         
-        const parsedBasicRatio = toNumber(basic_ratio, 0.5555);
-        const parsedHraRatio = toNumber(hra_ratio, 0.5);
-        const parsedConveyance = toNumber(conveyance_amount, 1500);
-        const parsedFixedPf = toNumber(fixed_pf_deduction, 1500);
-        const parsedFixedInsurance = toNumber(fixed_insurance_deduction, 334);
+        const parsedBasicRatio = toNumber(basic_ratio, 0.4);
+        const parsedHraRatio = toNumber(hra_ratio, 0.2);
+        const parsedConveyance = toNumber(conveyance_amount, 0.2);
+        const parsedFixedPf = toNumber(fixed_pf_deduction, 1800);
+        const parsedFixedEmployerPf = parsedFixedPf;
+        const parsedFixedInsurance = toNumber(fixed_insurance_deduction, 450);
         const parsedFixedPtax = toNumber(fixed_ptax_deduction, 200);
 
         if (![parsedPfEmployeeRate, parsedPfEmployerRate, parsedEsiEmployeeRate, parsedEsiEmployerRate].every((v) => Number.isFinite(v) && v >= 0)) {
@@ -553,13 +555,24 @@ const updateStatutorySettings = async (req, res) => {
             return res.status(400).json({ error: 'Invalid statutory contribution rates' });
         }
 
+        if (![parsedBasicRatio, parsedHraRatio, parsedConveyance].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Salary breakup percentages must be between 0% and 100%' });
+        }
+
+        const parsedSpecialRatio = round2(1 - (parsedBasicRatio + parsedHraRatio + parsedConveyance));
+        if (parsedSpecialRatio < 0 || Math.abs((parsedBasicRatio + parsedHraRatio + parsedConveyance + parsedSpecialRatio) - 1) > 0.01) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Basic + HRA + Conveyance + Special Allowance must total 100%' });
+        }
+
         if (!settingsId) {
             await client.query(
                 `INSERT INTO payroll_statutory_settings (
                     pf_employee_rate, pf_employer_rate, esi_employee_rate, esi_employer_rate,
-                    basic_ratio, hra_ratio, conveyance_amount, fixed_pf_deduction, 
-                    fixed_insurance_deduction, fixed_ptax_deduction
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                    basic_ratio, hra_ratio, conveyance_amount, fixed_pf_deduction,
+                    fixed_employer_pf_deduction, fixed_insurance_deduction, fixed_ptax_deduction
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
                 [
                     parsedPfEmployeeRate,
                     parsedPfEmployerRate,
@@ -569,6 +582,7 @@ const updateStatutorySettings = async (req, res) => {
                     parsedHraRatio,
                     parsedConveyance,
                     parsedFixedPf,
+                    parsedFixedEmployerPf,
                     parsedFixedInsurance,
                     parsedFixedPtax,
                 ]
@@ -584,10 +598,11 @@ const updateStatutorySettings = async (req, res) => {
                      hra_ratio = $6,
                      conveyance_amount = $7,
                      fixed_pf_deduction = $8,
-                     fixed_insurance_deduction = $9,
-                     fixed_ptax_deduction = $10,
+                     fixed_employer_pf_deduction = $9,
+                     fixed_insurance_deduction = $10,
+                     fixed_ptax_deduction = $11,
                      updated_at = NOW()
-                 WHERE id = $11`,
+                 WHERE id = $12`,
                 [
                     parsedPfEmployeeRate,
                     parsedPfEmployerRate,
@@ -597,6 +612,7 @@ const updateStatutorySettings = async (req, res) => {
                     parsedHraRatio,
                     parsedConveyance,
                     parsedFixedPf,
+                    parsedFixedEmployerPf,
                     parsedFixedInsurance,
                     parsedFixedPtax,
                     settingsId,

@@ -242,13 +242,13 @@ const Navbar = ({ onMenuClick, isMobile }) => {
 
     return (
         <div style={{
-            height: '70px',
+            height: '58px',
             background: 'var(--navbar-bg)',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: isMobile ? '0 16px' : '0 32px',
+            padding: isMobile ? '0 14px' : '0 24px',
             position: 'sticky',
             top: 0,
             zIndex: 90,
@@ -275,21 +275,21 @@ const Navbar = ({ onMenuClick, isMobile }) => {
                 )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {/* Notification Bell */}
                 <div ref={notificationRef} style={{ position: 'relative' }}>
                     <button
                         onClick={() => setShowNotifications(!showNotifications)}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', position: 'relative' }}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', position: 'relative', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        <Bell size={22} />
+                        <Bell size={19} />
                         {unreadCount > 0 && (
                             <span style={{
                                 position: 'absolute',
-                                top: '-6px',
-                                right: '-8px',
-                                minWidth: '16px',
-                                height: '16px',
+                                top: '-4px',
+                                right: '-6px',
+                                minWidth: '15px',
+                                height: '15px',
                                 background: '#EF4444',
                                 borderRadius: '999px',
                                 border: '2px solid var(--navbar-bg)',
@@ -390,12 +390,12 @@ const Navbar = ({ onMenuClick, isMobile }) => {
                 <div ref={profileRef} style={{ position: 'relative' }}>
                     <div
                         onClick={() => setShowProfile(!showProfile)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '3px 6px', borderRadius: '10px' }}
                         className="hover-bg"
                     >
                         <div style={{
-                            width: '36px',
-                            height: '36px',
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '50%',
                             background: 'var(--input-bg)',
                             color: 'var(--primary)',
@@ -407,10 +407,10 @@ const Navbar = ({ onMenuClick, isMobile }) => {
                             {profile?.full_name?.charAt(0) || 'U'}
                         </div>
                         <div style={{ display: 'none', md: 'block' }}>
-                            <p style={{ fontSize: 'var(--font-md)', fontWeight: '700', color: 'var(--text-main)', marginBottom: '-2px' }}>{profile?.full_name}</p>
+                            <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '-2px' }}>{profile?.full_name}</p>
                             <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800' }}>{profile?.role}</p>
                         </div>
-                        <ChevronDown size={14} color="var(--text-muted)" />
+                        <ChevronDown size={12} color="var(--text-muted)" />
                     </div>
 
                     {showProfile && (

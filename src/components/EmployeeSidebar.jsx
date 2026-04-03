@@ -78,7 +78,7 @@ const EmployeeSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         <div className={`sidebar-fixed ${isOpen ? 'sidebar-open' : ''}`} style={{
             width: '260px',
             height: '100vh',
-            background: 'var(--sidebar-bg)',
+            background: '#334155',
             borderRight: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
@@ -92,9 +92,9 @@ const EmployeeSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
             {/* Logo */}
             <Link to="/employee/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', padding: '0 24px' }}>
                 <img src="/logo.png" alt="Company Logo" style={{ height: '42px', width: 'auto', objectFit: 'contain' }} />
-                <div className="brand-lockup">
-                    <span className="brand-name-animated" style={{ fontSize: '17px', fontWeight: '800' }}>IndusInnovate</span>
-                    <span className="brand-name-animated-subline" style={{ fontSize: '11px', fontWeight: '500' }}>Technologies Pvt. Ltd.</span>
+                <div className="brand-lockup" style={{ color: '#fff' }}>
+                    <span className="brand-name-animated" style={{ fontSize: '17px', fontWeight: '800', color: '#fff' }}>IndusInnovate</span>
+                    <span className="brand-name-animated-subline" style={{ fontSize: '11px', fontWeight: '500', color: '#cbd5e1' }}>Technologies Pvt. Ltd.</span>
                 </div>
             </Link>
 
@@ -131,15 +131,15 @@ const EmployeeSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                                 gap: '12px',
                                 padding: '12px 24px',
                                 textDecoration: 'none',
-                                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                                background: isActive ? 'var(--input-bg)' : 'transparent',
-                                borderLeft: isActive ? '4px solid var(--primary)' : '4px solid transparent',
+                                color: isActive ? '#fff' : '#cbd5e1',
+                                background: isActive ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                borderLeft: isActive ? '4px solid #fff' : '4px solid transparent',
                                 fontSize: 'var(--font-lg)',
                                 fontWeight: isActive ? '600' : '500',
                                 transition: 'all 0.2s'
                             }}
                         >
-                            {React.cloneElement(item.icon, { color: isActive ? 'var(--primary)' : 'var(--text-muted)' })}
+                            {React.cloneElement(item.icon, { color: isActive ? '#fff' : '#cbd5e1' })}
                             <span>{item.label}</span>
                         </Link>
                     );
@@ -151,13 +151,13 @@ const EmployeeSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 onClick={signOut}
                 style={{
                     marginTop: 'auto',
-                    borderTop: '1px solid var(--border)',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                     padding: '16px 24px 0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    color: 'var(--text-muted)',
+                    color: '#cbd5e1',
                     fontSize: 'var(--font-lg)',
                     fontWeight: '500'
                 }}

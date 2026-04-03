@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -32,48 +32,123 @@ import { useAuth } from '../context/AuthContext';
 const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
     const { signOut } = useAuth();
     const location = useLocation();
+    const [openGroup, setOpenGroup] = useState(null);
 
-    const menuItems = [
-        // Admin-specific
-        { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
-        { icon: <Shield size={20} />, label: 'Admin Management', path: '/admin/admin-management' },
+    const menuGroups = useMemo(() => ([
+        {
+            label: 'Overview',
+            icon: LayoutDashboard,
+            items: [
+                { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
+                { icon: Shield, label: 'Admin Management', path: '/admin/admin-management' },
+            ],
+        },
+        {
+            label: 'People',
+            icon: Users,
+            items: [
+                { icon: Users, label: 'Employees', path: '/admin/employees' },
+                { icon: CalendarCheck, label: 'Attendance', path: '/admin/attendance' },
+                { icon: ClipboardList, label: 'Leave Requests', path: '/admin/leaves' },
+                { icon: UserMinus, label: 'Offboarding', path: '/admin/employees/offboarding' },
+                { icon: ClipboardList, label: 'Onboarding', path: '/admin/onboarding' },
+                { icon: Briefcase, label: 'Projects', path: '/admin/projects' },
+                { icon: BarChart3, label: 'Performance', path: '/admin/performance' },
+                { icon: ClipboardList, label: 'Surveys', path: '/admin/surveys' },
+                { icon: LifeBuoy, label: 'Helpdesk', path: '/admin/helpdesk' },
+                { icon: MessageSquare, label: 'Complaints', path: '/admin/complaints' },
+            ],
+        },
+        {
+            label: 'Payroll',
+            icon: CreditCard,
+            items: [
+                { icon: CreditCard, label: 'Payroll', path: '/admin/payroll' },
+                { icon: Settings, label: 'Statutory Settings', path: '/admin/payroll/statutory-settings' },
+                { icon: FileCheck, label: 'Statutory Report', path: '/admin/payroll/statutory-compliance' },
+                { icon: FileCheck, label: 'IT Declarations', path: '/admin/tax-declarations' },
+                { icon: FileCheck, label: 'Form 16', path: '/admin/form16' },
+                { icon: HandCoins, label: 'Leave Encashment', path: '/admin/leave-encashment' },
+                { icon: Wallet, label: 'Expense Approvals', path: '/admin/expense-approvals' },
+                { icon: Receipt, label: 'Reimbursement Summary', path: '/admin/reimbursement-summary' },
+            ],
+        },
+        {
+            label: 'Organization',
+            icon: Building2,
+            items: [
+                { icon: Building2, label: 'Departments', path: '/admin/departments' },
+                { icon: Network, label: 'Org Chart', path: '/admin/org-chart' },
+                { icon: Laptop, label: 'Assets', path: '/admin/assets' },
+                { icon: Clock3, label: 'Shift Management', path: '/admin/shifts' },
+            ],
+        },
+        {
+            label: 'Collaboration',
+            icon: MessageSquare,
+            items: [
+                { icon: MessageSquare, label: 'Chat', path: '/admin/chat' },
+                { icon: Video, label: 'Meetings', path: '/admin/meetings' },
+                { icon: HardDrive, label: 'Drive', path: '/admin/drive' },
+                { icon: CalendarCheck, label: 'Calendar', path: '/admin/calendar' },
+            ],
+        },
+        {
+            label: 'Governance',
+            icon: History,
+            items: [
+                { icon: History, label: 'Audit Logs', path: '/admin/audit-logs' },
+            ],
+        },
+    ]), []);
 
-        // All HR/Organizational Features (via admin routes)
-        { icon: <Users size={20} />, label: 'Employees', path: '/admin/employees' },
-        { icon: <CalendarCheck size={20} />, label: 'Attendance', path: '/admin/attendance' },
-        { icon: <ClipboardList size={20} />, label: 'Leave Requests', path: '/admin/leaves' },
-        { icon: <CreditCard size={20} />, label: 'Payroll', path: '/admin/payroll' },
-        { icon: <Settings size={20} />, label: 'Statutory Settings', path: '/admin/payroll/statutory-settings' },
-        { icon: <FileCheck size={20} />, label: 'Statutory Report', path: '/admin/payroll/statutory-compliance' },
-        { icon: <FileCheck size={20} />, label: 'IT Declarations', path: '/admin/tax-declarations' },
-        { icon: <FileCheck size={20} />, label: 'Form 16', path: '/admin/form16' },
-        { icon: <Wallet size={20} />, label: 'Expense Approvals', path: '/admin/expense-approvals' },
-        { icon: <Laptop size={20} />, label: 'Assets', path: '/admin/assets' },
-        { icon: <Receipt size={20} />, label: 'Reimbursement Summary', path: '/admin/reimbursement-summary' },
-        { icon: <Clock3 size={20} />, label: 'Shift Management', path: '/admin/shifts' },
-        { icon: <HandCoins size={20} />, label: 'Leave Encashment', path: '/admin/leave-encashment' },
-        { icon: <UserMinus size={20} />, label: 'Offboarding', path: '/admin/employees/offboarding' },
-        { icon: <LifeBuoy size={20} />, label: 'Helpdesk', path: '/admin/helpdesk' },
-        { icon: <ClipboardList size={20} />, label: 'Surveys', path: '/admin/surveys' },
-        { icon: <Briefcase size={20} />, label: 'Projects', path: '/admin/projects' },
-        { icon: <CalendarCheck size={20} />, label: 'Calendar', path: '/admin/calendar' },
-        { icon: <Mail size={20} />, label: 'Offer Letters', path: '/admin/offer-letters' },
-        { icon: <History size={20} />, label: 'Audit Logs', path: '/admin/audit-logs' },
-        { icon: <MessageSquare size={20} />, label: 'Chat', path: '/admin/chat' },
-        { icon: <Video size={20} />, label: 'Meetings', path: '/admin/meetings' },
-        { icon: <HardDrive size={20} />, label: 'Drive', path: '/admin/drive' },
-        { icon: <MessageSquare size={20} />, label: 'Complaints', path: '/admin/complaints' },
-        { icon: <BarChart3 size={20} />, label: 'Performance', path: '/admin/performance' },
-        { icon: <ClipboardList size={20} />, label: 'Onboarding', path: '/admin/onboarding' },
-        { icon: <Building2 size={20} />, label: 'Departments', path: '/admin/departments' },
-        { icon: <Network size={20} />, label: 'Org Chart', path: '/admin/org-chart' },
-    ];
+    const isItemActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+
+    const isGroupActive = (group) => group.items.some((item) => isItemActive(item.path));
+
+    const toggleGroup = (label) => {
+        setOpenGroup((prev) => (prev === label ? null : label));
+    };
+
+    const renderLink = (item, isChild = false) => {
+        const active = isItemActive(item.path);
+        return (
+            <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => isMobile && toggleSidebar()}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: isChild ? '10px 24px 10px 44px' : '12px 24px',
+                    textDecoration: 'none',
+                    color: active ? '#fff' : isChild ? '#e2e8f0' : '#cbd5e1',
+                    background: active ? 'rgba(255, 255, 255, 0.15)' : isChild ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    borderLeft: active ? '4px solid #fff' : '4px solid transparent',
+                    fontSize: 'var(--font-lg)',
+                    fontWeight: active ? '600' : '500',
+                    transition: 'all 0.2s'
+                }}
+            >
+                {React.cloneElement(<item.icon size={20} />, { color: active ? '#fff' : '#cbd5e1' })}
+                <span>{item.label}</span>
+            </Link>
+        );
+    };
+
+    React.useEffect(() => {
+        const activeGroup = menuGroups.find((group) => isGroupActive(group));
+        if (activeGroup) {
+            setOpenGroup(activeGroup.label);
+        }
+    }, [location.pathname, menuGroups]);
 
     return (
         <div className={`sidebar-fixed ${isOpen ? 'sidebar-open' : ''}`} style={{
             width: '260px',
             height: '100vh',
-            background: 'var(--sidebar-bg)',
+            background: '#334155',
             borderRight: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
@@ -86,9 +161,9 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         }}>
             <Link to="/admin/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', padding: '0 24px' }}>
                 <img src="/logo.png" alt="Company Logo" style={{ height: '42px', width: 'auto', objectFit: 'contain' }} />
-                <div className="brand-lockup">
-                    <span className="brand-name-animated" style={{ fontSize: '17px', fontWeight: '800' }}>IndusInnovate</span>
-                    <span className="brand-name-animated-subline" style={{ fontSize: '11px', fontWeight: '500' }}>Admin Console</span>
+                <div className="brand-lockup" style={{ color: '#fff' }}>
+                    <span className="brand-name-animated" style={{ fontSize: '17px', fontWeight: '800', color: '#fff' }}>IndusInnovate</span>
+                    <span className="brand-name-animated-subline" style={{ fontSize: '11px', fontWeight: '500', color: '#cbd5e1' }}>Admin Console</span>
                 </div>
             </Link>
 
@@ -104,30 +179,42 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 <style>{`
                     nav::-webkit-scrollbar { display: none; }
                 `}</style>
-                {menuItems.map((item, index) => {
-                    const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                {menuGroups.map((group) => {
+                    const groupActive = isGroupActive(group);
+                    const isOpenGroup = openGroup === group.label;
+
                     return (
-                        <Link
-                            key={index}
-                            to={item.path}
-                            onClick={() => isMobile && toggleSidebar()}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '12px 24px',
-                                textDecoration: 'none',
-                                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                                background: isActive ? 'var(--input-bg)' : 'transparent',
-                                borderLeft: isActive ? '4px solid var(--primary)' : '4px solid transparent',
-                                fontSize: 'var(--font-lg)',
-                                fontWeight: isActive ? '600' : '500',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            {React.cloneElement(item.icon, { color: isActive ? 'var(--primary)' : 'var(--text-muted)' })}
-                            <span>{item.label}</span>
-                        </Link>
+                        <div key={group.label}>
+                            <button
+                                type="button"
+                                onClick={() => toggleGroup(group.label)}
+                                style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    padding: '12px 24px',
+                                    border: 'none',
+                                    background: isOpenGroup ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    borderLeft: isOpenGroup ? '4px solid #fff' : '4px solid transparent',
+                                    color: isOpenGroup ? '#fff' : '#cbd5e1',
+                                    cursor: 'pointer',
+                                    fontSize: 'var(--font-lg)',
+                                    fontWeight: isOpenGroup ? '600' : '500',
+                                    textAlign: 'left'
+                                }}
+                            >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <group.icon size={20} color={isOpenGroup ? '#fff' : '#cbd5e1'} />
+                                    <span>{group.label}</span>
+                                </span>
+                            </button>
+                            {isOpenGroup && (
+                                <div>
+                                    {group.items.map((item) => renderLink(item, true))}
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </nav>
@@ -136,13 +223,13 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 onClick={signOut}
                 style={{
                     marginTop: 'auto',
-                    borderTop: '1px solid var(--border)',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                     padding: '16px 24px 0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    color: 'var(--text-muted)',
+                    color: '#cbd5e1',
                     fontSize: 'var(--font-lg)',
                     fontWeight: '500'
                 }}

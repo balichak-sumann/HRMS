@@ -36,13 +36,8 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
     },
     logoImage: {
-        width: 140,
+        width: 180,
         marginBottom: 5,
-    },
-    tagline: {
-        fontSize: 8,
-        color: '#666',
-        marginLeft: 35, // align slightly right of the mark
     },
     companyAddress: {
         flex: 1,
@@ -290,15 +285,38 @@ const PayslipPDF = ({ payslip, employee }) => {
     const leaveEncashment = Number(payslip.leave_encashment) || 0;
     const grossPay = Number(payslip.gross_salary) || (basic + hra + conveyance + specialAllowance + leaveEncashment);
 
-    const pfEmployee = Number(payslip.pf_employee ?? payslip.pf) || 0;
-    const esiEmployee = Number(payslip.esi_employee) || 0;
+    const fixedEmployeePf = Number(payslip.fixed_employee_pf ?? payslip.fixed_deductions?.employee_pf) || 0;
+    const fixedEmployerPf = Number(payslip.fixed_employer_pf ?? payslip.fixed_deductions?.employer_pf) || 0;
+    const fixedInsurance = Number(payslip.fixed_insurance ?? payslip.fixed_deductions?.insurance) || 0;
     const tds = Number(payslip.tds) || 0;
-    const statutoryDeductions = round2(pfEmployee + esiEmployee + tds);
+    const professionalTax = Number(payslip.ptax ?? payslip.professional_tax) || 0;
+    const knownDeductions = round2(fixedEmployeePf + fixedEmployerPf + fixedInsurance + tds + professionalTax);
     const persistedDeductions = Number(payslip.deductions) || 0;
-    const legacyOtherDeduction = persistedDeductions > statutoryDeductions
-        ? round2(persistedDeductions - statutoryDeductions)
+    const explicitOtherDeduction = Number(payslip.other_deduction ?? payslip.otherDeduction) || 0;
+    const residualOtherDeduction = persistedDeductions > round2(knownDeductions + explicitOtherDeduction)
+        ? round2(persistedDeductions - knownDeductions - explicitOtherDeduction)
         : 0;
-    const totalDeductions = persistedDeductions || round2(statutoryDeductions + legacyOtherDeduction);
+    const otherDeduction = round2(explicitOtherDeduction + residualOtherDeduction);
+    const totalDeductions = persistedDeductions || round2(knownDeductions + otherDeduction);
+
+    const earningRows = [
+        { label: 'Basic', amount: basic },
+        { label: 'HRA', amount: hra },
+        { label: 'Conveyance', amount: conveyance },
+        { label: 'Special Allowance', amount: specialAllowance },
+        { label: 'Leave Encashment', amount: leaveEncashment },
+    ];
+
+    const deductionRows = [
+        { label: 'Fixed PF (Employee)', amount: fixedEmployeePf },
+        { label: 'Fixed PF (Employer)', amount: fixedEmployerPf },
+        { label: 'Fixed Insurance', amount: fixedInsurance },
+        { label: 'TDS', amount: tds },
+        { label: 'Professional Tax', amount: professionalTax },
+        { label: 'Other Deduction', amount: otherDeduction },
+    ].filter((row) => row.amount > 0);
+
+    const rowCount = Math.max(earningRows.length, deductionRows.length || 0);
 
     // Net Pay based strictly on the split above to ensure math is perfect
     const netPay = round2(grossPay - totalDeductions);
@@ -315,7 +333,6 @@ const PayslipPDF = ({ payslip, employee }) => {
                         <View style={styles.logoSection}>
                             {/* In a real project you'd use your actual logo asset. Using a placeholder or text if unavailable */}
                             <Image style={styles.logoImage} src={headerLogoSrc} />
-                            <Text style={styles.tagline}>Innovating the future, the Indus way.</Text>
                         </View>
                         <Text style={styles.companyAddress}>
                             #206, 2nd floor, Panchsheel Complex,{'\n'}
@@ -381,36 +398,19 @@ const PayslipPDF = ({ payslip, employee }) => {
                         </View>
 
                         {/* Table Body */}
-                        <View style={styles.trContainer}>
-                            <Text style={styles.tdEarningLabel}>Basic</Text>
-                            <Text style={styles.tdEarningAmount}>{basic}</Text>
-                            <Text style={styles.tdDeductionLabel}>PF (Employee)</Text>
-                            <Text style={styles.tdDeductionAmount}>{pfEmployee}</Text>
-                        </View>
-                        <View style={styles.trContainer}>
-                            <Text style={styles.tdEarningLabel}>HRA</Text>
-                            <Text style={styles.tdEarningAmount}>{hra}</Text>
-                            <Text style={styles.tdDeductionLabel}>ESI (Employee)</Text>
-                            <Text style={styles.tdDeductionAmount}>{esiEmployee}</Text>
-                        </View>
-                        <View style={styles.trContainer}>
-                            <Text style={styles.tdEarningLabel}>Conveyance</Text>
-                            <Text style={styles.tdEarningAmount}>{conveyance}</Text>
-                            <Text style={styles.tdDeductionLabel}>TDS</Text>
-                            <Text style={styles.tdDeductionAmount}>{tds}</Text>
-                        </View>
-                        <View style={styles.trContainer}>
-                            <Text style={styles.tdEarningLabel}>Special Allowance</Text>
-                            <Text style={styles.tdEarningAmount}>{specialAllowance}</Text>
-                            <Text style={styles.tdDeductionLabel}>{legacyOtherDeduction > 0 ? 'Other Deduction' : ''}</Text>
-                            <Text style={styles.tdDeductionAmount}>{legacyOtherDeduction > 0 ? legacyOtherDeduction : ''}</Text>
-                        </View>
-                        <View style={styles.trContainer}>
-                            <Text style={styles.tdEarningLabel}>Leave Encashment</Text>
-                            <Text style={styles.tdEarningAmount}>{leaveEncashment}</Text>
-                            <Text style={styles.tdDeductionLabel}></Text>
-                            <Text style={styles.tdDeductionAmount}></Text>
-                        </View>
+                        {Array.from({ length: rowCount }).map((_, index) => {
+                            const earningRow = earningRows[index];
+                            const deductionRow = deductionRows[index];
+
+                            return (
+                                <View key={`row-${index}`} style={styles.trContainer}>
+                                    <Text style={styles.tdEarningLabel}>{earningRow ? earningRow.label : ''}</Text>
+                                    <Text style={styles.tdEarningAmount}>{earningRow ? earningRow.amount : ''}</Text>
+                                    <Text style={styles.tdDeductionLabel}>{deductionRow ? deductionRow.label : ''}</Text>
+                                    <Text style={styles.tdDeductionAmount}>{deductionRow ? deductionRow.amount : ''}</Text>
+                                </View>
+                            );
+                        })}
 
                         {/* Gross Pay & Total Deductions */}
                         <View style={styles.grossRow}>

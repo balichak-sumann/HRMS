@@ -8,12 +8,15 @@ const HRAttendancePage = () => {
     const [departments, setDepartments] = useState([]);
     const [filters, setFilters] = useState({
         date: new Date().toISOString().split('T')[0],
+        month: new Date().toISOString().slice(0, 7),
         department: ''
     });
+    const [updatingId, setUpdatingId] = useState(null);
+    const [openDropdownId, setOpenDropdownId] = useState(null);
 
     useEffect(() => {
         fetchAttendance();
-    }, [filters]);
+    }, [filters.date, filters.department]);
 
     useEffect(() => {
         fetchDepartments();
@@ -31,7 +34,10 @@ const HRAttendancePage = () => {
     const fetchAttendance = async () => {
         try {
             setLoading(true);
-            const query = new URLSearchParams(filters).toString();
+            const query = new URLSearchParams({
+                date: filters.date,
+                ...(filters.department ? { department: filters.department } : {})
+            }).toString();
             const data = await api.get(`/attendance/all?${query}`);
             setRecords(data);
         } catch (err) {
@@ -52,27 +58,104 @@ const HRAttendancePage = () => {
         return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    const handleExport = () => {
-        const headers = ['Employee', 'Department', 'Check-In', 'Check-Out', 'Hours', 'Status'];
-        const rows = records.map(r => [
-            r.full_name,
-            r.department,
-            formatTime(r.check_in),
-            formatTime(r.check_out),
-            calculateHours(r.check_in, r.check_out),
-            r.status
-        ]);
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'Present':
+                return { bg: '#D1FAE5', text: '#047857', label: '✓ Present' }; // Light green
+            case 'Late':
+                return { bg: '#FEF3C7', text: '#92400E', label: '⏱ Late' }; // Light yellow
+            case 'On Leave':
+                return { bg: '#FECACA', text: '#991B1B', label: '🏥 On Leave' }; // Light red
+            case 'Absent':
+                return { bg: '#E5E7EB', text: '#374151', label: '✕ Absent' }; // Light gray
+            default:
+                return { bg: '#D1FAE5', text: '#047857', label: '✓ Present' }; // Blue
+        }
+    };
 
-        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `attendance_report_${filters.date}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const handleStatusChange = async (record, newStatus) => {
+        // For records without an ID, create a new attendance record first
+        let attendanceId = record.id;
+        const trackingId = record.id || record.employee_id;
+
+        try {
+            setUpdatingId(trackingId);
+            
+            if (!attendanceId) {
+                // Create new attendance record if it doesn't exist
+                const createResponse = await api.post('/attendance/create', {
+                    employee_id: record.employee_id,
+                    date: filters.date,
+                    status: newStatus
+                });
+                attendanceId = createResponse.id;
+            } else {
+                // Update existing record
+                await api.put(`/attendance/${attendanceId}`, { status: newStatus });
+            }
+            
+            // Update the local state
+            setRecords(records.map(r => 
+                r.employee_id === record.employee_id ? { ...r, id: attendanceId, status: newStatus } : r
+            ));
+        } catch (err) {
+            console.error('Failed to update status', err);
+            alert('Failed to update status: ' + (err.message || 'Unknown error'));
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    const handleExport = async () => {
+        try {
+            const exportParams = new URLSearchParams({
+                month: filters.month,
+                ...(filters.department ? { department: filters.department } : {})
+            }).toString();
+
+            const monthlyRows = await api.get(`/attendance/monthly-export?${exportParams}`);
+            const headers = [
+                'Employee ID',
+                'Employee',
+                'Department',
+                'Month',
+                'Present Days',
+                'Late Days',
+                'On Leave Days',
+                'Absent Days',
+                'Half-Day Count',
+                'Recorded Days',
+                'Total Hours'
+            ];
+
+            const rows = monthlyRows.map(r => [
+                r.employee_id,
+                r.full_name,
+                r.department || 'Unassigned',
+                filters.month,
+                r.present_days,
+                r.late_days,
+                r.on_leave_days,
+                r.absent_days,
+                r.half_day_count,
+                r.recorded_days,
+                r.total_hours
+            ]);
+
+            const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `attendance_monthly_report_${filters.month}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            console.error('Failed to export monthly attendance', err);
+            alert('Failed to export monthly attendance: ' + (err.message || 'Unknown error'));
+        }
     };
 
     const stats = {
@@ -89,26 +172,36 @@ const HRAttendancePage = () => {
                     <h1 style={{ fontSize: '28px', color: 'var(--text-main)' }}>Company Attendance</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Monitor and manage employee daily presence.</p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 20px',
-                        background: 'var(--card-bg)',
-                        color: 'var(--text-main)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseOver={e => e.currentTarget.style.background = '#F9FAFB'}
-                    onMouseOut={e => e.currentTarget.style.background = 'white'}
-                >
-                    <Download size={18} /> Export Report
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <input
+                        type="month"
+                        className="input-field"
+                        value={filters.month}
+                        onChange={e => setFilters({ ...filters, month: e.target.value })}
+                        max={new Date().toISOString().slice(0, 7)}
+                        style={{ minWidth: '170px' }}
+                    />
+                    <button
+                        onClick={handleExport}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 20px',
+                            background: 'var(--card-bg)',
+                            color: 'var(--text-main)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '8px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = '#F9FAFB'}
+                        onMouseOut={e => e.currentTarget.style.background = 'white'}
+                    >
+                        <Download size={18} /> Export Report
+                    </button>
+                </div>
             </header>
 
             {/* Stats */}
@@ -204,10 +297,79 @@ const HRAttendancePage = () => {
                                         </td>
                                         <td style={{ padding: '16px' }}>{formatTime(row.check_out)}</td>
                                         <td style={{ padding: '16px' }}>{calculateHours(row.check_in, row.check_out)}h</td>
-                                        <td style={{ padding: '16px' }}>
-                                            <span className={`attendance-status-badge ${(row.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                                                {row.status}
-                                            </span>
+                                        <td style={{ padding: '16px', position: 'relative' }}>
+                                            <>
+                                                <button
+                                                    onClick={() => setOpenDropdownId(openDropdownId === (row.id || row.employee_id) ? null : (row.id || row.employee_id))}
+                                                    disabled={updatingId === (row.id || row.employee_id)}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        borderRadius: '20px',
+                                                        border: 'none',
+                                                        background: getStatusColor(row.status).bg,
+                                                        color: getStatusColor(row.status).text,
+                                                        fontSize: '13px',
+                                                        fontWeight: '600',
+                                                        cursor: updatingId === (row.id || row.employee_id) ? 'not-allowed' : 'pointer',
+                                                        opacity: updatingId === (row.id || row.employee_id) ? 0.6 : 1,
+                                                        transition: 'all 0.2s',
+                                                        minWidth: 'auto',
+                                                        textAlign: 'center'
+                                                    }}
+                                                >
+                                                    {row.status ? getStatusColor(row.status).label : '+ Set Status'}
+                                                </button>
+                                                
+                                                {openDropdownId === (row.id || row.employee_id) && (
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        top: '100%',
+                                                        left: 0,
+                                                        marginTop: '4px',
+                                                        background: 'white',
+                                                        border: '1px solid var(--border)',
+                                                        borderRadius: '8px',
+                                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                                        zIndex: 10,
+                                                        minWidth: '160px'
+                                                    }}>
+                                                        {['Present', 'Late', 'On Leave', 'Absent'].map(status => {
+                                                            const colorObj = getStatusColor(status);
+                                                            return (
+                                                                <button
+                                                                    key={status}
+                                                                    onClick={() => {
+                                                                        handleStatusChange(row, status);
+                                                                        setOpenDropdownId(null);
+                                                                    }}
+                                                                    style={{
+                                                                        display: 'block',
+                                                                        width: '100%',
+                                                                        padding: '10px 16px',
+                                                                        border: 'none',
+                                                                        background: row.status === status ? colorObj.bg : 'white',
+                                                                        color: row.status === status ? colorObj.text : 'var(--text-main)',
+                                                                        fontSize: '13px',
+                                                                        fontWeight: '500',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left',
+                                                                        borderBottom: status !== 'Absent' ? '1px solid var(--border)' : 'none',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                    onMouseOver={(e) => {
+                                                                        e.currentTarget.style.background = colorObj.bg + '66';
+                                                                    }}
+                                                                    onMouseOut={(e) => {
+                                                                        e.currentTarget.style.background = row.status === status ? colorObj.bg : 'white';
+                                                                    }}
+                                                                >
+                                                                    {colorObj.label}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </>
                                         </td>
                                     </tr>
                                 ))

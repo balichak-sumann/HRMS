@@ -859,8 +859,9 @@ model payroll_statutory_settings {
   basic_ratio               Decimal?  @default(0.5555) @db.Decimal
   hra_ratio                 Decimal?  @default(0.5) @db.Decimal
   conveyance_amount         Decimal?  @default(1500) @db.Decimal
-  fixed_pf_deduction        Decimal?  @default(1500) @db.Decimal
-  fixed_insurance_deduction Decimal?  @default(334) @db.Decimal
+  fixed_pf_deduction        Decimal?  @default(1800) @db.Decimal
+  fixed_employer_pf_deduction Decimal?  @default(1800) @db.Decimal
+  fixed_insurance_deduction Decimal?  @default(450) @db.Decimal
   fixed_ptax_deduction      Decimal?  @default(200) @db.Decimal
   created_at                DateTime? @default(now()) @db.Timestamptz(6)
   updated_at                DateTime? @default(now()) @db.Timestamptz(6)

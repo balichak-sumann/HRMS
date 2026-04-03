@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -31,6 +31,7 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
     const { signOut } = useAuth();
     const location = useLocation();
     const navRef = useRef(null);
+    const [openGroup, setOpenGroup] = useState(null);
 
     useEffect(() => {
         const savedTop = window.sessionStorage.getItem('hr_sidebar_scroll_top');
@@ -54,42 +55,114 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         };
     }, []);
 
-    const menuItems = [
-        { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/hr/dashboard' },
-        { icon: <Users size={20} />, label: 'Employees', path: '/hr/employees' },
-        { icon: <CalendarCheck size={20} />, label: 'Attendance', path: '/hr/attendance' },
-        { icon: <ClipboardList size={20} />, label: 'Leave Requests', path: '/hr/leaves' },
-        { icon: <CreditCard size={20} />, label: 'Payroll', path: '/hr/payroll' },
-        { icon: <Settings size={20} />, label: 'Statutory Settings', path: '/hr/payroll/statutory-settings' },
-        { icon: <FileCheck size={20} />, label: 'Statutory Report', path: '/hr/payroll/statutory-compliance' },
-        { icon: <FileCheck size={20} />, label: 'IT Declarations', path: '/hr/tax-declarations' },
-        { icon: <FileCheck size={20} />, label: 'Form 16', path: '/hr/form16' },
-        { icon: <Wallet size={20} />, label: 'Expense Approvals', path: '/hr/expense-approvals' },
-        { icon: <Laptop size={20} />, label: 'Assets', path: '/hr/assets' },
-        { icon: <Receipt size={20} />, label: 'Reimbursement Summary', path: '/hr/reimbursement-summary' },
-        { icon: <Clock3 size={20} />, label: 'Shift Management', path: '/hr/shifts' },
-        { icon: <HandCoins size={20} />, label: 'Leave Encashment', path: '/hr/leave-encashment' },
-        { icon: <UserMinus size={20} />, label: 'Offboarding', path: '/hr/employees/offboarding' },
-        { icon: <LifeBuoy size={20} />, label: 'Helpdesk', path: '/hr/helpdesk' },
-        { icon: <ClipboardList size={20} />, label: 'Surveys', path: '/hr/surveys' },
-        { icon: <Briefcase size={20} />, label: 'Projects', path: '/hr/projects' },
-        { icon: <CalendarCheck size={20} />, label: 'Calendar', path: '/hr/calendar' },
-        { icon: <Mail size={20} />, label: 'Offer Letters', path: '/hr/offer-letters' },
-        { icon: <MessageSquare size={20} />, label: 'Chat', path: '/hr/chat' },
-        { icon: <Video size={20} />, label: 'Meetings', path: '/hr/meetings' },
-        { icon: <HardDrive size={20} />, label: 'Drive', path: '/hr/drive' },
-        { icon: <MessageSquare size={20} />, label: 'Complaints', path: '/hr/complaints' },
-        { icon: <BarChart3 size={20} />, label: 'Performance', path: '/hr/performance' },
-        { icon: <ClipboardList size={20} />, label: 'Onboarding', path: '/hr/onboarding' },
-        { icon: <Building2 size={20} />, label: 'Departments', path: '/hr/departments' },
-        { icon: <Network size={20} />, label: 'Org Chart', path: '/hr/org-chart' },
-    ];
+    const menuGroups = useMemo(() => ([
+        {
+            label: 'Overview',
+            icon: LayoutDashboard,
+            items: [
+                { icon: LayoutDashboard, label: 'Dashboard', path: '/hr/dashboard' },
+            ],
+        },
+        {
+            label: 'People',
+            icon: Users,
+            items: [
+                { icon: Users, label: 'Employees', path: '/hr/employees' },
+                { icon: CalendarCheck, label: 'Attendance', path: '/hr/attendance' },
+                { icon: ClipboardList, label: 'Leave Requests', path: '/hr/leaves' },
+                { icon: UserMinus, label: 'Offboarding', path: '/hr/employees/offboarding' },
+                { icon: ClipboardList, label: 'Onboarding', path: '/hr/onboarding' },
+                { icon: BarChart3, label: 'Performance', path: '/hr/performance' },
+            ],
+        },
+        {
+            label: 'Payroll',
+            icon: CreditCard,
+            items: [
+                { icon: CreditCard, label: 'Payroll', path: '/hr/payroll' },
+                { icon: Settings, label: 'Statutory Settings', path: '/hr/payroll/statutory-settings' },
+                { icon: FileCheck, label: 'Statutory Report', path: '/hr/payroll/statutory-compliance' },
+                { icon: FileCheck, label: 'IT Declarations', path: '/hr/tax-declarations' },
+                { icon: FileCheck, label: 'Form 16', path: '/hr/form16' },
+                { icon: HandCoins, label: 'Leave Encashment', path: '/hr/leave-encashment' },
+                { icon: Wallet, label: 'Expense Approvals', path: '/hr/expense-approvals' },
+                { icon: Receipt, label: 'Reimbursement Summary', path: '/hr/reimbursement-summary' },
+                { icon: Mail, label: 'Offer Letters', path: '/hr/offer-letters' },
+            ],
+        },
+        {
+            label: 'Organization',
+            icon: Building2,
+            items: [
+                { icon: Building2, label: 'Departments', path: '/hr/departments' },
+                { icon: Network, label: 'Org Chart', path: '/hr/org-chart' },
+                { icon: Laptop, label: 'Assets', path: '/hr/assets' },
+                { icon: Clock3, label: 'Shift Management', path: '/hr/shifts' },
+                { icon: Briefcase, label: 'Projects', path: '/hr/projects' },
+                { icon: CalendarCheck, label: 'Calendar', path: '/hr/calendar' },
+            ],
+        },
+        {
+            label: 'Collaboration',
+            icon: MessageSquare,
+            items: [
+                { icon: MessageSquare, label: 'Chat', path: '/hr/chat' },
+                { icon: Video, label: 'Meetings', path: '/hr/meetings' },
+                { icon: HardDrive, label: 'Drive', path: '/hr/drive' },
+                { icon: LifeBuoy, label: 'Helpdesk', path: '/hr/helpdesk' },
+                { icon: MessageSquare, label: 'Complaints', path: '/hr/complaints' },
+                { icon: ClipboardList, label: 'Surveys', path: '/hr/surveys' },
+            ],
+        },
+    ]), []);
+
+    const isItemActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+    const isGroupActive = (group) => group.items.some((item) => isItemActive(item.path));
+
+    const toggleGroup = (label) => {
+        setOpenGroup((prev) => (prev === label ? null : label));
+    };
+
+    const renderLink = (item, isChild = false) => {
+        const active = isItemActive(item.path);
+        const Icon = item.icon;
+        return (
+            <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => isMobile && toggleSidebar()}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: isChild ? '10px 24px 10px 44px' : '12px 24px',
+                    textDecoration: 'none',
+                    color: active ? '#fff' : isChild ? '#e2e8f0' : '#cbd5e1',
+                    background: active ? 'rgba(255, 255, 255, 0.15)' : isChild ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    borderLeft: active ? '4px solid #fff' : '4px solid transparent',
+                    fontSize: 'var(--font-lg)',
+                    fontWeight: active ? '600' : '500',
+                    transition: 'all 0.2s'
+                }}
+            >
+                <Icon size={20} color={active ? '#fff' : '#cbd5e1'} />
+                <span>{item.label}</span>
+            </Link>
+        );
+    };
+
+    useEffect(() => {
+        const activeGroup = menuGroups.find((group) => isGroupActive(group));
+        if (activeGroup) {
+            setOpenGroup(activeGroup.label);
+        }
+    }, [location.pathname, menuGroups]);
 
     return (
         <div className={`sidebar-fixed ${isOpen ? 'sidebar-open' : ''}`} style={{
             width: '260px',
             height: '100vh',
-            background: 'var(--sidebar-bg)',
+            background: '#334155',
             borderRight: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
@@ -103,9 +176,9 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
             {/* Logo */}
             <Link to="/hr/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', padding: '0 24px' }}>
                 <img src="/logo.png" alt="Company Logo" style={{ height: '42px', width: 'auto', objectFit: 'contain' }} />
-                <div className="brand-lockup">
-                    <span className="brand-name-animated" style={{ fontSize: '17px', fontWeight: '800' }}>IndusInnovate</span>
-                    <span className="brand-name-animated-subline" style={{ fontSize: '11px', fontWeight: '500' }}>Technologies Pvt. Ltd.</span>
+                <div className="brand-lockup" style={{ color: '#fff' }}>
+                    <span className="brand-name-animated" style={{ fontSize: '17px', fontWeight: '800', color: '#fff' }}>IndusInnovate</span>
+                    <span className="brand-name-animated-subline" style={{ fontSize: '11px', fontWeight: '500', color: '#cbd5e1' }}>Technologies Pvt. Ltd.</span>
                 </div>
             </Link>
 
@@ -124,45 +197,45 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                         display: none; /* For Chrome, Safari, and Opera */
                     }
                 `}</style>
-                {(() => {
-                    // Find the deepest matching path
-                    let maxMatchLen = -1;
-                    let activeIndex = -1;
-                    menuItems.forEach((item, idx) => {
-                        if (location.pathname === item.path || location.pathname.startsWith(item.path + '/')) {
-                            if (item.path.length > maxMatchLen) {
-                                maxMatchLen = item.path.length;
-                                activeIndex = idx;
-                            }
-                        }
-                    });
-                    return menuItems.map((item, index) => {
-                        const isActive = index === activeIndex;
-                        return (
-                            <Link
-                                key={index}
-                                to={item.path}
-                                onClick={() => isMobile && toggleSidebar()}
+                {menuGroups.map((group) => {
+                    const groupActive = isGroupActive(group);
+                    const isOpenGroup = openGroup === group.label;
+                    const GroupIcon = group.icon;
+
+                    return (
+                        <div key={group.label}>
+                            <button
+                                type="button"
+                                onClick={() => toggleGroup(group.label)}
                                 style={{
+                                    width: '100%',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '12px',
                                     padding: '12px 24px',
-                                    textDecoration: 'none',
-                                    color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                                    background: isActive ? 'var(--input-bg)' : 'transparent',
-                                    borderLeft: isActive ? '4px solid var(--primary)' : '4px solid transparent',
+                                    border: 'none',
+                                    background: isOpenGroup ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    borderLeft: isOpenGroup ? '4px solid #fff' : '4px solid transparent',
+                                    color: isOpenGroup ? '#fff' : '#cbd5e1',
+                                    cursor: 'pointer',
                                     fontSize: 'var(--font-lg)',
-                                    fontWeight: isActive ? '600' : '500',
-                                    transition: 'all 0.2s'
+                                    fontWeight: isOpenGroup ? '600' : '500',
+                                    textAlign: 'left'
                                 }}
                             >
-                                {React.cloneElement(item.icon, { color: isActive ? 'var(--primary)' : 'var(--text-muted)' })}
-                                <span>{item.label}</span>
-                            </Link>
-                        );
-                    });
-                })()}
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <GroupIcon size={20} color={isOpenGroup ? '#fff' : '#cbd5e1'} />
+                                    <span>{group.label}</span>
+                                </span>
+                            </button>
+                            {isOpenGroup && (
+                                <div>
+                                    {group.items.map((item) => renderLink(item, true))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </nav>
 
             {/* Logout */}
@@ -170,13 +243,13 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 onClick={signOut}
                 style={{
                     marginTop: 'auto',
-                    borderTop: '1px solid var(--border)',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                     padding: '16px 24px 0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    color: 'var(--text-muted)',
+                    color: '#cbd5e1',
                     fontSize: 'var(--font-lg)',
                     fontWeight: '500'
                 }}

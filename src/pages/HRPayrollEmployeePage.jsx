@@ -33,7 +33,44 @@ const HRPayrollEmployeePage = () => {
     const [validationErrors, setValidationErrors] = useState({});
 
     const round2 = (value) => Number((Math.round((Number(value) || 0) * 100) / 100).toFixed(2));
+
+    const toRatio = (value, fallback = 0) => {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 0) return fallback;
+        if (n <= 1) return n;
+        if (n <= 100) return n / 100;
+        return fallback;
+    };
+
+    const getBreakupRatios = (settings = {}) => {
+        const basicRatio = toRatio(settings.basic_ratio, 0.4);
+        const hraRatio = toRatio(settings.hra_ratio, 0.2);
+        const conveyanceRatio = toRatio(settings.conveyance_amount, 0.2);
+        const configuredSum = basicRatio + hraRatio + conveyanceRatio;
+
+        if (configuredSum > 1) {
+            return { basicRatio: 0.4, hraRatio: 0.2, conveyanceRatio: 0.2, specialRatio: 0.2 };
+        }
+
+        return {
+            basicRatio,
+            hraRatio,
+            conveyanceRatio,
+            specialRatio: Math.max(0, 1 - configuredSum),
+        };
+    };
     const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+    const getProrationFactor = (data) => {
+        const processedDays = Number(data?.processed_days) || 0;
+        if (processedDays <= 0) return 1;
+
+        const paidDaysRaw = data?.paid_days === undefined || data?.paid_days === null
+            ? processedDays
+            : Number(data.paid_days);
+        const paidDays = Number.isFinite(paidDaysRaw) ? paidDaysRaw : 0;
+        return Math.min(Math.max(paidDays / processedDays, 0), 1);
+    };
 
     const getTdsBreakdown = (annualIncome, slabs = []) => {
         const income = Math.max(0, Number(annualIncome) || 0);
@@ -146,24 +183,26 @@ const HRPayrollEmployeePage = () => {
         const monthlyCtc = Math.round(annualSalary / 12);
         
         const settings = statutorySettings?.settings || {};
-        const pfDef = Number(settings.fixed_pf_deduction) || 1500;
-        const insDef = Number(settings.fixed_insurance_deduction) || 334;
-        const basicRatio = Number(settings.basic_ratio) || 0.5555;
-        const hraRatio = Number(settings.hra_ratio) || 0.5;
-        const convAmount = Number(settings.conveyance_amount) || 1500;
+        const employeePfDef = Number(settings.fixed_pf_deduction) || 1800;
+        const employerPfDef = employeePfDef;
+        const insDef = Number(settings.fixed_insurance_deduction) || 450;
+        const { basicRatio, hraRatio, conveyanceRatio, specialRatio } = getBreakupRatios(settings);
         const ptaxAmount = Number(settings.fixed_ptax_deduction) || 200;
 
-        // Gross = CTC - (PF + Insurance)
-        const gross = annualSalary > 0 ? Math.max(0, monthlyCtc - (pfDef + insDef)) : 0;
+        // Breakup base = full Monthly CTC (deductions are applied separately)
+        const gross = annualSalary > 0 ? Math.max(0, monthlyCtc) : 0;
         
         // Components based on dynamic logic
         const basic = annualSalary > 0 ? Math.round(gross * basicRatio) : 0;
-        const hra = Math.round(basic * hraRatio);
-        const conveyance = annualSalary > 0 ? convAmount : 0;
-        const specialAllowance = annualSalary > 0 ? Math.max(0, gross - basic - hra - conveyance) : 0;
+        const hra = annualSalary > 0 ? Math.round(gross * hraRatio) : 0;
+        const conveyance = annualSalary > 0 ? Math.round(gross * conveyanceRatio) : 0;
+        const specialAllowance = annualSalary > 0 ? Math.max(0, Math.round(gross * specialRatio)) : 0;
 
         const ptax = annualSalary > 0 ? ptaxAmount : 0; // Dynamic P Tax
         const otherDeduction = 0;
+        const fixedEmployeePf = annualSalary > 0 ? employeePfDef : 0;
+        const fixedEmployerPf = annualSalary > 0 ? employerPfDef : 0;
+        const fixedInsurance = annualSalary > 0 ? insDef : 0;
 
         return {
             month,
@@ -199,6 +238,9 @@ const HRPayrollEmployeePage = () => {
             net_salary: gross - ptax,
             ptax,
             otherDeduction,
+            fixed_employee_pf: fixedEmployeePf,
+            fixed_employer_pf: fixedEmployerPf,
+            fixed_insurance: fixedInsurance,
             created_at: new Date().toISOString()
         };
     };
@@ -212,33 +254,41 @@ const HRPayrollEmployeePage = () => {
         const otherDeduction = Number(current.otherDeduction ?? current.tds) || 0;
         const ptax = current.ptax != null && current.ptax !== '' ? Number(current.ptax) : 0;
         
-        const processedDays = Number(current.processed_days) || 30;
-        const paidDays = current.paid_days === undefined || current.paid_days === null ? processedDays : Number(current.paid_days);
-        const factor = processedDays > 0 ? Math.min(paidDays / processedDays, 1) : 0;
+        const factor = getProrationFactor(current);
+        const hasZeroFactor = factor === 0;
+        const overrides = current.manualProratedOverrides || {};
 
         // Prorate all Earnings
-        const basic_salary = Math.round(baseBasic * factor);
-        const hra = Math.round(baseHra * factor);
-        const conveyance = Math.round(baseConveyance * factor);
-        const specialAllowance = Math.round(baseSpecial * factor);
+        const basic_salary = hasZeroFactor
+            ? Math.max(0, Number(overrides.basic_salary ?? current.basic_salary ?? 0))
+            : Math.round(baseBasic * factor);
+        const hra = hasZeroFactor
+            ? Math.max(0, Number(overrides.hra ?? current.hra ?? 0))
+            : Math.round(baseHra * factor);
+        const conveyance = hasZeroFactor
+            ? Math.max(0, Number(overrides.conveyance ?? current.conveyance ?? 0))
+            : Math.round(baseConveyance * factor);
+        const specialAllowance = hasZeroFactor
+            ? Math.max(0, Number(overrides.specialAllowance ?? current.specialAllowance ?? 0))
+            : Math.round(baseSpecial * factor);
         const allowances = conveyance + specialAllowance;
         const gross_salary = basic_salary + hra + allowances;
 
-        const pfEmployeeRate = Number(statutorySettings?.settings?.pf_employee_rate) || 0;
-        const pfEmployerRate = Number(statutorySettings?.settings?.pf_employer_rate) || 0;
-        const esiEmployeeRate = Number(statutorySettings?.settings?.esi_employee_rate) || 0;
-        const esiEmployerRate = Number(statutorySettings?.settings?.esi_employer_rate) || 0;
+        const fixedEmployeePf = Number(statutorySettings?.settings?.fixed_pf_deduction) || 0;
+        const fixedEmployerPf = fixedEmployeePf;
+        const fixedInsurance = Number(statutorySettings?.settings?.fixed_insurance_deduction) || 0;
         const slabs = statutorySettings?.tds_slabs || [];
 
-        const pf_employee = round2(gross_salary * (pfEmployeeRate / 100));
-        const pf_employer = round2(gross_salary * (pfEmployerRate / 100));
-        const esi_employee = round2(gross_salary * (esiEmployeeRate / 100));
-        const esi_employer = round2(gross_salary * (esiEmployerRate / 100));
+        const pf_employee = 0;
+        const pf_employer = 0;
+        const esi_employee = 0;
+        const esi_employer = 0;
         
         const annualTds = computeAnnualTds(gross_salary * 12, slabs);
         const tds = round2(annualTds / 12);
 
-        const deductions = round2(pf_employee + esi_employee + tds + ptax + round2(otherDeduction));
+        const fixedDeductions = round2(fixedEmployeePf + fixedEmployerPf + fixedInsurance);
+        const deductions = round2(fixedDeductions + tds + ptax + round2(otherDeduction));
         const net_salary = round2(gross_salary - deductions);
 
         return {
@@ -258,6 +308,9 @@ const HRPayrollEmployeePage = () => {
             deductions,
             net_salary,
             otherDeduction,
+            fixed_employee_pf: fixedEmployeePf,
+            fixed_employer_pf: fixedEmployerPf,
+            fixed_insurance: fixedInsurance,
             year: Number(current.year) || Number(year)
         };
     };
@@ -266,7 +319,32 @@ const HRPayrollEmployeePage = () => {
         setPayslip((prev) => {
             if (!prev) return prev;
             const parsed = value === '' ? 0 : Number(value);
-            const next = { ...prev, [field]: Number.isNaN(parsed) ? 0 : parsed };
+            const normalized = Number.isNaN(parsed) ? 0 : parsed;
+            const editableToBaseFieldMap = {
+                basic_salary: 'base_basic_salary',
+                hra: 'base_hra',
+                conveyance: 'base_conveyance',
+                specialAllowance: 'base_special_allowance',
+            };
+
+            if (editableToBaseFieldMap[field]) {
+                const factor = getProrationFactor(prev);
+                const baseField = editableToBaseFieldMap[field];
+                const recalculatedBase = factor > 0 ? Math.round(normalized / factor) : normalized;
+                const currentOverrides = prev.manualProratedOverrides || {};
+                const updatedOverrides = factor === 0
+                    ? { ...currentOverrides, [field]: normalized }
+                    : currentOverrides;
+                const next = {
+                    ...prev,
+                    [field]: normalized,
+                    [baseField]: recalculatedBase,
+                    manualProratedOverrides: updatedOverrides,
+                };
+                return recalculatePayslip(next);
+            }
+
+            const next = { ...prev, [field]: normalized };
             return recalculatePayslip(next);
         });
     };
@@ -302,15 +380,12 @@ const HRPayrollEmployeePage = () => {
     const generatePayslip = async () => {
         if (!selectedEmp || !payslip) return;
 
-        // Client-side validation — check Base Monthly values instead of Prorated
-        const baseBasic = Number(payslip.base_basic_salary) || 0;
-        const h = Number(payslip.base_hra) || 0;
-        const c = Number(payslip.base_conveyance) || 0;
-        const s = Number(payslip.base_special_allowance) || 0;
-        const baseGross = baseBasic + h + c + s;
+        // Client-side validation — require payable values
+        const payableBasic = Number(payslip.basic_salary) || 0;
+        const payableGross = Number(payslip.gross_salary) || 0;
         
-        if (baseBasic <= 0 || baseGross <= 0) {
-            setValidationErrors({ basic_salary: baseBasic <= 0 });
+        if (payableBasic <= 0 || payableGross <= 0) {
+            setValidationErrors({ basic_salary: payableBasic <= 0 });
             return;
         }
         setValidationErrors({});
@@ -442,42 +517,39 @@ const HRPayrollEmployeePage = () => {
 
                         <div className="payroll-breakdown" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px', padding: '24px' }}>
                             <div>
-                                <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', marginBottom: '12px' }}>EARNINGS (Base Monthly)</p>
+                                <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', marginBottom: '12px' }}>EARNINGS (Prorated Monthly)</p>
                                 <div className="pay-row pay-row-editable">
                                 <span>Basic Salary <span style={{ color: '#EF4444' }}>*</span></span>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
-                                        <input type="number" value={payslip.base_basic_salary} onChange={(e) => { updateNumericField('base_basic_salary', e.target.value); setValidationErrors((v) => ({ ...v, basic_salary: false })); }} style={{ width: '100%', textAlign: 'right', border: validationErrors.basic_salary ? '2px solid #EF4444' : undefined }} className="input-field" />
-                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.basic_salary}</span>
+                                        <input type="number" value={payslip.basic_salary} onChange={(e) => { updateNumericField('basic_salary', e.target.value); setValidationErrors((v) => ({ ...v, basic_salary: false })); }} style={{ width: '100%', textAlign: 'right', border: validationErrors.basic_salary ? '2px solid #EF4444' : undefined }} className="input-field" />
                                     </div>
                                     {validationErrors.basic_salary && <p style={{ color: '#EF4444', fontSize: '11px', margin: '2px 0 0', gridColumn: '1 / -1' }}>Basic Salary is required</p>}
                                 </div>
                                 <div className="pay-row pay-row-editable">
                                     <span>HRA <span style={{ color: '#EF4444' }}>*</span></span>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
-                                        <input type="number" value={payslip.base_hra} onChange={(e) => updateNumericField('base_hra', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
-                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.hra}</span>
+                                        <input type="number" value={payslip.hra} onChange={(e) => updateNumericField('hra', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
                                     </div>
                                 </div>
                                 <div className="pay-row pay-row-editable">
                                     <span>Conveyance</span>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
-                                        <input type="number" value={payslip.base_conveyance} onChange={(e) => updateNumericField('base_conveyance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
-                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.conveyance}</span>
+                                        <input type="number" value={payslip.conveyance} onChange={(e) => updateNumericField('conveyance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
                                     </div>
                                 </div>
                                 <div className="pay-row pay-row-editable">
                                     <span>Special Allowance</span>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
-                                        <input type="number" value={payslip.base_special_allowance} onChange={(e) => updateNumericField('base_special_allowance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
-                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Prorated: ₹{payslip.specialAllowance}</span>
+                                        <input type="number" value={payslip.specialAllowance} onChange={(e) => updateNumericField('specialAllowance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
                                     </div>
                                 </div>
                                 <div className="pay-row total"><span>Gross Total (Payable)</span> <span>₹{payslip.gross_salary}</span></div>
                             </div>
                             <div>
                                 <p style={{ fontSize: '13px', fontWeight: '700', color: '#EF4444', marginBottom: '12px' }}>DEDUCTIONS</p>
-                                <div className="pay-row"><span>PF</span> <span>₹{payslip.pf}</span></div>
-                                <div className="pay-row"><span>ESI (Employee)</span> <span>₹{payslip.esi_employee}</span></div>
+                                <div className="pay-row"><span>Fixed PF (Employee)</span> <span>₹{payslip.fixed_employee_pf || 0}</span></div>
+                                <div className="pay-row"><span>Fixed PF (Employer)</span> <span>₹{payslip.fixed_employer_pf || 0}</span></div>
+                                <div className="pay-row"><span>Fixed Insurance</span> <span>₹{payslip.fixed_insurance || 0}</span></div>
                                 <div className="pay-row"><span>TDS</span> <span>₹{payslip.tds}</span></div>
                                 <div className="pay-row pay-row-editable">
                                     <span>Other Deduction</span>

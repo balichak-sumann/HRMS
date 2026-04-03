@@ -85,6 +85,20 @@ const getOfferLetters = async (req, res) => {
 const sendOfferLetter = async (req, res) => {
     try {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const settingsRes = await pool.query(
+            `SELECT basic_ratio,
+                    hra_ratio,
+                    conveyance_amount,
+                    fixed_pf_deduction,
+                    fixed_employer_pf_deduction,
+                    fixed_insurance_deduction,
+                    fixed_ptax_deduction
+             FROM payroll_statutory_settings
+             ORDER BY updated_at DESC
+             LIMIT 1`
+        );
+        const statutorySettings = settingsRes.rows[0] || {};
+
         const existing = await pool.query(
             "SELECT id, candidate_name, email, role, department, ctc, joining_date, type, file_path FROM offer_letters WHERE id = $1",
             [req.params.id]
@@ -123,7 +137,8 @@ const sendOfferLetter = async (req, res) => {
             issueDate: null,
             joiningDate: letter.joining_date,
             type: letter.type || 'offer',
-            attachmentPath
+            attachmentPath,
+            settings: statutorySettings
         });
 
         await pool.query("UPDATE offer_letters SET status = 'Sent' WHERE id = $1", [req.params.id]);
@@ -158,6 +173,19 @@ const bulkSendOfferLetters = async (req, res) => {
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const settingsRes = await pool.query(
+            `SELECT basic_ratio,
+                    hra_ratio,
+                    conveyance_amount,
+                    fixed_pf_deduction,
+                    fixed_employer_pf_deduction,
+                    fixed_insurance_deduction,
+                    fixed_ptax_deduction
+             FROM payroll_statutory_settings
+             ORDER BY updated_at DESC
+             LIMIT 1`
+        );
+        const statutorySettings = settingsRes.rows[0] || {};
         const results = { success: [], failures: [] };
 
         for (const id of ids) {
@@ -195,7 +223,8 @@ const bulkSendOfferLetters = async (req, res) => {
                     issueDate: null,
                     joiningDate: letter.joining_date,
                     type: letter.type || 'offer',
-                    attachmentPath
+                    attachmentPath,
+                    settings: statutorySettings
                 });
 
                 await pool.query("UPDATE offer_letters SET status = 'Sent' WHERE id = $1", [id]);

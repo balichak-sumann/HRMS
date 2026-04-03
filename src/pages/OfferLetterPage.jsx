@@ -40,6 +40,32 @@ const toInr = (value) => {
     return `RS ${n.toLocaleString('en-IN')}`;
 };
 
+const toRatio = (value, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return fallback;
+    if (n <= 1) return n;
+    if (n <= 100) return n / 100;
+    return fallback;
+};
+
+const getBreakupRatios = (settings = {}) => {
+    const basicRatio = toRatio(settings.basic_ratio, 0.4);
+    const hraRatio = toRatio(settings.hra_ratio, 0.2);
+    const conveyanceRatio = toRatio(settings.conveyance_amount, 0.2);
+    const configuredSum = basicRatio + hraRatio + conveyanceRatio;
+
+    if (configuredSum > 1) {
+        return { basicRatio: 0.4, hraRatio: 0.2, conveyanceRatio: 0.2, specialRatio: 0.2 };
+    }
+
+    return {
+        basicRatio,
+        hraRatio,
+        conveyanceRatio,
+        specialRatio: Math.max(0, 1 - configuredSum),
+    };
+};
+
 const styles = StyleSheet.create({
     page: {
         paddingTop: 20,
@@ -220,23 +246,25 @@ const OfferLetterPDF = ({ data, settings = {} }) => {
     const hasPaidCtc = annualCtc > 0;
     const ctcText = toInr(annualCtc);
 
-    // Match screenshot logic: Gross = Monthly CTC - (Fixed PF + Fixed Insurance)
+    // Monthly salary is the annual package divided by 12.
     const monthlyCtc = hasPaidCtc ? Math.round(annualCtc / 12) : 0;
-    const employeePfMonth = hasPaidCtc ? (Number(settings.fixed_pf_deduction) || 1500) : 0;
-    const insuranceMonth = hasPaidCtc ? (Number(settings.fixed_insurance_deduction) || 334) : 0;
+    const employeePfMonth = hasPaidCtc ? (Number(settings.fixed_pf_deduction) || 1800) : 0;
+    const employerPfMonth = employeePfMonth;
+    const insuranceMonth = hasPaidCtc ? (Number(settings.fixed_insurance_deduction) || 450) : 0;
     const professionalTaxMonth = hasPaidCtc ? (Number(settings.fixed_ptax_deduction) || 200) : 0; 
     
-    const grossMonth = hasPaidCtc ? Math.max(0, monthlyCtc - employeePfMonth - insuranceMonth) : 0;
+    const grossMonth = hasPaidCtc
+        ? Math.max(0, monthlyCtc - employeePfMonth - employerPfMonth - insuranceMonth - professionalTaxMonth)
+        : 0;
     
-    // Components based on dynamic settings
-    const bRatio = Number(settings.basic_ratio) || 0.5555;
-    const hRatio = Number(settings.hra_ratio) || 0.5;
-    const convAmount = Number(settings.conveyance_amount) || 1500;
+    // Components based on dynamic settings, applied on the post-deduction monthly salary.
+    const { basicRatio, hraRatio, conveyanceRatio, specialRatio } = getBreakupRatios(settings);
 
-    const basicPayMonth = hasPaidCtc ? Math.round(grossMonth * bRatio) : 0;
-    const hraMonth = hasPaidCtc ? Math.round(basicPayMonth * hRatio) : 0;
-    const conveyanceMonth = hasPaidCtc ? convAmount : 0; 
-    const specialAllowanceMonth = hasPaidCtc ? Math.max(0, grossMonth - basicPayMonth - hraMonth - conveyanceMonth) : 0;
+    const basicPayMonth = hasPaidCtc ? Math.round(grossMonth * basicRatio) : 0;
+    const hraMonth = hasPaidCtc ? Math.round(grossMonth * hraRatio) : 0;
+    const conveyanceMonth = hasPaidCtc ? Math.round(grossMonth * conveyanceRatio) : 0;
+    const specialAllowanceMonth = hasPaidCtc ? Math.max(0, Math.round(grossMonth * specialRatio)) : 0;
+    const netPayableMonth = grossMonth;
 
     return (
         <Document>
@@ -262,7 +290,7 @@ const OfferLetterPDF = ({ data, settings = {} }) => {
 
                 <Text style={styles.heading}>2. Compensation and Benefits:</Text>
                 <Text style={styles.block}>
-                    Your starting salary will be {ctcText} per annum which includes of all statutory deductions. Refer to the Annexure A for stack up details.
+                    Your starting salary will be {ctcText} per annum. Refer to Annexure A for the monthly break-up details.
                 </Text>
 
                 <Text style={styles.heading}>3. Working Hours:</Text>
@@ -585,8 +613,9 @@ const OfferLetterPDF = ({ data, settings = {} }) => {
                     <View style={styles.tr}><Text style={styles.tdComponent}>House Rent Allowance (HRA)</Text><Text style={styles.tdMonth}>{hraMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(hraMonth * 12).toLocaleString('en-IN')}</Text></View>
                     <View style={styles.tr}><Text style={styles.tdComponent}>Conveyance Allowance</Text><Text style={styles.tdMonth}>{conveyanceMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(conveyanceMonth * 12).toLocaleString('en-IN')}</Text></View>
                     <View style={styles.tr}><Text style={styles.tdComponent}>Special Allowance</Text><Text style={styles.tdMonth}>{specialAllowanceMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(specialAllowanceMonth * 12).toLocaleString('en-IN')}</Text></View>
-                    <View style={styles.tr}><Text style={styles.tdComponent}>Gross Salary (A)</Text><Text style={styles.tdMonth}>{grossMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(grossMonth * 12).toLocaleString('en-IN')}</Text></View>
+                    <View style={styles.tr}><Text style={styles.tdComponent}>Net Payable (A)</Text><Text style={styles.tdMonth}>{netPayableMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(netPayableMonth * 12).toLocaleString('en-IN')}</Text></View>
                     <View style={styles.tr}><Text style={styles.tdComponent}>Employee PF Contribution</Text><Text style={styles.tdMonth}>{employeePfMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(employeePfMonth * 12).toLocaleString('en-IN')}</Text></View>
+                    <View style={styles.tr}><Text style={styles.tdComponent}>Employer PF Contribution</Text><Text style={styles.tdMonth}>{employerPfMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(employerPfMonth * 12).toLocaleString('en-IN')}</Text></View>
                     <View style={styles.tr}><Text style={styles.tdComponent}>Insurance (Company Paid)</Text><Text style={styles.tdMonth}>{insuranceMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(insuranceMonth * 12).toLocaleString('en-IN')}</Text></View>
                     <View style={styles.tr}><Text style={styles.tdComponent}>Professional Tax</Text><Text style={styles.tdMonth}>{professionalTaxMonth.toLocaleString('en-IN')}</Text><Text style={styles.tdYear}>{(professionalTaxMonth * 12).toLocaleString('en-IN')}</Text></View>
                     <View style={styles.tr}>

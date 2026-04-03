@@ -4,20 +4,68 @@ const fs = require('fs');
 const path = require('path');
 const { Buffer } = require('buffer');
 
+const emailPort = parseInt(process.env.EMAIL_PORT || '587', 10);
+const emailSecure = String(process.env.EMAIL_USE_SSL || (emailPort === 465 ? 'true' : 'false')).toLowerCase() === 'true';
+const emailRequireTLS = String(process.env.EMAIL_USE_TLS || 'true').toLowerCase() === 'true';
+
+const toRatio = (value, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return fallback;
+    if (n <= 1) return n;
+    if (n <= 100) return n / 100;
+    return fallback;
+};
+
+const getBreakupRatios = (settings = {}) => {
+    const basicRatio = toRatio(settings.basic_ratio, 0.4);
+    const hraRatio = toRatio(settings.hra_ratio, 0.2);
+    const conveyanceRatio = toRatio(settings.conveyance_amount, 0.2);
+    const configuredSum = basicRatio + hraRatio + conveyanceRatio;
+
+    if (configuredSum > 1) {
+        return { basicRatio: 0.4, hraRatio: 0.2, conveyanceRatio: 0.2, specialRatio: 0.2 };
+    }
+
+    return {
+        basicRatio,
+        hraRatio,
+        conveyanceRatio,
+        specialRatio: Math.max(0, 1 - configuredSum),
+    };
+};
+
+const getMonthlySalaryBreakdown = (monthlyBase, settings = {}) => {
+    const { basicRatio, hraRatio, conveyanceRatio, specialRatio } = getBreakupRatios(settings);
+    const totalMonthly = Math.max(0, Math.round(Number(monthlyBase) || 0));
+    const basic = Math.round(totalMonthly * basicRatio);
+    const hra = Math.round(totalMonthly * hraRatio);
+    const conveyance = Math.round(totalMonthly * conveyanceRatio);
+    const special = Math.max(0, Math.round(totalMonthly * specialRatio));
+
+    return {
+        totalMonthly,
+        basic,
+        hra,
+        conveyance,
+        special,
+    };
+};
+
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false,
+    host: process.env.EMAIL_HOST || 'smtppro.zoho.in',
+    port: emailPort,
+    secure: emailSecure,
+    requireTLS: emailRequireTLS,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.EMAIL_HOST_USER || process.env.EMAIL_USER,
+        pass: process.env.EMAIL_HOST_PASSWORD || process.env.EMAIL_PASS,
     },
 });
 
-const FROM = process.env.EMAIL_FROM || `"IndusInnovate Technologies" <${process.env.EMAIL_USER}>`;
+const FROM = process.env.DEFAULT_FROM_EMAIL || process.env.EMAIL_FROM || `"IndusInnovate Technologies" <${process.env.EMAIL_HOST_USER || process.env.EMAIL_USER}>`;
 
 // ─── Generate Offer Letter PDF ───────────────────────────────────
-const generateOfferLetterPDF = (offerData) => {
+const generateOfferLetterPDF = (offerData, settings = {}) => {
     return new Promise((resolve, reject) => {
         try {
             const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -57,14 +105,15 @@ const generateOfferLetterPDF = (offerData) => {
             doc.moveDown(0.3);
 
             // Salary Table Header
-            const monthlyCtc = offerData.ctc ? Math.round(offerData.ctc / 12) : 33334;
-            const employeePf = 1500;
-            const insurance = 334;
-            const gross = offerData.ctc ? Math.round(monthlyCtc - employeePf - insurance) : 31500;
-            const basic = offerData.ctc ? Math.round((gross * 55) / 100) : 17300;
-            const hra = offerData.ctc ? Math.round((gross * 27.8) / 100) : 8750;
-            const conveyance = 1500;
-            const special = offerData.ctc ? Math.round(gross - basic - hra - conveyance) : 3750;
+            const monthlyCtc = offerData.ctc ? Math.round(Number(offerData.ctc) / 12) : 33334;
+            const employeePf = Number(settings.fixed_pf_deduction) || 1800;
+            const employerPf = employeePf;
+            const insurance = Number(settings.fixed_insurance_deduction) || 450;
+            const professionalTax = Number(settings.fixed_ptax_deduction) || 200;
+            const gross = Math.max(0, monthlyCtc - employeePf - employerPf - insurance - professionalTax);
+            const salaryBreakdown = getMonthlySalaryBreakdown(gross, settings);
+            const { basic, hra, conveyance, special } = salaryBreakdown;
+            const netPayable = gross;
 
             doc.fontSize(9).font('Helvetica-Bold').text('SALARY ANNEXURE', { underline: true });
             doc.moveDown(0.3);
@@ -89,9 +138,11 @@ const generateOfferLetterPDF = (offerData) => {
                 ['House Rent Allowance', `₹${hra.toLocaleString('en-IN')}`, `₹${(hra * 12).toLocaleString('en-IN')}`],
                 ['Conveyance', `₹${conveyance.toLocaleString('en-IN')}`, `₹${(conveyance * 12).toLocaleString('en-IN')}`],
                 ['Special Allowance', `₹${special.toLocaleString('en-IN')}`, `₹${(special * 12).toLocaleString('en-IN')}`],
-                ['Gross Salary (A)', `₹${gross.toLocaleString('en-IN')}`, `₹${(gross * 12).toLocaleString('en-IN')}`],
-                ['Employee PF', `₹${employeePf.toLocaleString('en-IN')}`, `₹${(employeePf * 12).toLocaleString('en-IN')}`],
-                ['Insurance', `₹${insurance.toLocaleString('en-IN')}`, `₹${(insurance * 12).toLocaleString('en-IN')}`],
+                ['Net Payable (A)', `₹${netPayable.toLocaleString('en-IN')}`, `₹${(netPayable * 12).toLocaleString('en-IN')}`],
+                ['Employee PF Contribution', `₹${employeePf.toLocaleString('en-IN')}`, `₹${(employeePf * 12).toLocaleString('en-IN')}`],
+                ['Employer PF Contribution', `₹${employerPf.toLocaleString('en-IN')}`, `₹${(employerPf * 12).toLocaleString('en-IN')}`],
+                ['Insurance (Company Paid)', `₹${insurance.toLocaleString('en-IN')}`, `₹${(insurance * 12).toLocaleString('en-IN')}`],
+                ['Professional Tax', `₹${professionalTax.toLocaleString('en-IN')}`, `₹${(professionalTax * 12).toLocaleString('en-IN')}`],
                 ['Total CTC', `₹${monthlyCtc.toLocaleString('en-IN')}`, `₹${(offerData.ctc || '4,00,008').toLocaleString('en-IN')}`]
             ];
 
@@ -378,19 +429,18 @@ const sendOnboardingAssignedEmail = async ({ to, name, templateName }) => {
 };
 
 // ─── Send Offer Letter Email ─────────────────────────────────────
-const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, department, location, ctc, issueDate, joiningDate, type, attachmentPath }) => {
+const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, department, location, ctc, issueDate, joiningDate, type, attachmentPath, settings = {} }) => {
     const isOffer = type === 'offer';
     const safeCandidateName = (candidateName || 'Candidate').replace(/\s+/g, '_');
-    const monthlyCtc = ctc ? Math.round(ctc / 12) : 33334;
-    
-    // Calculate salary components
-    const employeePf = 1500;
-    const insurance = 334;
-    const gross = ctc ? Math.round(monthlyCtc - employeePf - insurance) : 31500;
-    const basic = ctc ? Math.round((gross * 55) / 100) : 17300;
-    const hra = ctc ? Math.round((gross * 27.8) / 100) : 8750;
-    const conveyance = 1500;
-    const special = ctc ? Math.round(gross - basic - hra - conveyance) : 3750;
+    const monthlyCtc = ctc ? Math.round(Number(ctc) / 12) : 33334;
+    const employeePf = Number(settings.fixed_pf_deduction) || 1800;
+    const employerPf = employeePf;
+    const insurance = Number(settings.fixed_insurance_deduction) || 450;
+    const professionalTax = Number(settings.fixed_ptax_deduction) || 200;
+    const gross = Math.max(0, monthlyCtc - employeePf - employerPf - insurance - professionalTax);
+    const salaryBreakdown = getMonthlySalaryBreakdown(gross, settings);
+    const { basic, hra, conveyance, special } = salaryBreakdown;
+    const netPayable = gross;
 
     let normalizedPdfBuffer = null;
 
@@ -405,7 +455,7 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
             ctc,
             issueDate,
             joiningDate
-        });
+        }, settings);
         normalizedPdfBuffer = Buffer.from(pdfBuffer || []);
     }
 
@@ -457,16 +507,24 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
                         <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;">₹${special.toLocaleString('en-IN')}</td>
                     </tr>
                     <tr style="background:#E0F2FE;">
-                        <td style="padding:10px;border:1px solid #E5E7EB;"><strong>Gross Salary</strong></td>
-                        <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;"><strong>₹${gross.toLocaleString('en-IN')}</strong></td>
+                        <td style="padding:10px;border:1px solid #E5E7EB;"><strong>Net Payable (A)</strong></td>
+                        <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;"><strong>₹${netPayable.toLocaleString('en-IN')}</strong></td>
                     </tr>
                     <tr>
                         <td style="padding:10px;border:1px solid #E5E7EB;">Employee PF Contribution</td>
                         <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;">₹${employeePf.toLocaleString('en-IN')}</td>
                     </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #E5E7EB;">Employer PF Contribution</td>
+                        <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;">₹${employerPf.toLocaleString('en-IN')}</td>
+                    </tr>
                     <tr style="background:#F9FAFB;">
                         <td style="padding:10px;border:1px solid #E5E7EB;">Insurance (Company Paid)</td>
                         <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;">₹${insurance.toLocaleString('en-IN')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #E5E7EB;">Professional Tax</td>
+                        <td style="padding:10px;border:1px solid #E5E7EB;text-align:right;">₹${professionalTax.toLocaleString('en-IN')}</td>
                     </tr>
                     <tr style="background:#FEF3C7;">
                         <td style="padding:12px;border:1px solid #E5E7EB;"><strong>Total CTC (A + Benefits)</strong></td>
