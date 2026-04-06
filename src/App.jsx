@@ -1,74 +1,77 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
 import HRLayout from './components/HRLayout';
 import AdminLayout from './components/AdminLayout';
 import EmployeeLayout from './components/EmployeeLayout';
 import { useAuth } from './context/AuthContext';
-import HRDashboard from './pages/HRDashboard';
-import EmployeesPage from './pages/EmployeesPage';
-import EmployeeProfilePage from './pages/EmployeeProfilePage';
-import ApplyLeavePage from './pages/ApplyLeavePage';
-import HRLeavesPage from './pages/HRLeavesPage';
-import CalendarPage from './pages/CalendarPage';
-import HRPayrollPage from './pages/HRPayrollPage';
-import HRPayrollEmployeePage from './pages/HRPayrollEmployeePage';
-import HRStatutorySettingsPage from './pages/HRStatutorySettingsPage';
-import HRStatutoryCompliancePage from './pages/HRStatutoryCompliancePage';
-import HRTaxDeclarationPage from './pages/HRTaxDeclarationPage';
-import HRForm16Page from './pages/HRForm16Page';
-import EmployeePayslipsPage from './pages/EmployeePayslipsPage';
-import HRAttendancePage from './pages/HRAttendancePage';
-import HRProjectsPage from './pages/HRProjectsPage';
-import EmployeeDashboard from './pages/EmployeeDashboard';
-import EmployeeAttendancePage from './pages/EmployeeAttendancePage';
-import EmployeeProjectsPage from './pages/EmployeeProjectsPage';
-import OfferLetterPage from './pages/OfferLetterPage';
-import EmployeeIDCardPage from './pages/EmployeeIDCardPage';
-import EmployeeComplaintsPage from './pages/EmployeeComplaintsPage';
-import HRComplaintsPage from './pages/HRComplaintsPage';
-import HRAuditLogsPage from './pages/HRAuditLogsPage';
-import HRPerformancePage from './pages/HRPerformancePage';
-import HROnboardingPage from './pages/HROnboardingPage';
-import HRDepartmentsPage from './pages/HRDepartmentsPage';
-import HROrgChartPage from './pages/HROrgChartPage';
-import HRExpenseApprovalsPage from './pages/HRExpenseApprovalsPage';
-import HRReimbursementSummaryPage from './pages/HRReimbursementSummaryPage';
-import HRShiftManagementPage from './pages/HRShiftManagementPage';
-import HRLeaveEncashmentPage from './pages/HRLeaveEncashmentPage';
-import HROffboardingPage from './pages/HROffboardingPage';
-import HRAssetsPage from './pages/HRAssetsPage';
-import ChatPage from './pages/ChatPage';
-import MeetingsPage from './pages/MeetingsPage';
-import MeetingRoomPage from './pages/MeetingRoomPage';
-import DrivePage from './pages/DrivePage';
-import SettingsPage from './pages/SettingsPage';
-import ProfilePage from './pages/ProfilePage';
-import EmployeePerformancePage from './pages/EmployeePerformancePage';
-import EmployeeOnboardingPage from './pages/EmployeeOnboardingPage';
-import EmployeeExpensesPage from './pages/EmployeeExpensesPage';
-import EmployeeLeaveEncashmentPage from './pages/EmployeeLeaveEncashmentPage';
-import EmployeeExitInterviewPage from './pages/EmployeeExitInterviewPage';
-import EmployeeAssetsPage from './pages/EmployeeAssetsPage';
-import EmployeeTaxDeclarationPage from './pages/EmployeeTaxDeclarationPage';
-import EmployeeForm16Page from './pages/EmployeeForm16Page';
-import EmployeeSalaryStructurePage from './pages/EmployeeSalaryStructurePage';
-import HRHelpDeskPage from './pages/HRHelpDeskPage';
-import EmployeeHelpDeskPage from './pages/EmployeeHelpDeskPage';
-import HRSurveysPage from './pages/HRSurveysPage';
-import HRSurveyCreatePage from './pages/HRSurveyCreatePage';
-import HRSurveyResultsPage from './pages/HRSurveyResultsPage';
-import EmployeeSurveysPage from './pages/EmployeeSurveysPage';
-import EmployeeSurveyFillPage from './pages/EmployeeSurveyFillPage';
-import AdminManagementPage from './pages/AdminManagementPage';
 import { Toaster } from 'react-hot-toast';
 import { SocketProvider, useSocket } from './context/SocketContext';
 import CallModal from './components/Chat/CallModal';
 import './index.css';
+
+const lazyPage = (path) => lazy(() => import(path));
+
+const LoginPage = lazyPage('./pages/LoginPage');
+const ForgotPasswordPage = lazyPage('./pages/ForgotPasswordPage');
+const ResetPasswordPage = lazyPage('./pages/ResetPasswordPage');
+const HRDashboard = lazyPage('./pages/HRDashboard');
+const EmployeesPage = lazyPage('./pages/EmployeesPage');
+const EmployeeProfilePage = lazyPage('./pages/EmployeeProfilePage');
+const ApplyLeavePage = lazyPage('./pages/ApplyLeavePage');
+const HRLeavesPage = lazyPage('./pages/HRLeavesPage');
+const CalendarPage = lazyPage('./pages/CalendarPage');
+const HRPayrollPage = lazyPage('./pages/HRPayrollPage');
+const HRPayrollEmployeePage = lazyPage('./pages/HRPayrollEmployeePage');
+const HRStatutorySettingsPage = lazyPage('./pages/HRStatutorySettingsPage');
+const HRStatutoryCompliancePage = lazyPage('./pages/HRStatutoryCompliancePage');
+const HRTaxDeclarationPage = lazyPage('./pages/HRTaxDeclarationPage');
+const HRForm16Page = lazyPage('./pages/HRForm16Page');
+const EmployeePayslipsPage = lazyPage('./pages/EmployeePayslipsPage');
+const HRAttendancePage = lazyPage('./pages/HRAttendancePage');
+const HRProjectsPage = lazyPage('./pages/HRProjectsPage');
+const EmployeeDashboard = lazyPage('./pages/EmployeeDashboard');
+const EmployeeAttendancePage = lazyPage('./pages/EmployeeAttendancePage');
+const EmployeeProjectsPage = lazyPage('./pages/EmployeeProjectsPage');
+const OfferLetterPage = lazyPage('./pages/OfferLetterPage');
+const EmployeeIDCardPage = lazyPage('./pages/EmployeeIDCardPage');
+const EmployeeComplaintsPage = lazyPage('./pages/EmployeeComplaintsPage');
+const HRComplaintsPage = lazyPage('./pages/HRComplaintsPage');
+const HRAuditLogsPage = lazyPage('./pages/HRAuditLogsPage');
+const HRPerformancePage = lazyPage('./pages/HRPerformancePage');
+const HROnboardingPage = lazyPage('./pages/HROnboardingPage');
+const HRDepartmentsPage = lazyPage('./pages/HRDepartmentsPage');
+const HROrgChartPage = lazyPage('./pages/HROrgChartPage');
+const HRExpenseApprovalsPage = lazyPage('./pages/HRExpenseApprovalsPage');
+const HRReimbursementSummaryPage = lazyPage('./pages/HRReimbursementSummaryPage');
+const HRShiftManagementPage = lazyPage('./pages/HRShiftManagementPage');
+const HRLeaveEncashmentPage = lazyPage('./pages/HRLeaveEncashmentPage');
+const HROffboardingPage = lazyPage('./pages/HROffboardingPage');
+const HRAssetsPage = lazyPage('./pages/HRAssetsPage');
+const ChatPage = lazyPage('./pages/ChatPage');
+const MeetingsPage = lazyPage('./pages/MeetingsPage');
+const MeetingRoomPage = lazyPage('./pages/MeetingRoomPage');
+const DrivePage = lazyPage('./pages/DrivePage');
+const SettingsPage = lazyPage('./pages/SettingsPage');
+const ProfilePage = lazyPage('./pages/ProfilePage');
+const EmployeePerformancePage = lazyPage('./pages/EmployeePerformancePage');
+const EmployeeOnboardingPage = lazyPage('./pages/EmployeeOnboardingPage');
+const EmployeeExpensesPage = lazyPage('./pages/EmployeeExpensesPage');
+const EmployeeLeaveEncashmentPage = lazyPage('./pages/EmployeeLeaveEncashmentPage');
+const EmployeeExitInterviewPage = lazyPage('./pages/EmployeeExitInterviewPage');
+const EmployeeAssetsPage = lazyPage('./pages/EmployeeAssetsPage');
+const EmployeeTaxDeclarationPage = lazyPage('./pages/EmployeeTaxDeclarationPage');
+const EmployeeForm16Page = lazyPage('./pages/EmployeeForm16Page');
+const EmployeeSalaryStructurePage = lazyPage('./pages/EmployeeSalaryStructurePage');
+const HRHelpDeskPage = lazyPage('./pages/HRHelpDeskPage');
+const EmployeeHelpDeskPage = lazyPage('./pages/EmployeeHelpDeskPage');
+const HRSurveysPage = lazyPage('./pages/HRSurveysPage');
+const HRSurveyCreatePage = lazyPage('./pages/HRSurveyCreatePage');
+const HRSurveyResultsPage = lazyPage('./pages/HRSurveyResultsPage');
+const EmployeeSurveysPage = lazyPage('./pages/EmployeeSurveysPage');
+const EmployeeSurveyFillPage = lazyPage('./pages/EmployeeSurveyFillPage');
+const AdminManagementPage = lazyPage('./pages/AdminManagementPage');
 
 const getRoleBasePath = (role) => {
   if (role === 'admin') return '/admin';
@@ -125,175 +128,183 @@ function App() {
         <Router>
           <Toaster position="top-center" />
           <GlobalCallContainer />
-          <Routes>
-          {/* Public Route */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Suspense
+            fallback={
+              <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Loading page...
+              </div>
+            }
+          >
+            <Routes>
+            {/* Public Route */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-          {/* HR Routes */}
-          <Route path="/hr/*" element={
-            <ProtectedRoute requiredRole={['hr', 'admin']}>
-              <HRLayout>
-                <Routes>
-                  <Route path="dashboard" element={<HRDashboard />} />
-                  <Route path="employees" element={<EmployeesPage />} />
-                  <Route path="employees/offboarding" element={<HROffboardingPage />} />
-                  <Route path="assets" element={<HRAssetsPage />} />
-                  <Route path="employees/:id" element={<EmployeeProfilePage />} />
-                  <Route path="leaves" element={<HRLeavesPage />} />
-                  <Route path="attendance" element={<HRAttendancePage />} />
-                  <Route path="projects" element={<HRProjectsPage />} />
-                  <Route path="calendar" element={<CalendarPage />} />
-                  <Route path="offer-letters" element={<OfferLetterPage />} />
-                  <Route path="payroll" element={<HRPayrollPage />} />
-                  <Route path="payroll/:employeeId" element={<HRPayrollEmployeePage />} />
-                  <Route path="payroll/statutory-settings" element={<HRStatutorySettingsPage />} />
-                  <Route path="payroll/statutory-compliance" element={<HRStatutoryCompliancePage />} />
-                  <Route path="tax-declarations" element={<HRTaxDeclarationPage />} />
-                  <Route path="form16" element={<HRForm16Page />} />
-                  <Route path="complaints" element={<HRComplaintsPage />} />
-                  <Route path="performance" element={<HRPerformancePage />} />
-                  <Route path="onboarding" element={<HROnboardingPage />} />
-                  <Route path="departments" element={<HRDepartmentsPage />} />
-                  <Route path="org-chart" element={<HROrgChartPage />} />
-                  <Route path="expense-approvals" element={<HRExpenseApprovalsPage />} />
-                  <Route path="reimbursement-summary" element={<HRReimbursementSummaryPage />} />
-                  <Route path="shifts" element={<HRShiftManagementPage />} />
-                  <Route path="leave-encashment" element={<HRLeaveEncashmentPage />} />
-                  <Route path="helpdesk" element={<HRHelpDeskPage />} />
-                  <Route path="surveys" element={<HRSurveysPage />} />
-                  <Route path="surveys/create" element={<HRSurveyCreatePage />} />
-                  <Route path="surveys/:id/results" element={<HRSurveyResultsPage />} />
-                  <Route path="chat" element={<ChatPage />} />
-                  <Route path="meetings" element={<MeetingsPage />} />
-                  <Route path="meetings/:id" element={<MeetingRoomPage />} />
-                  <Route path="drive" element={<DrivePage />} />
-                  <Route path="profile" element={<ProfilePage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
-                </Routes>
-              </HRLayout>
-            </ProtectedRoute>
-          } />
+            {/* HR Routes */}
+            <Route path="/hr/*" element={
+              <ProtectedRoute requiredRole={['hr', 'admin']}>
+                <HRLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<HRDashboard />} />
+                    <Route path="employees" element={<EmployeesPage />} />
+                    <Route path="employees/offboarding" element={<HROffboardingPage />} />
+                    <Route path="assets" element={<HRAssetsPage />} />
+                    <Route path="employees/:id" element={<EmployeeProfilePage />} />
+                    <Route path="leaves" element={<HRLeavesPage />} />
+                    <Route path="attendance" element={<HRAttendancePage />} />
+                    <Route path="projects" element={<HRProjectsPage />} />
+                    <Route path="calendar" element={<CalendarPage />} />
+                    <Route path="offer-letters" element={<OfferLetterPage />} />
+                    <Route path="payroll" element={<HRPayrollPage />} />
+                    <Route path="payroll/:employeeId" element={<HRPayrollEmployeePage />} />
+                    <Route path="payroll/statutory-settings" element={<HRStatutorySettingsPage />} />
+                    <Route path="payroll/statutory-compliance" element={<HRStatutoryCompliancePage />} />
+                    <Route path="tax-declarations" element={<HRTaxDeclarationPage />} />
+                    <Route path="form16" element={<HRForm16Page />} />
+                    <Route path="complaints" element={<HRComplaintsPage />} />
+                    <Route path="performance" element={<HRPerformancePage />} />
+                    <Route path="onboarding" element={<HROnboardingPage />} />
+                    <Route path="departments" element={<HRDepartmentsPage />} />
+                    <Route path="org-chart" element={<HROrgChartPage />} />
+                    <Route path="expense-approvals" element={<HRExpenseApprovalsPage />} />
+                    <Route path="reimbursement-summary" element={<HRReimbursementSummaryPage />} />
+                    <Route path="shifts" element={<HRShiftManagementPage />} />
+                    <Route path="leave-encashment" element={<HRLeaveEncashmentPage />} />
+                    <Route path="helpdesk" element={<HRHelpDeskPage />} />
+                    <Route path="surveys" element={<HRSurveysPage />} />
+                    <Route path="surveys/create" element={<HRSurveyCreatePage />} />
+                    <Route path="surveys/:id/results" element={<HRSurveyResultsPage />} />
+                    <Route path="chat" element={<ChatPage />} />
+                    <Route path="meetings" element={<MeetingsPage />} />
+                    <Route path="meetings/:id" element={<MeetingRoomPage />} />
+                    <Route path="drive" element={<DrivePage />} />
+                    <Route path="profile" element={<ProfilePage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
+                  </Routes>
+                </HRLayout>
+              </ProtectedRoute>
+            } />
 
-          {/* Admin Routes */}
-          <Route path="/admin/*" element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminLayout>
-                <Routes>
-                  <Route path="dashboard" element={<HRDashboard />} />
-                  <Route path="admin-management" element={<AdminManagementPage />} />
-                  <Route path="employees" element={<EmployeesPage />} />
-                  <Route path="employees/offboarding" element={<HROffboardingPage />} />
-                  <Route path="employees/:id" element={<EmployeeProfilePage />} />
-                  <Route path="leaves" element={<HRLeavesPage />} />
-                  <Route path="attendance" element={<HRAttendancePage />} />
-                  <Route path="projects" element={<HRProjectsPage />} />
-                  <Route path="calendar" element={<CalendarPage />} />
-                  <Route path="offer-letters" element={<OfferLetterPage />} />
-                  <Route path="payroll" element={<HRPayrollPage />} />
-                  <Route path="payroll/:employeeId" element={<HRPayrollEmployeePage />} />
-                  <Route path="payroll/statutory-settings" element={<HRStatutorySettingsPage />} />
-                  <Route path="payroll/statutory-compliance" element={<HRStatutoryCompliancePage />} />
-                  <Route path="tax-declarations" element={<HRTaxDeclarationPage />} />
-                  <Route path="form16" element={<HRForm16Page />} />
-                  <Route path="complaints" element={<HRComplaintsPage />} />
-                  <Route path="audit-logs" element={<HRAuditLogsPage />} />
-                  <Route path="performance" element={<HRPerformancePage />} />
-                  <Route path="onboarding" element={<HROnboardingPage />} />
-                  <Route path="departments" element={<HRDepartmentsPage />} />
-                  <Route path="org-chart" element={<HROrgChartPage />} />
-                  <Route path="expense-approvals" element={<HRExpenseApprovalsPage />} />
-                  <Route path="reimbursement-summary" element={<HRReimbursementSummaryPage />} />
-                  <Route path="shifts" element={<HRShiftManagementPage />} />
-                  <Route path="leave-encashment" element={<HRLeaveEncashmentPage />} />
-                  <Route path="helpdesk" element={<HRHelpDeskPage />} />
-                  <Route path="surveys" element={<HRSurveysPage />} />
-                  <Route path="surveys/create" element={<HRSurveyCreatePage />} />
-                  <Route path="surveys/:id/results" element={<HRSurveyResultsPage />} />
-                  <Route path="assets" element={<HRAssetsPage />} />
-                  <Route path="chat" element={<ChatPage />} />
-                  <Route path="meetings" element={<MeetingsPage />} />
-                  <Route path="meetings/:id" element={<MeetingRoomPage />} />
-                  <Route path="drive" element={<DrivePage />} />
-                  <Route path="profile" element={<ProfilePage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-                </Routes>
-              </AdminLayout>
-            </ProtectedRoute>
-          } />
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<HRDashboard />} />
+                    <Route path="admin-management" element={<AdminManagementPage />} />
+                    <Route path="employees" element={<EmployeesPage />} />
+                    <Route path="employees/offboarding" element={<HROffboardingPage />} />
+                    <Route path="employees/:id" element={<EmployeeProfilePage />} />
+                    <Route path="leaves" element={<HRLeavesPage />} />
+                    <Route path="attendance" element={<HRAttendancePage />} />
+                    <Route path="projects" element={<HRProjectsPage />} />
+                    <Route path="calendar" element={<CalendarPage />} />
+                    <Route path="offer-letters" element={<OfferLetterPage />} />
+                    <Route path="payroll" element={<HRPayrollPage />} />
+                    <Route path="payroll/:employeeId" element={<HRPayrollEmployeePage />} />
+                    <Route path="payroll/statutory-settings" element={<HRStatutorySettingsPage />} />
+                    <Route path="payroll/statutory-compliance" element={<HRStatutoryCompliancePage />} />
+                    <Route path="tax-declarations" element={<HRTaxDeclarationPage />} />
+                    <Route path="form16" element={<HRForm16Page />} />
+                    <Route path="complaints" element={<HRComplaintsPage />} />
+                    <Route path="audit-logs" element={<HRAuditLogsPage />} />
+                    <Route path="performance" element={<HRPerformancePage />} />
+                    <Route path="onboarding" element={<HROnboardingPage />} />
+                    <Route path="departments" element={<HRDepartmentsPage />} />
+                    <Route path="org-chart" element={<HROrgChartPage />} />
+                    <Route path="expense-approvals" element={<HRExpenseApprovalsPage />} />
+                    <Route path="reimbursement-summary" element={<HRReimbursementSummaryPage />} />
+                    <Route path="shifts" element={<HRShiftManagementPage />} />
+                    <Route path="leave-encashment" element={<HRLeaveEncashmentPage />} />
+                    <Route path="helpdesk" element={<HRHelpDeskPage />} />
+                    <Route path="surveys" element={<HRSurveysPage />} />
+                    <Route path="surveys/create" element={<HRSurveyCreatePage />} />
+                    <Route path="surveys/:id/results" element={<HRSurveyResultsPage />} />
+                    <Route path="assets" element={<HRAssetsPage />} />
+                    <Route path="chat" element={<ChatPage />} />
+                    <Route path="meetings" element={<MeetingsPage />} />
+                    <Route path="meetings/:id" element={<MeetingRoomPage />} />
+                    <Route path="drive" element={<DrivePage />} />
+                    <Route path="profile" element={<ProfilePage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+                  </Routes>
+                </AdminLayout>
+              </ProtectedRoute>
+            } />
 
-          {/* Employee Routes */}
-          <Route path="/employee/*" element={
-            <ProtectedRoute requiredRole="employee">
-              <EmployeeLayout>
-                <Routes>
-                  <Route path="dashboard" element={<EmployeeDashboard />} />
-                  <Route path="attendance" element={<EmployeeAttendancePage />} />
-                  <Route path="projects" element={<EmployeeProjectsPage />} />
-                  <Route path="apply-leave" element={<ApplyLeavePage />} />
-                  <Route path="calendar" element={<CalendarPage />} />
-                  <Route path="payslips" element={<EmployeePayslipsPage />} />
-                  <Route path="expenses" element={<EmployeeExpensesPage />} />
-                  <Route path="leave-encashment" element={<EmployeeLeaveEncashmentPage />} />
-                  <Route path="tax-declaration" element={<EmployeeTaxDeclarationPage />} />
-                  <Route path="form16" element={<EmployeeForm16Page />} />
-                  <Route path="salary-structure" element={<EmployeeSalaryStructurePage />} />
-                  <Route path="exit-interview" element={<EmployeeExitInterviewPage />} />
-                  <Route path="assets" element={<EmployeeAssetsPage />} />
-                  <Route path="id-card" element={<EmployeeIDCardPage />} />
-                  <Route path="complaints" element={<EmployeeComplaintsPage />} />
-                  <Route path="helpdesk" element={<EmployeeHelpDeskPage />} />
-                  <Route path="surveys" element={<EmployeeSurveysPage />} />
-                  <Route path="surveys/:id" element={<EmployeeSurveyFillPage />} />
-                  <Route path="performance" element={<EmployeePerformancePage />} />
-                  <Route path="onboarding" element={<EmployeeOnboardingPage />} />
-                  <Route path="profile/:id" element={<EmployeeProfilePage />} />
-                  <Route path="chat" element={<ChatPage />} />
-                  <Route path="meetings" element={<MeetingsPage />} />
-                  <Route path="meetings/:id" element={<MeetingRoomPage />} />
-                  <Route path="drive" element={<DrivePage />} />
-                  <Route path="profile" element={<ProfilePage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
-                </Routes>
-              </EmployeeLayout>
-            </ProtectedRoute>
-          } />
+            {/* Employee Routes */}
+            <Route path="/employee/*" element={
+              <ProtectedRoute requiredRole="employee">
+                <EmployeeLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<EmployeeDashboard />} />
+                    <Route path="attendance" element={<EmployeeAttendancePage />} />
+                    <Route path="projects" element={<EmployeeProjectsPage />} />
+                    <Route path="apply-leave" element={<ApplyLeavePage />} />
+                    <Route path="calendar" element={<CalendarPage />} />
+                    <Route path="payslips" element={<EmployeePayslipsPage />} />
+                    <Route path="expenses" element={<EmployeeExpensesPage />} />
+                    <Route path="leave-encashment" element={<EmployeeLeaveEncashmentPage />} />
+                    <Route path="tax-declaration" element={<EmployeeTaxDeclarationPage />} />
+                    <Route path="form16" element={<EmployeeForm16Page />} />
+                    <Route path="salary-structure" element={<EmployeeSalaryStructurePage />} />
+                    <Route path="exit-interview" element={<EmployeeExitInterviewPage />} />
+                    <Route path="assets" element={<EmployeeAssetsPage />} />
+                    <Route path="id-card" element={<EmployeeIDCardPage />} />
+                    <Route path="complaints" element={<EmployeeComplaintsPage />} />
+                    <Route path="helpdesk" element={<EmployeeHelpDeskPage />} />
+                    <Route path="surveys" element={<EmployeeSurveysPage />} />
+                    <Route path="surveys/:id" element={<EmployeeSurveyFillPage />} />
+                    <Route path="performance" element={<EmployeePerformancePage />} />
+                    <Route path="onboarding" element={<EmployeeOnboardingPage />} />
+                    <Route path="profile/:id" element={<EmployeeProfilePage />} />
+                    <Route path="chat" element={<ChatPage />} />
+                    <Route path="meetings" element={<MeetingsPage />} />
+                    <Route path="meetings/:id" element={<MeetingRoomPage />} />
+                    <Route path="drive" element={<DrivePage />} />
+                    <Route path="profile" element={<ProfilePage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
+                  </Routes>
+                </EmployeeLayout>
+              </ProtectedRoute>
+            } />
 
-          {/* Legacy shared routes redirected to role-scoped routes */}
-          <Route path="/chat" element={
-            <ProtectedRoute>
-              <LegacySharedRedirect section="chat" />
-            </ProtectedRoute>
-          } />
-          <Route path="/meetings" element={
-            <ProtectedRoute>
-              <LegacySharedRedirect section="meetings" />
-            </ProtectedRoute>
-          } />
-          <Route path="/meetings/:id" element={
-            <ProtectedRoute>
-              <LegacySharedRedirect section="meeting-room" />
-            </ProtectedRoute>
-          } />
-          <Route path="/drive" element={
-            <ProtectedRoute>
-              <LegacySharedRedirect section="drive" />
-            </ProtectedRoute>
-          } />
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <LegacySharedRedirect section="profile" />
-            </ProtectedRoute>
-          } />
+            {/* Legacy shared routes redirected to role-scoped routes */}
+            <Route path="/chat" element={
+              <ProtectedRoute>
+                <LegacySharedRedirect section="chat" />
+              </ProtectedRoute>
+            } />
+            <Route path="/meetings" element={
+              <ProtectedRoute>
+                <LegacySharedRedirect section="meetings" />
+              </ProtectedRoute>
+            } />
+            <Route path="/meetings/:id" element={
+              <ProtectedRoute>
+                <LegacySharedRedirect section="meeting-room" />
+              </ProtectedRoute>
+            } />
+            <Route path="/drive" element={
+              <ProtectedRoute>
+                <LegacySharedRedirect section="drive" />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <LegacySharedRedirect section="profile" />
+              </ProtectedRoute>
+            } />
 
-          {/* Redirects */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+            {/* Redirects */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+          </Suspense>
         </Router>
       </SocketProvider>
     </AuthProvider>
