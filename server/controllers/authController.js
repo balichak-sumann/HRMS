@@ -172,8 +172,8 @@ const login = async (req, res) => {
 
         await pool.query(
             `INSERT INTO password_reset_tokens (profile_id, token, expires_at, used)
-             VALUES ($1, $2, NOW() + ($3 || ' minutes')::interval, FALSE)`,
-            [user.id, otpTokenValue, String(LOGIN_OTP_EXPIRY_MINUTES)]
+             VALUES ($1, $2, DATE_ADD(NOW(), INTERVAL $3 MINUTE), FALSE)`,
+            [user.id, otpTokenValue, LOGIN_OTP_EXPIRY_MINUTES]
         );
 
         try {
