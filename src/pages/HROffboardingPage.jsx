@@ -3,13 +3,9 @@ import { api } from '../lib/api';
 import { Loader2, RefreshCw, Download, CheckCircle2 } from 'lucide-react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
 
-const reasonOptions = [
-    { value: 'resignation', label: 'Resignation' },
-    { value: 'termination', label: 'Termination' },
-    { value: 'contract_end', label: 'Contract End' }
-];
+// Dynamic lookup states
 
-const roleOptions = ['IT', 'Finance', 'HR'];
+// Dynamic lookup states
 
 const formatDate = (value) => {
     if (!value) return '-';
@@ -126,6 +122,8 @@ const HROffboardingPage = () => {
     const [cases, setCases] = useState([]);
     const [selectedCaseId, setSelectedCaseId] = useState('');
     const [selectedCase, setSelectedCase] = useState(null);
+    const [reasonOptions, setReasonOptions] = useState([]);
+    const [roleOptions, setRoleOptions] = useState([]);
 
     const [startForm, setStartForm] = useState({
         employee_id: '',
@@ -142,14 +140,18 @@ const HROffboardingPage = () => {
     }, []);
 
     const fetchList = async (nextFilter = filter) => {
-        const [employeeRows, caseRows] = await Promise.all([
-            api.get('/employees'),
-            api.get(`/offboarding/cases?status=${encodeURIComponent(nextFilter)}`)
+        const [employeeRows, caseRows, reasonRows, roleRows] = await Promise.all([
+            api.get('/employees').catch(() => []),
+            api.get(`/offboarding/cases?status=${encodeURIComponent(nextFilter)}`),
+            api.get('/lookups?category=OFFBOARDING_REASON').catch(() => []),
+            api.get('/lookups?category=CLEARANCE_ROLE').catch(() => [])
         ]);
 
         const activeEmployees = (employeeRows || []).filter((row) => (row.status || 'Active').toLowerCase() !== 'inactive');
         setEmployees(activeEmployees);
         setCases(Array.isArray(caseRows) ? caseRows : []);
+        setReasonOptions(reasonRows?.map(r => ({ value: r.value, label: r.value })) || []);
+        setRoleOptions(roleRows?.map(r => r.value) || []);
 
         if (!selectedCaseId && Array.isArray(caseRows) && caseRows[0]) {
             setSelectedCaseId(caseRows[0].id);

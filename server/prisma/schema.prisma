@@ -799,6 +799,18 @@ model onboarding_templates {
   employees                 employees?                  @relation(fields: [created_by], references: [id], onUpdate: NoAction)
 }
 
+model system_lookups {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category    String
+  value       String
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([category, value], map: "idx_system_lookups_unique")
+  @@index([category, is_active], map: "idx_system_lookups_category")
+}
+
 model password_reset_tokens {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   profile_id String?   @db.Uuid
@@ -1045,6 +1057,7 @@ model surveys {
   id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title                String
   description          String?
+  survey_type          String?
   created_by           String?            @db.Uuid
   target_type          String             @default("all")
   target_department_id String?            @db.Uuid

@@ -24,13 +24,7 @@ const AdminManagementPage = () => {
     const [listLoading, setListLoading] = useState(true);
     const [departments, setDepartments] = useState([]);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const hrRoleOptions = [
-        'HR Manager',
-        'HR Executive',
-        'HR Generalist',
-        'Talent Acquisition Specialist',
-        'HR Business Partner'
-    ];
+    const [hrRoleOptions, setHrRoleOptions] = useState([]);
 
     const isAdmin = profile?.role === 'admin';
 
@@ -42,13 +36,15 @@ const AdminManagementPage = () => {
     const fetchData = async () => {
         try {
             setListLoading(true);
-            const [hrAccountsData, departmentData] = await Promise.all([
+            const [hrAccountsData, departmentData, roleData] = await Promise.all([
                 api.get('/employees/hr-accounts'),
-                api.get('/departments').catch(() => [])
+                api.get('/departments').catch(() => []),
+                api.get('/lookups?category=HR_ROLE').catch(() => [])
             ]);
 
             setHrUsers(hrAccountsData || []);
             setDepartments(departmentData || []);
+            setHrRoleOptions(roleData?.map(r => r.value) || []);
         } catch (error) {
             toast.error('Failed to load admin data: ' + error.message);
             setHrUsers([]);

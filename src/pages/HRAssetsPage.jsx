@@ -2,14 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { Loader2, PlusCircle, RefreshCw } from 'lucide-react';
 
-const assetTypes = ['Laptop', 'Phone', 'Monitor', 'Access Card', 'Other'];
-const assetStatuses = ['available', 'assigned', 'damaged', 'retired'];
+// Asset Statuses map dynamically from lookup table
 
 const money = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
 
 const HRAssetsPage = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [assetTypes, setAssetTypes] = useState([]);
+    const [assetStatuses, setAssetStatuses] = useState([]);
 
     const [employees, setEmployees] = useState([]);
     const [assets, setAssets] = useState([]);
@@ -37,8 +38,22 @@ const HRAssetsPage = () => {
     };
 
     const fetchBaseData = async () => {
-        const employeeRows = await api.get('/employees');
+        const [employeeRows, typesData, statusData] = await Promise.all([
+            api.get('/employees').catch(() => []),
+            api.get('/lookups?category=ASSET_TYPE').catch(() => []),
+            api.get('/lookups?category=ASSET_STATUS').catch(() => [])
+        ]);
         setEmployees(Array.isArray(employeeRows) ? employeeRows : []);
+        setAssetTypes(typesData?.map(t => t.value) || []);
+        const statuses = statusData?.map(s => s.value) || [];
+        setAssetStatuses(statuses);
+        
+        if (typesData && typesData.length > 0) {
+            setAssetForm(prev => ({ ...prev, type: typesData[0].value }));
+        }
+        if (statuses.length > 0) {
+            setAssetForm(prev => ({ ...prev, status: statuses[0] }));
+        }
     };
 
     const loadData = async () => {
@@ -88,7 +103,7 @@ const HRAssetsPage = () => {
                 serial_number: '',
                 purchase_date: '',
                 value: '',
-                status: 'available'
+                status: assetStatuses?.[0] || 'available'
             });
             await fetchAssets(filters);
         } catch (error) {

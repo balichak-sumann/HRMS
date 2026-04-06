@@ -29,17 +29,16 @@ const EmployeePayslipsPage = () => {
             // Fetch payslips for the logged-in user
             const psData = await api.get('/payroll');
 
-            // Reconstruct the PDF's extra display fields that aren't stored in the database
+            // Ensure fields are properly mapped without overriding 0 values with hardcoded calculations
             const enrichedPayslips = (psData || []).map(ps => {
-                const allowances = Number(ps.allowances) || 0;
                 return {
                     ...ps,
-                    conveyance: Number(ps.conveyance) || (allowances > 0 ? Math.floor(allowances * 0.285) : 0),
-                    specialAllowance: Number(ps.special_allowance) || (allowances > 0 ? Math.ceil(allowances * 0.715) : 0),
-                    pf_employee: Number(ps.pf_employee ?? ps.pf) || 0,
-                    esi_employee: Number(ps.esi_employee) || 0,
-                    ptax: Number(ps.ptax) || 200,
-                    otherDeduction: 0
+                    conveyance: Number(ps.conveyance ?? 0),
+                    specialAllowance: Number(ps.special_allowance ?? ps.specialAllowance ?? 0),
+                    pf_employee: Number(ps.pf_employee ?? ps.pf ?? 0),
+                    esi_employee: Number(ps.esi_employee ?? 0),
+                    ptax: Number(ps.ptax ?? 0),
+                    otherDeduction: Number(ps.other_deduction ?? ps.otherDeduction ?? 0)
                 };
             });
 

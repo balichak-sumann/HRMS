@@ -2,13 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { Loader2, PlusCircle, Upload } from 'lucide-react';
 
-const sectionOptions = [
-    { value: '80C', label: '80C Investments' },
-    { value: 'HRA', label: 'HRA Exemption' },
-    { value: 'HOME_LOAN_INTEREST', label: 'Home Loan Interest' },
-    { value: 'STANDARD_DEDUCTION', label: 'Standard Deduction' },
-    { value: 'OTHER', label: 'Other Deductions' },
-];
+// Handled via state dynamically
 
 const normalizeAmountInput = (value) => {
     const raw = String(value ?? '').trim();
@@ -54,6 +48,7 @@ const EmployeeTaxDeclarationPage = () => {
     const [declaration, setDeclaration] = useState(null);
     const [declarationOptions, setDeclarationOptions] = useState([]);
     const [selectedDeclarationId, setSelectedDeclarationId] = useState('');
+    const [sectionOptions, setSectionOptions] = useState([]);
     const [items, setItems] = useState([]);
     const [financialYear, setFinancialYear] = useState(getCurrentFinancialYear());
     const financialYearOptions = useMemo(() => getFinancialYearOptions(6), []);
@@ -85,6 +80,8 @@ const EmployeeTaxDeclarationPage = () => {
             );
 
             await fetchDeclarationOptions(fy);
+            const sections = await api.get('/lookups?category=TAX_SECTION').catch(() => []);
+            setSectionOptions(sections?.map(s => ({ value: s.value, label: s.value })) || []);
         } catch (error) {
             console.error('Failed to load declaration', error);
             alert(error.message || 'Failed to load declaration');

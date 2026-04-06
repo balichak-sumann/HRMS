@@ -72,6 +72,7 @@ app.use('/api/income-tax', require('./routes/incomeTax'));
 app.use('/api/salary-revisions', require('./routes/salaryRevisions'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/surveys', require('./routes/surveys'));
+app.use('/api/lookups', require('./routes/lookups'));
 
 // Socket.io Logic
 const onlineUsers = new Map(); // userId -> socketId

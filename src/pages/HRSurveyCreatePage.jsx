@@ -14,9 +14,11 @@ const HRSurveyCreatePage = () => {
     const navigate = useNavigate();
     const [saving, setSaving] = useState(false);
     const [departments, setDepartments] = useState([]);
+    const [surveyTypes, setSurveyTypes] = useState([]);
     const [form, setForm] = useState({
         title: '',
         description: '',
+        survey_type: '',
         deadline: '',
         is_anonymous: false,
         target_type: 'all',
@@ -25,15 +27,23 @@ const HRSurveyCreatePage = () => {
     });
 
     useEffect(() => {
-        const loadDepartments = async () => {
+        const loadInitialData = async () => {
             try {
-                const data = await api.get('/departments');
-                setDepartments(Array.isArray(data) ? data : []);
+                const [deptData, typeData] = await Promise.all([
+                    api.get('/departments').catch(() => []),
+                    api.get('/lookups?category=SURVEY_TYPE').catch(() => [])
+                ]);
+                setDepartments(Array.isArray(deptData) ? deptData : []);
+                const types = Array.isArray(typeData) ? typeData : [];
+                setSurveyTypes(types);
+                if (types.length > 0) {
+                    setForm(prev => ({ ...prev, survey_type: types[0].value }));
+                }
             } catch (err) {
-                console.error('Failed to load departments:', err.message);
+                console.error('Failed to load survey data:', err.message);
             }
         };
-        loadDepartments();
+        loadInitialData();
     }, []);
 
     const canSubmit = useMemo(() => {
@@ -101,6 +111,7 @@ const HRSurveyCreatePage = () => {
                 description: form.description.trim(),
                 deadline: form.deadline || null,
                 is_anonymous: form.is_anonymous,
+                survey_type: form.survey_type,
                 target_type: form.target_type,
                 target_department_id: form.target_type === 'department' ? form.target_department_id : null,
                 questions: form.questions.map((q, idx) => ({
@@ -129,12 +140,26 @@ const HRSurveyCreatePage = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <input
-                    className="input"
-                    placeholder="Survey title"
-                    value={form.title}
-                    onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                />
+                <div className="responsive-grid-2">
+                    <input
+                        className="input"
+                        placeholder="Survey title"
+                        value={form.title}
+                        onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                    />
+
+                    <select
+                        className="input"
+                        value={form.survey_type}
+                        onChange={(e) => setForm((prev) => ({ ...prev, survey_type: e.target.value }))}
+                        required
+                    >
+                        <option value="">Select Survey Type</option>
+                        {surveyTypes.map((t) => (
+                            <option key={t.id} value={t.value}>{t.value}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <textarea
                     className="input"

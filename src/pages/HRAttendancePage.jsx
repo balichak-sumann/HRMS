@@ -296,7 +296,12 @@ const HRAttendancePage = () => {
                                             )}
                                         </td>
                                         <td style={{ padding: '16px' }}>{formatTime(row.check_out)}</td>
-                                        <td style={{ padding: '16px' }}>{calculateHours(row.check_in, row.check_out)}h</td>
+                                        <td style={{ padding: '16px' }}>
+                                            {row.total_hours !== undefined && row.total_hours !== null
+                                                ? `${Number(row.total_hours).toFixed(1)}h`
+                                                : `${calculateHours(row.check_in, row.check_out)}h`
+                                            }
+                                        </td>
                                         <td style={{ padding: '16px', position: 'relative' }}>
                                             <>
                                                 <button

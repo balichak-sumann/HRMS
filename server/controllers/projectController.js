@@ -168,9 +168,14 @@ const createReport = async (req, res) => {
 const getProjectReports = async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT r.*, e.full_name 
+            SELECT r.*, 
+                   COALESCE(
+                       e.full_name, 
+                       (SELECT e2.full_name FROM employees e2 JOIN profiles p ON e2.email = p.email WHERE p.id = r.employee_id LIMIT 1),
+                       'Unknown Employee'
+                   ) as full_name 
             FROM daily_reports r
-            JOIN employees e ON r.employee_id = e.id
+            LEFT JOIN employees e ON r.employee_id = e.id
             WHERE r.project_id = $1
             ORDER BY r.created_at DESC
         `, [req.params.id]);

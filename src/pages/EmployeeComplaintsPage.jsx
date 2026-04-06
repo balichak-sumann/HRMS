@@ -16,14 +16,26 @@ const EmployeeComplaintsPage = () => {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        category: 'HR',
+        category: '',
         description: '',
         attachment_url: ''
     });
+    const [categories, setCategories] = useState([]);
 
     useEffect(() => {
         fetchComplaints();
+        fetchCategories();
     }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const data = await api.get('/lookups?category=COMPLAINT_CATEGORY').catch(() => []);
+            setCategories(data || []);
+            if (data?.[0]) {
+                setFormData(prev => ({ ...prev, category: data[0].value }));
+            }
+        } catch (e) { }
+    };
 
     const fetchComplaints = async () => {
         try {
@@ -43,7 +55,7 @@ const EmployeeComplaintsPage = () => {
             setSubmitting(true);
             await api.post('/complaints', formData);
             alert('Your concern has been submitted successfully.');
-            setFormData({ category: 'HR', description: '', attachment_url: '' });
+            setFormData({ category: categories?.[0]?.value || '', description: '', attachment_url: '' });
             fetchComplaints();
         } catch (error) {
             alert(error.message || 'Failed to submit complaint');
@@ -85,11 +97,9 @@ const EmployeeComplaintsPage = () => {
                                 value={formData.category}
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                             >
-                                <option>HR</option>
-                                <option>Harassment</option>
-                                <option>Workload</option>
-                                <option>Technical</option>
-                                <option>Other</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.value}>{cat.value}</option>
+                                ))}
                             </select>
                         </div>
 

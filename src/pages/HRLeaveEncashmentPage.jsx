@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { Loader2, Save } from 'lucide-react';
 
-const leaveTypes = ['Casual', 'Sick', 'Earned', 'Comp-Off'];
-
+// Removed explicit leave array config
 const money = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
 
 const HRLeaveEncashmentPage = () => {
     const [loading, setLoading] = useState(true);
+    const [leaveTypes, setLeaveTypes] = useState([]);
     const [savingPolicy, setSavingPolicy] = useState(false);
     const [filter, setFilter] = useState('Pending');
     const [requests, setRequests] = useState([]);
@@ -33,6 +33,8 @@ const HRLeaveEncashmentPage = () => {
     const loadData = async () => {
         try {
             setLoading(true);
+            const typesData = await api.get('/lookups?category=LEAVE_TYPE').catch(() => []);
+            setLeaveTypes(typesData?.map(t => t.value) || []);
             await Promise.all([fetchPolicy(), fetchRequests(filter)]);
         } catch (error) {
             console.error('Failed to load leave encashment data', error);

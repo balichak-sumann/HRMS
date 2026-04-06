@@ -48,25 +48,8 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
     const emergencyContactRegex = /^\d{10}$/;
     const phoneRegex = /^(\d{10}|\+91\d{10})$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const employeeRoleOptions = [
-        'Software Engineer',
-        'Senior Software Engineer',
-        'Frontend Developer',
-        'Backend Developer',
-        'Full Stack Developer',
-        'QA Engineer',
-        'DevOps Engineer',
-        'Business Analyst',
-        'Product Manager',
-        'UI/UX Designer'
-    ];
-    const hrRoleOptions = [
-        'HR Manager',
-        'HR Executive',
-        'HR Generalist',
-        'Talent Acquisition Specialist',
-        'HR Business Partner'
-    ];
+    const [employeeRoleOptions, setEmployeeRoleOptions] = useState([]);
+    const [hrRoleOptions, setHrRoleOptions] = useState([]);
 
     const normalizePanByPosition = (rawValue) => {
         const source = String(rawValue || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
@@ -129,14 +112,18 @@ const AddEmployeeModal = ({ isOpen, onClose, onRefresh, employeeData = null }) =
         const fetchLookups = async () => {
             if (!isOpen) return;
             try {
-                const [templateData, departmentData, employeesData] = await Promise.all([
+                const [templateData, departmentData, employeesData, empRoles, hrRoles] = await Promise.all([
                     api.get('/onboarding/templates').catch(() => []),
                     api.get('/departments').catch(() => []),
-                    api.get('/employees').catch(() => [])
+                    api.get('/employees').catch(() => []),
+                    api.get('/lookups?category=EMPLOYEE_ROLE').catch(() => []),
+                    api.get('/lookups?category=HR_ROLE').catch(() => [])
                 ]);
 
                 setTemplates(templateData || []);
                 setDepartments(departmentData || []);
+                setEmployeeRoleOptions(empRoles?.map(r => r.value) || []);
+                setHrRoleOptions(hrRoles?.map(r => r.value) || []);
                 setManagerOptions(
                     (employeesData || []).filter((emp) => {
                         if (employeeData && emp.id === employeeData.id) return false;

@@ -17,6 +17,7 @@ import EmptyState from '../components/EmptyState';
 const ApplyLeavePage = () => {
     const [loading, setLoading] = useState(false);
     const [history, setHistory] = useState([]);
+    const [leaveTypes, setLeaveTypes] = useState([]);
     const [formData, setFormData] = useState({
         leave_type: 'Casual',
         start_date: '',
@@ -35,8 +36,16 @@ const ApplyLeavePage = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const leaves = await api.get('/leaves');
+            const [leaves, typesData] = await Promise.all([
+                api.get('/leaves').catch(() => []),
+                api.get('/lookups?category=LEAVE_TYPE').catch(() => [])
+            ]);
             setHistory(leaves || []);
+            const fetchedTypes = typesData?.map(t => t.value) || [];
+            if (fetchedTypes.length > 0) {
+                setLeaveTypes(fetchedTypes);
+                setFormData(prev => ({ ...prev, leave_type: fetchedTypes[0] }));
+            }
 
             // Store only leave history — balance cards removed (no entitlement system yet)
         } catch (err) {
@@ -145,9 +154,7 @@ const ApplyLeavePage = () => {
                                 value={formData.leave_type}
                                 onChange={(e) => setFormData({ ...formData, leave_type: e.target.value })}
                             >
-                                <option>Casual</option>
-                                <option>Sick</option>
-                                <option>Earned</option>
+                                {leaveTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

@@ -42,6 +42,7 @@ const EmployeeAttendancePage = () => {
 
     const [currentTime, setCurrentTime] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(getTodayYmd());
+    const [isCheckingIn, setIsCheckingIn] = useState(false); // To prevent double-clicks
     const [attendance, setAttendance] = useState([]);
     const [todayRecord, setTodayRecord] = useState(null);
     const [todayRecords, setTodayRecords] = useState([]);
@@ -60,13 +61,13 @@ const EmployeeAttendancePage = () => {
     const isWeekend = selectedDateObj.getDay() === 0 || selectedDateObj.getDay() === 6;
 
     // Check if selected day matches any holiday
-    const selectedHoliday = holidays.find(h => h.date === selectedDate);
+    const selectedHoliday = holidays.find(h => formatLocalYmd(new Date(h.date)) === selectedDate);
 
     // Check if selected day falls within any approved leave
     const selectedLeave = leaves.find(l => 
         l.status === 'Approved' && 
-        selectedDate >= l.start_date.slice(0,10) && 
-        selectedDate <= l.end_date.slice(0,10)
+        selectedDate >= formatLocalYmd(new Date(l.start_date)) && 
+        selectedDate <= formatLocalYmd(new Date(l.end_date))
     );
 
     const isRestrictedDay = isWeekend || selectedHoliday || selectedLeave;
@@ -77,21 +78,48 @@ const EmployeeAttendancePage = () => {
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-
-            // Update active session duration every second
-            setTodayRecord(currentActive => {
-                if (selectedDate === getTodayYmd() && currentActive && !currentActive.check_out) {
-                    const diffSeconds = Math.floor((new Date() - new Date(currentActive.check_in)) / 1000);
-                    setActiveDuration(diffSeconds > 0 ? diffSeconds : 0);
-                } else {
-                    setActiveDuration(0);
-                }
-                return currentActive;
-            });
         }, 1000);
         fetchAttendance();
         return () => clearInterval(timer);
     }, [selectedDate]);
+
+    // Deterministic Active Duration Calculation completely decoupled from isolated states
+    useEffect(() => {
+        let cumulativeSeconds = 0;
+
+        // Sum prior completed shift durations for the day
+        todayRecords.forEach(rec => {
+            if (rec.check_out) {
+                const s = new Date(rec.check_in).getTime();
+                const e = new Date(rec.check_out).getTime();
+                cumulativeSeconds += Math.max(0, Math.floor((e - s) / 1000));
+            }
+        });
+
+        if (todayRecord && !todayRecord.check_out) {
+            const checkInTime = new Date(todayRecord.check_in).getTime();
+            
+            // Cap the duration calculation to the end of the selected date 
+            // so we don't show >24 hours if a session stays open for days.
+            const endOfDay = new Date(`${selectedDate}T23:59:59`).getTime();
+            const effectiveNowTime = Math.min(currentTime.getTime(), endOfDay);
+            
+            const rawDiffSeconds = Math.floor((effectiveNowTime - checkInTime) / 1000);
+            
+            // Use Math.max(0, ...) to handle slight clock skew between server and local machine
+            const adjustedRawSeconds = Math.max(0, rawDiffSeconds);
+            cumulativeSeconds += adjustedRawSeconds;
+            
+            // diagnostic log
+            if (rawDiffSeconds < 0 && rawDiffSeconds > -300) {
+                console.warn(`[Attendance Timer] Slight clock drift detected: ${rawDiffSeconds}s. Timer will resume shortly.`);
+            }
+
+            setActiveDuration(cumulativeSeconds);
+        } else {
+            setActiveDuration(cumulativeSeconds);
+        }
+    }, [currentTime, todayRecord, todayRecords, selectedDate]);
 
     useEffect(() => {
         const onResize = () => {
@@ -108,7 +136,7 @@ const EmployeeAttendancePage = () => {
             setAttendance(data);
 
             // Get all records for today
-            const foundToday = data.filter(rec => rec.check_in.startsWith(selectedDate));
+            const foundToday = data.filter(rec => formatLocalYmd(new Date(rec.check_in)) === selectedDate);
             setTodayRecords(foundToday);
 
             // Find an active session (not checked out) or the most recent one
@@ -146,7 +174,9 @@ const EmployeeAttendancePage = () => {
     };
 
     const handleCheckIn = async () => {
+        if (isCheckingIn) return;
         try {
+            setIsCheckingIn(true);
             setLoading(true);
             let locationString = "Unknown Location";
 
@@ -205,6 +235,7 @@ const EmployeeAttendancePage = () => {
             alert(err.message);
         } finally {
             setLoading(false);
+            setIsCheckingIn(false);
         }
     };
 
@@ -220,13 +251,19 @@ const EmployeeAttendancePage = () => {
     const calculateHours = (start, end) => {
         if (!start) return 0;
         const startTime = new Date(start);
-        const endTime = end ? new Date(end) : new Date();
-        return (endTime - startTime) / (1000 * 60 * 60);
+        const endTime = end ? new Date(end) : currentTime; // Use stateful currentTime for reactivity
+        const durationMs = endTime - startTime;
+        return Math.max(0, durationMs) / (1000 * 60 * 60);
     };
 
     const calculateTotalTodayHours = () => {
         const total = todayRecords.reduce((sum, record) => sum + calculateHours(record.check_in, record.check_out), 0);
-        return total.toFixed(1);
+        // If the user wants to see it changing, showing 2 decimals helps (every 36 seconds)
+        // or we could show HH:MM
+        const hours = Math.floor(total);
+        const minutes = Math.floor((total - hours) * 60);
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
     };
 
     const calculateTotalPresentForMonth = () => {
@@ -241,7 +278,7 @@ const EmployeeAttendancePage = () => {
                 checkInDate.getFullYear() === calendarYear &&
                 checkInDate.getMonth() === calendarMonth
             ) {
-                uniqueDays.add(record.check_in.slice(0, 10));
+                uniqueDays.add(formatLocalYmd(checkInDate));
             }
         }
 
@@ -249,10 +286,12 @@ const EmployeeAttendancePage = () => {
     };
 
     const formatDuration = (totalSeconds) => {
-        const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-        const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-        const s = (totalSeconds % 60).toString().padStart(2, '0');
-        return `${h}:${m}:${s}`;
+        const sign = totalSeconds < 0 ? '-' : '';
+        const absSeconds = Math.abs(totalSeconds);
+        const h = Math.floor(absSeconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((absSeconds % 3600) / 60).toString().padStart(2, '0');
+        const s = (absSeconds % 60).toString().padStart(2, '0');
+        return `${sign}${h}:${m}:${s}`;
     };
 
     // Calendar Heatmap logic
@@ -265,7 +304,7 @@ const EmployeeAttendancePage = () => {
     const isVeryShortViewport = viewport.height <= 760;
 
     const getStatusColor = (dateString) => {
-        const record = attendance.find(rec => rec.check_in.startsWith(dateString));
+        const record = attendance.find(rec => formatLocalYmd(new Date(rec.check_in)) === dateString);
         if (record) {
             switch (record.status) {
                 case 'Present': return 'var(--status-approved-text)';
@@ -338,7 +377,7 @@ const EmployeeAttendancePage = () => {
                     </p>
 
                     {(!todayRecord || todayRecord.check_out) ? (
-                        isRestrictedDay ? (
+                        (isRestrictedDay || selectedDate > getTodayYmd()) ? (
                             <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -352,7 +391,7 @@ const EmployeeAttendancePage = () => {
                                 fontWeight: '600',
                                 cursor: 'not-allowed'
                             }}>
-                                <Calendar size={20} /> {restrictReason}
+                                <Calendar size={20} /> {selectedDate > getTodayYmd() ? 'Future Date' : restrictReason}
                             </div>
                         ) : (
                             <button
@@ -443,8 +482,10 @@ const EmployeeAttendancePage = () => {
                     <div className="card" style={{ background: 'var(--card-bg)', borderLeft: '4px solid #F59E0B' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Hours Worked (Today)</p>
-                                <h3 style={{ fontSize: '18px', marginTop: '2px', color: 'var(--text-main)' }}>{calculateTotalTodayHours()}h</h3>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Work Time ({selectedDate === getTodayYmd() ? 'Today' : selectedDate})</p>
+                                <h3 style={{ fontSize: '18px', marginTop: '2px', color: 'var(--text-main)' }}>
+                                    {todayRecords.some(r => !r.check_out) ? formatDuration(activeDuration).split(':').slice(0, 2).join(':') + 'h' : calculateTotalTodayHours()}
+                                </h3>
                             </div>
                             <Timer color="#F59E0B" size={24} />
                         </div>
@@ -498,6 +539,7 @@ const EmployeeAttendancePage = () => {
                         const dateString = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                         const statusColor = getStatusColor(dateString);
                         const isSelected = dateString === selectedDate;
+                        const isFuture = dateString > getTodayYmd();
                         return (
                             <div
                                 key={day}
@@ -506,18 +548,19 @@ const EmployeeAttendancePage = () => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: statusColor,
+                                    background: isFuture ? 'var(--input-bg)' : statusColor,
                                     borderRadius: '4px',
                                     fontSize: '12px',
                                     fontWeight: '500',
                                     minHeight: isVeryShortViewport ? '22px' : '24px',
-                                    color: statusColor === 'var(--input-bg)' ? 'var(--text-main)' : 'white',
+                                    color: (isFuture && statusColor === 'var(--input-bg)') ? 'var(--text-muted)' : (statusColor === 'var(--input-bg)' ? 'var(--text-main)' : 'white'),
                                     cursor: 'pointer',
                                     border: isSelected ? '2px solid var(--primary)' : '1px solid transparent',
+                                    opacity: isFuture ? 0.7 : 1,
                                     transform: isSelected ? 'scale(1.05)' : 'scale(1)',
                                     transition: 'transform 0.15s ease'
                                 }}
-                                title={`Select ${dateString}`}
+                                title={isFuture ? 'Future date' : `Select ${dateString}`}
                             >
                                 {day}
                             </div>

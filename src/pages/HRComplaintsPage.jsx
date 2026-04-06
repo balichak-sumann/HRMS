@@ -19,10 +19,19 @@ const HRComplaintsPage = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
+    const [categories, setCategories] = useState([]);
 
     useEffect(() => {
         fetchComplaints();
+        fetchCategories();
     }, [statusFilter, categoryFilter]);
+
+    const fetchCategories = async () => {
+        try {
+            const data = await api.get('/lookups?category=COMPLAINT_CATEGORY');
+            setCategories(data || []);
+        } catch (e) { }
+    };
 
     const fetchComplaints = async () => {
         try {
@@ -80,10 +89,9 @@ const HRComplaintsPage = () => {
                             onChange={(e) => setCategoryFilter(e.target.value)}
                         >
                             <option value="All">All Categories</option>
-                            <option value="HR">HR</option>
-                            <option value="Harassment">Harassment</option>
-                            <option value="Workload">Workload</option>
-                            <option value="Technical">Technical</option>
+                            {categories.map(cat => (
+                                <option key={cat.id} value={cat.value}>{cat.value}</option>
+                            ))}
                         </select>
                     </div>
                 </div>

@@ -62,6 +62,7 @@ const createSurvey = async (req, res) => {
         target_type = 'all',
         target_department_id,
         is_anonymous = false,
+        survey_type,
         deadline,
         questions = [],
     } = req.body;
@@ -90,8 +91,8 @@ const createSurvey = async (req, res) => {
         const creator = await resolveEmployee(req, client);
         const surveyResult = await client.query(
             `INSERT INTO surveys
-             (title, description, created_by, target_type, target_department_id, is_anonymous, deadline, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+             (title, description, created_by, target_type, target_department_id, is_anonymous, deadline, survey_type, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft')
              RETURNING *`,
             [
                 title,
@@ -101,6 +102,7 @@ const createSurvey = async (req, res) => {
                 target_type === 'department' ? target_department_id : null,
                 !!is_anonymous,
                 deadline || null,
+                survey_type || null,
             ]
         );
 

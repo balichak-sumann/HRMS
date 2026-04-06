@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { Loader2, UploadCloud } from 'lucide-react';
 
-const categories = ['Travel', 'Food', 'Equipment', 'Other'];
+// Dynamic categories state handled inside component
 
 const money = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
 
@@ -23,6 +23,7 @@ const EmployeeExpensesPage = () => {
     const [claims, setClaims] = useState([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [categories, setCategories] = useState([]);
     const [form, setForm] = useState({
         category: 'Travel',
         amount: '',
@@ -52,7 +53,15 @@ const EmployeeExpensesPage = () => {
     };
 
     useEffect(() => {
-        fetchClaims();
+        const loadInitialData = async () => {
+            await fetchClaims();
+            const cats = await api.get('/lookups?category=EXPENSE_CATEGORY').catch(() => []);
+            setCategories(cats?.map(c => c.value) || []);
+            if (cats?.[0]) {
+                setForm(prev => ({ ...prev, category: cats[0].value }));
+            }
+        };
+        loadInitialData();
     }, []);
 
     const onSubmit = async (e) => {
@@ -68,7 +77,7 @@ const EmployeeExpensesPage = () => {
 
             await api.post('/expenses/submit', formData);
             setForm({
-                category: 'Travel',
+                category: categories?.[0] || '',
                 amount: '',
                 expense_date: new Date().toISOString().slice(0, 10),
                 description: '',
