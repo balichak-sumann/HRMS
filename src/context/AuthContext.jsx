@@ -39,8 +39,30 @@ export const AuthProvider = ({ children }) => {
             requestedRole: selectedRole,
         });
 
+        if (data?.requiresOtp) {
+            return data;
+        }
+
         const allowedRoles = Array.isArray(options.allowedRoles) ? options.allowedRoles : null;
         if (allowedRoles && !allowedRoles.includes(data?.user?.role)) {
+            throw new Error(
+                `Unauthorized. This account is registered as ${String(data?.user?.role || '').toUpperCase()}, but you tried to login as ${String(selectedRole || '').toUpperCase()}.`
+            );
+        }
+
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        setProfile(data.user);
+        return data;
+    };
+
+    const verifyLoginOtp = async ({ otp, preAuthToken, selectedRole, allowedRoles }) => {
+        const data = await api.post('/auth/verify-login-otp', {
+            otp,
+            pre_auth_token: preAuthToken,
+        });
+
+        if (Array.isArray(allowedRoles) && !allowedRoles.includes(data?.user?.role)) {
             throw new Error(
                 `Unauthorized. This account is registered as ${String(data?.user?.role || '').toUpperCase()}, but you tried to login as ${String(selectedRole || '').toUpperCase()}.`
             );
@@ -58,7 +80,7 @@ export const AuthProvider = ({ children }) => {
         setProfile(null);
     };
 
-    const value = { user, profile, loading, login, signOut, setProfile };
+    const value = { user, profile, loading, login, verifyLoginOtp, signOut, setProfile };
     console.log('AuthProvider rendered with value:', value);
 
     return (

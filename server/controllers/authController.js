@@ -1,15 +1,26 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { randomUUID: uuidv4 } = require('crypto');
+const { randomUUID: uuidv4, randomInt } = require('crypto');
 const { logManualAction } = require('../middleware/auditLogger');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendLoginOtpEmail } = require('../services/emailService');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_FAILED_ATTEMPTS = 5;
+const LOGIN_OTP_EXPIRY_MINUTES = 10;
+
+const maskEmail = (email) => {
+    const normalized = String(email || '').trim().toLowerCase();
+    const [local, domain] = normalized.split('@');
+    if (!local || !domain) return normalized;
+    if (local.length <= 2) return `${local[0] || '*'}*@${domain}`;
+    return `${local[0]}${'*'.repeat(Math.max(local.length - 2, 1))}${local.slice(-1)}@${domain}`;
+};
+
+const signLoginToken = (userPayload) => jwt.sign(userPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
 const isBounceEvent = (eventType, eventPayload) => {
     const typeText = String(eventType || '').toLowerCase();
@@ -149,24 +160,148 @@ const login = async (req, res) => {
         const emp = await pool.query('SELECT id FROM employees WHERE email = $1', [user.email]);
         const employee_uuid = emp.rows[0]?.id || null;
 
-        const token = jwt.sign(
+        const otpCode = String(randomInt(100000, 1000000));
+        const otpSessionId = uuidv4();
+        const otpTokenValue = `LOGINOTP:${otpSessionId}:${otpCode}`;
+
+        // Invalidate old, unused login OTP entries for this profile.
+        await pool.query(
+            "UPDATE password_reset_tokens SET used = TRUE WHERE profile_id = $1 AND used = FALSE AND token LIKE 'LOGINOTP:%'",
+            [user.id]
+        );
+
+        await pool.query(
+            `INSERT INTO password_reset_tokens (profile_id, token, expires_at, used)
+             VALUES ($1, $2, NOW() + ($3 || ' minutes')::interval, FALSE)`,
+            [user.id, otpTokenValue, String(LOGIN_OTP_EXPIRY_MINUTES)]
+        );
+
+        try {
+            await sendLoginOtpEmail({
+                to: user.email,
+                name: user.full_name || user.email,
+                otp: otpCode,
+                expiresMinutes: LOGIN_OTP_EXPIRY_MINUTES,
+            });
+        } catch (emailErr) {
+            await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE profile_id = $1 AND token = $2', [user.id, otpTokenValue]);
+            console.warn('[Email] Login OTP email failed:', emailErr.message);
+            return res.status(503).json({ error: 'Unable to send OTP email. Please try again.' });
+        }
+
+        const preAuthToken = jwt.sign(
             {
                 id: user.id,
                 role: user.role,
                 email: user.email,
                 name: user.full_name || user.email,
                 employee_id: user.employee_id || null,
-                employee_uuid: employee_uuid
+                employee_uuid,
+                requested_role: normalizedRequestedRole || null,
+                purpose: 'login_otp',
+                otp_session_id: otpSessionId,
             },
             JWT_SECRET,
-            { expiresIn: JWT_EXPIRES_IN }
+            { expiresIn: '15m' }
         );
+
+        res.json({
+            requiresOtp: true,
+            message: `OTP sent to ${maskEmail(user.email)}`,
+            pre_auth_token: preAuthToken,
+            otp_expires_in_minutes: LOGIN_OTP_EXPIRY_MINUTES,
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Verify Login OTP ───────────────────────────────────────────
+const verifyLoginOtp = async (req, res) => {
+    const { otp, pre_auth_token } = req.body || {};
+    const normalizedOtp = String(otp || '').trim();
+
+    if (!/^\d{6}$/.test(normalizedOtp)) {
+        return res.status(400).json({ error: 'OTP must be a 6-digit code' });
+    }
+
+    if (!pre_auth_token) {
+        return res.status(400).json({ error: 'OTP session is missing. Please login again.' });
+    }
+
+    try {
+        const decoded = jwt.verify(pre_auth_token, JWT_SECRET);
+        if (decoded?.purpose !== 'login_otp' || !decoded?.id || !decoded?.otp_session_id) {
+            return res.status(400).json({ error: 'Invalid OTP session. Please login again.' });
+        }
+
+        const expectedTokenValue = `LOGINOTP:${decoded.otp_session_id}:${normalizedOtp}`;
+
+        const otpResult = await pool.query(
+            `SELECT id
+             FROM password_reset_tokens
+             WHERE profile_id = $1
+               AND token = $2
+               AND used = FALSE
+               AND expires_at > NOW()
+             LIMIT 1`,
+            [decoded.id, expectedTokenValue]
+        );
+
+        if (otpResult.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid or expired OTP. Please try again.' });
+        }
+
+        await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [otpResult.rows[0].id]);
+
+        const result = await pool.query(
+            `SELECT p.*, e.full_name
+             FROM profiles p
+             LEFT JOIN employees e ON p.email = e.email
+             WHERE p.id = $1
+             LIMIT 1`,
+            [decoded.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = result.rows[0];
+
+        if (String(user.status || '').toLowerCase() !== 'active') {
+            return res.status(403).json({ error: 'Account is not active. Please contact admin.' });
+        }
+
+        if (decoded.requested_role) {
+            const allowedRolesForPortal = decoded.requested_role === 'admin'
+                ? ['admin', 'hr']
+                : ['employee'];
+
+            if (!allowedRolesForPortal.includes(user.role)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+        }
+
+        const emp = await pool.query('SELECT id FROM employees WHERE email = $1', [user.email]);
+        const employee_uuid = emp.rows[0]?.id || null;
+
+        const token = signLoginToken({
+            id: user.id,
+            role: user.role,
+            email: user.email,
+            name: user.full_name || user.email,
+            employee_id: user.employee_id || null,
+            employee_uuid,
+        });
 
         await logManualAction({
             email: user.email,
             name: user.full_name || user.email,
-            action: 'Login', module: 'Authentication',
-            ip: req.ip || req.connection.remoteAddress
+            action: 'Login (OTP)',
+            module: 'Authentication',
+            ip: req.ip || req.connection.remoteAddress,
         });
 
         res.json({
@@ -177,12 +312,15 @@ const login = async (req, res) => {
                 role: user.role,
                 full_name: user.full_name,
                 employee_id: user.employee_id,
-                employee_uuid: employee_uuid,
+                employee_uuid,
                 is_first_login: user.is_first_login ?? true,
-                status: user.status
+                status: user.status,
             }
         });
     } catch (err) {
+        if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
+            return res.status(401).json({ error: 'OTP session expired. Please login again.' });
+        }
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
     }
@@ -484,6 +622,7 @@ const getMe = async (req, res) => {
 module.exports = {
     signup,
     login,
+    verifyLoginOtp,
     logout,
     changePassword,
     forgotPassword,

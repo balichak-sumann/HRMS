@@ -227,6 +227,8 @@ const HRPayrollEmployeePage = () => {
             conveyance: conveyance,
             specialAllowance: specialAllowance,
             allowances: conveyance + specialAllowance,
+            reimbursements: 0,
+            leave_encashment: 0,
             pf: 0,
             pf_employee: 0,
             pf_employer: 0,
@@ -272,7 +274,12 @@ const HRPayrollEmployeePage = () => {
             ? Math.max(0, Number(overrides.specialAllowance ?? current.specialAllowance ?? 0))
             : Math.round(baseSpecial * factor);
         const allowances = conveyance + specialAllowance;
-        const gross_salary = basic_salary + hra + allowances;
+        const baseSalaryEarnings = basic_salary + hra + allowances;
+
+        // Include reimbursements and leave encashment in gross (matches backend calculation)
+        const reimbursements = round2(Number(current.reimbursements) || 0);
+        const leaveEncashment = round2(Number(current.leave_encashment) || 0);
+        const gross_salary = baseSalaryEarnings + reimbursements + leaveEncashment;
 
         const fixedEmployeePf = Number(statutorySettings?.settings?.fixed_pf_deduction) || 0;
         const fixedEmployerPf = fixedEmployeePf;
@@ -284,7 +291,8 @@ const HRPayrollEmployeePage = () => {
         const esi_employee = 0;
         const esi_employer = 0;
         
-        const annualTds = computeAnnualTds(gross_salary * 12, slabs);
+        // TDS calculated on base salary earnings only (not including reimbursements)
+        const annualTds = computeAnnualTds(baseSalaryEarnings * 12, slabs);
         const tds = round2(annualTds / 12);
 
         const fixedDeductions = round2(fixedEmployeePf + fixedEmployerPf + fixedInsurance);
@@ -307,6 +315,8 @@ const HRPayrollEmployeePage = () => {
             gross_salary,
             deductions,
             net_salary,
+            reimbursements,
+            leave_encashment: leaveEncashment,
             otherDeduction,
             fixed_employee_pf: fixedEmployeePf,
             fixed_employer_pf: fixedEmployerPf,

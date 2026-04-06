@@ -61,10 +61,10 @@ const EmployeeExitInterviewPage = () => {
                 feedback: form.feedback
             });
             await loadData();
-            alert('Exit interview submitted successfully');
+            alert('Offboarding details submitted successfully');
         } catch (error) {
-            console.error('Failed to submit exit interview', error);
-            alert(error.message || 'Failed to submit exit interview');
+            console.error('Failed to submit offboarding details', error);
+            alert(error.message || 'Failed to submit offboarding details');
         } finally {
             setSubmitting(false);
         }
@@ -154,7 +154,7 @@ const EmployeeExitInterviewPage = () => {
                             </div>
                             <button className="btn-primary" type="submit" disabled={submitting || myCase.status === 'completed'}>
                                 {submitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                {submitting ? 'Submitting...' : 'Submit Exit Interview'}
+                                {submitting ? 'Submitting...' : 'Submit Offboarding Details'}
                             </button>
                         </form>
                     </div>

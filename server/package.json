@@ -11,6 +11,8 @@
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:seed:profiles": "cross-env SEED_DEFAULT_USERS=true node db/setup.js",
+    "db:seed:lookups": "node scripts/seedLookups.js",
+    "db:seed:all": "npm run db:seed:profiles && npm run db:seed:lookups",
     "db:seed:employees": "node db/seedEmployeeDetails.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

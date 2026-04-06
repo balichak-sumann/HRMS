@@ -98,6 +98,10 @@ const checkIn = async (req, res) => {
             return res.status(400).json({ error: 'Check-in is not allowed for future dates.' });
         }
 
+        if (attendanceDate < todayStr) {
+            return res.status(400).json({ error: 'Check-in is only allowed for today. Past dates cannot be checked in.' });
+        }
+
         if (isWeekendDate(attendanceDate)) {
             return res.status(400).json({ error: 'Check-in is disabled on Saturday and Sunday by default.' });
         }
@@ -177,6 +181,10 @@ const checkOut = async (req, res) => {
         
         if (attendanceDate > todayStr) {
             return res.status(400).json({ error: 'Check-out is not allowed for future dates.' });
+        }
+
+        if (attendanceDate < todayStr) {
+            return res.status(400).json({ error: 'Check-out is only allowed for today. Past dates cannot be checked out.' });
         }
 
         const checkOutAt = buildTimestampForDate(attendanceDate);

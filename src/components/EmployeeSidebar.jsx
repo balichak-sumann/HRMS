@@ -60,7 +60,7 @@ const EmployeeSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         { icon: <FileText size={20} />, label: 'Form 16', path: '/employee/form16' },
         { icon: <CreditCard size={20} />, label: 'Salary Structure', path: '/employee/salary-structure' },
         { icon: <HandCoins size={20} />, label: 'Leave Encashment', path: '/employee/leave-encashment' },
-        { icon: <UserX size={20} />, label: 'Exit Interview', path: '/employee/exit-interview' },
+        { icon: <UserX size={20} />, label: 'Offboarding', path: '/employee/exit-interview' },
         { icon: <LifeBuoy size={20} />, label: 'Support', path: '/employee/helpdesk' },
         { icon: <ClipboardList size={20} />, label: 'Surveys', path: '/employee/surveys' },
         { icon: <Briefcase size={20} />, label: 'My Projects', path: '/employee/projects' },

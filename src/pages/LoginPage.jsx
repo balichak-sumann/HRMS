@@ -10,8 +10,12 @@ const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [otpStep, setOtpStep] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [preAuthToken, setPreAuthToken] = useState('');
+    const [otpHint, setOtpHint] = useState('');
     const navigate = useNavigate();
-    const { login, user, profile } = useAuth();
+    const { login, verifyLoginOtp, user, profile } = useAuth();
 
     React.useEffect(() => {
         if (user && profile) {
@@ -38,13 +42,37 @@ const LoginPage = () => {
         }
 
         try {
-            const expectedRole = role === 'admin'
-                ? ['admin', 'hr']
-                : ['employee'];
+            const expectedRole = role === 'admin' ? ['admin', 'hr'] : ['employee'];
 
-            const data = await login(email, password, {
-                allowedRoles: expectedRole,
+            if (!otpStep) {
+                const data = await login(email, password, {
+                    allowedRoles: expectedRole,
+                    selectedRole: role,
+                });
+
+                if (data?.requiresOtp) {
+                    setPreAuthToken(data.pre_auth_token || '');
+                    setOtpStep(true);
+                    setOtp('');
+                    setOtpHint(data.message || 'OTP sent to your email');
+                    return;
+                }
+
+                if (data.user.role === 'admin') {
+                    navigate('/admin/dashboard');
+                } else if (data.user.role === 'hr') {
+                    navigate('/hr/dashboard');
+                } else {
+                    navigate('/employee/dashboard');
+                }
+                return;
+            }
+
+            const data = await verifyLoginOtp({
+                otp,
+                preAuthToken,
                 selectedRole: role,
+                allowedRoles: expectedRole,
             });
 
             if (data.user.role === 'admin') {
@@ -83,14 +111,21 @@ const LoginPage = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
-                    marginBottom: '32px'
+                    height: '84px',
+                    overflow: 'hidden',
+                    marginBottom: '10px'
                 }}>
-                    <img src="/logo.png" alt="Company Logo" style={{ height: '56px', width: 'auto', objectFit: 'contain' }} />
-                    <div className="brand-lockup" style={{ textAlign: 'left' }}>
-                        <span className="brand-name-animated" style={{ fontSize: '26px', fontWeight: '800' }}>IndusInnovate</span>
-                        <span className="brand-name-animated-subline" style={{ fontSize: '13px', fontWeight: '500' }}>Technologies Pvt. Ltd.</span>
-                    </div>
+                    <img
+                        src="/login.png"
+                        alt="Company Logo"
+                        style={{
+                            height: '150px',
+                            width: 'auto',
+                            objectFit: 'contain',
+                            transform: 'scale(1.18)',
+                            display: 'block'
+                        }}
+                    />
                 </div>
 
                 <h2 style={{
@@ -98,6 +133,7 @@ const LoginPage = () => {
                     fontWeight: '600',
                     textAlign: 'center',
                     color: 'var(--text-main)',
+                    marginTop: '0',
                     marginBottom: '24px'
                 }}>Welcome Back</h2>
 
@@ -176,6 +212,7 @@ const LoginPage = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
+                                disabled={otpStep}
                                 style={{
                                     width: '100%',
                                     paddingLeft: '40px',
@@ -185,13 +222,14 @@ const LoginPage = () => {
                                     borderRadius: '8px',
                                     border: '1px solid var(--border)',
                                     outline: 'none',
-                                    fontSize: '14px'
+                                    fontSize: '14px',
+                                    background: otpStep ? '#f8fafc' : 'white'
                                 }}
                             />
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {!otpStep && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Password</label>
                             <button
@@ -259,7 +297,58 @@ const LoginPage = () => {
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
-                    </div>
+                    </div>}
+
+                    {otpStep && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Enter OTP</label>
+                            <input
+                                type="text"
+                                placeholder="6-digit OTP"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                required
+                                maxLength={6}
+                                inputMode="numeric"
+                                style={{
+                                    width: '100%',
+                                    paddingLeft: '12px',
+                                    paddingRight: '12px',
+                                    paddingTop: '10px',
+                                    paddingBottom: '10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border)',
+                                    outline: 'none',
+                                    fontSize: '16px',
+                                    letterSpacing: '4px',
+                                    textAlign: 'center'
+                                }}
+                            />
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                {otpHint || 'We sent a one-time password to your email.'}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setOtpStep(false);
+                                    setOtp('');
+                                    setPreAuthToken('');
+                                    setOtpHint('');
+                                    setError(null);
+                                }}
+                                style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: 'var(--primary)',
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline'
+                                }}
+                            >
+                                Back to password login
+                            </button>
+                        </div>
+                    )}
 
                     {error && (
                         <div style={{
@@ -296,7 +385,7 @@ const LoginPage = () => {
                         }}
                     >
                         {loading && <Loader2 size={20} className="animate-spin" />}
-                        {loading ? 'Signing in...' : 'Sign In'}
+                        {loading ? (otpStep ? 'Verifying OTP...' : 'Signing in...') : (otpStep ? 'Verify OTP' : 'Sign In')}
                     </button>
                 </form>
             </div>

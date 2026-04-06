@@ -823,13 +823,18 @@ const sendPayslip = async (req, res) => {
             return res.status(400).json({ error: 'Employee email not configured' });
         }
 
+        // Calculate the actual take-home salary shown in the payslip PDF
+        const inHandSalary = round2(
+            toNumber(payroll.gross_salary) - toNumber(payroll.deductions)
+        );
+
         // Send payslip email
         await sendPayslipEmail({
             to: payroll.email,
             name: payroll.full_name,
             month: payroll.month,
             year: payroll.year,
-            netSalary: payroll.net_salary,
+            netSalary: inHandSalary,
             attachmentBuffer: pdfBuffer,
             attachmentFileName: pdfFileName || req.file?.originalname,
         });

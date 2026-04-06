@@ -230,6 +230,31 @@ const sendPasswordResetEmail = async ({ to, name, resetLink }) => {
     });
 };
 
+// ─── Send Login OTP Email ───────────────────────────────────────
+const sendLoginOtpEmail = async ({ to, name, otp, expiresMinutes = 10 }) => {
+    await transporter.sendMail({
+        from: FROM,
+        to,
+        subject: 'Your Login OTP - IndusInnovate Technologies',
+        html: `
+        <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">
+            <div style="background:linear-gradient(135deg,#1E3A8A,#3B82F6);padding:32px;border-radius:12px 12px 0 0;text-align:center;">
+                <h1 style="color:white;margin:0;font-size:24px;">IndusInnovate Technologies</h1>
+            </div>
+            <div style="padding:32px;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 12px 12px;">
+                <h2 style="color:#111827;">Login Verification</h2>
+                <p style="color:#6B7280;">Hi ${name}, use the OTP below to complete your login.</p>
+                <div style="background:#EFF6FF;border:1px solid #DBEAFE;border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
+                    <p style="color:#6B7280;font-size:13px;margin:0;">One-Time Password (OTP)</p>
+                    <p style="color:#1E40AF;font-size:34px;letter-spacing:6px;font-weight:700;margin:8px 0;">${otp}</p>
+                </div>
+                <p style="color:#EF4444;font-size:13px;">This OTP expires in ${expiresMinutes} minutes. Do not share it with anyone.</p>
+                <p style="color:#9CA3AF;font-size:12px;margin-top:32px;">© 2025 IndusInnovate Technologies. All rights reserved.</p>
+            </div>
+        </div>`
+    });
+};
+
 // ─── Send Leave Approval/Rejection Email ─────────────────────────
 const sendLeaveStatusEmail = async ({ to, name, status, leaveType, fromDate, toDate, remarks }) => {
     const isApproved = status === 'Approved';
@@ -565,6 +590,7 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
 module.exports = {
     sendWelcomeEmail,
     sendPasswordResetEmail,
+    sendLoginOtpEmail,
     sendLeaveStatusEmail,
     sendPayslipEmail,
     sendMeetingInvite,
