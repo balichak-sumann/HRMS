@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "npm run --prefix server start",
     "dev:all": "node scripts/dev-all.js",
+    "install:all": "npm install && npm install --prefix server",
     "deploy": "npm run --prefix server db:deploy",
     "migrate": "npm run --prefix server db:migrate && npm run --prefix server db:seed:lookups",
     "seed": "npm run --prefix server db:seed:all",

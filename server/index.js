@@ -30,6 +30,11 @@ app.use(express.json({ limit: '10mb' }));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+if (process.env.NODE_ENV === 'production') {
+    const distPath = path.resolve(__dirname, '../dist');
+    app.use(express.static(distPath));
+}
+
 // Database Connection
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -233,6 +238,16 @@ if (process.env.CELEBRATIONS_RUN_ON_STARTUP === 'true') {
 app.get('/api/health', (req, res) => {
     res.json({ status: 'IndusInnovate Server Running', database: 'Connected' });
 });
+
+if (process.env.NODE_ENV === 'production') {
+    const distPath = path.resolve(__dirname, '../dist');
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/socket.io')) {
+            return next();
+        }
+        return res.sendFile(path.join(distPath, 'index.html'));
+    });
+}
 
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
