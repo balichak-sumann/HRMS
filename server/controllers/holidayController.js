@@ -28,7 +28,7 @@ const getHolidays = async (req, res) => {
                         const data = await response.json();
                         for (const h of data) {
                             await pool.query(
-                                'INSERT INTO holidays (name, date, type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                                'INSERT IGNORE INTO holidays (name, date, type) VALUES ($1, $2, $3)',
                                 [h.localName, h.date, 'National']
                             );
                         }
@@ -50,7 +50,7 @@ const getHolidays = async (req, res) => {
                     ];
                     for (const h of staticHolidays) {
                         await pool.query(
-                            'INSERT INTO holidays (name, date, type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                            'INSERT IGNORE INTO holidays (name, date, type) VALUES ($1, $2, $3)',
                             [h.name, h.date, 'National']
                         );
                     }

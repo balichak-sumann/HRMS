@@ -442,53 +442,79 @@ const getWeeklyRoster = async (req, res) => {
 
         const weekStart = weekStartRaw ? parseDate(weekStartRaw, 'week_start') : today.toISOString().slice(0, 10);
 
-        const params = [weekStart];
-        let employeeWhere = `WHERE COALESCE(e.status, 'Active') <> 'Inactive'`;
-        if (departmentId) {
-            params.push(departmentId);
-            employeeWhere += ` AND e.department_id = $${params.length}`;
+        // Generate week days in application layer (replaces generate_series)
+        const weekDays = [];
+        const startDate = new Date(weekStart + 'T00:00:00Z');
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(startDate);
+            d.setUTCDate(d.getUTCDate() + i);
+            weekDays.push(d.toISOString().slice(0, 10));
         }
 
-        const query = `
-            WITH week_days AS (
-                SELECT generate_series($1::date, $1::date + INTERVAL '6 days', INTERVAL '1 day')::date AS day
-            ),
-            selected_employees AS (
-                SELECT e.id, e.full_name, e.department,
-                       d.name AS department_name
-                FROM employees e
-                LEFT JOIN departments d ON d.id = e.department_id
-                ${employeeWhere}
-                ORDER BY e.full_name
-            )
-            SELECT se.id AS employee_id,
-                   se.full_name,
-                   COALESCE(se.department_name, se.department, 'Unassigned') AS department_name,
-                   TO_CHAR(wd.day, 'YYYY-MM-DD') AS day,
-                   s.id AS shift_id,
-                   s.name AS shift_name,
-                   s.start_time,
-                   s.end_time
-            FROM selected_employees se
-            CROSS JOIN week_days wd
-            LEFT JOIN LATERAL (
-                SELECT esa.shift_id
-                FROM employee_shift_assignments esa
-                WHERE esa.employee_id = se.id
-                  AND esa.effective_from <= wd.day
-                  AND (esa.effective_to IS NULL OR esa.effective_to >= wd.day)
-                ORDER BY esa.effective_from DESC, esa.created_at DESC
-                LIMIT 1
-            ) active ON TRUE
-            LEFT JOIN shifts s ON s.id = active.shift_id
-            ORDER BY se.full_name, wd.day;
+        // Fetch employees
+        let employeeQuery = `
+            SELECT e.id, e.full_name, e.department, d.name AS department_name
+            FROM employees e
+            LEFT JOIN departments d ON d.id = e.department_id
+            WHERE COALESCE(e.status, 'Active') <> 'Inactive'
+        `;
+        const employeeParams = [];
+        if (departmentId) {
+            employeeParams.push(departmentId);
+            employeeQuery += ` AND e.department_id = $1`;
+        }
+        employeeQuery += ` ORDER BY e.full_name`;
+
+        const employees = await pool.query(employeeQuery, employeeParams);
+
+        if (!employees.rows || employees.rows.length === 0) {
+            return res.json({
+                week_start: weekStart,
+                roster: [],
+            });
+        }
+
+        // Fetch all shift assignments for the week - using IN with parameterized query
+        const employeeIds = employees.rows.map(e => e.id);
+        const placeholders = employeeIds.map((_, i) => `$${i + 1}`).join(',');
+        const shiftQuery = `
+            SELECT esa.employee_id, esa.shift_id, s.name AS shift_name, s.start_time, s.end_time,
+                   esa.effective_from, esa.effective_to
+            FROM employee_shift_assignments esa
+            LEFT JOIN shifts s ON s.id = esa.shift_id
+            WHERE esa.employee_id IN (${placeholders})
+            ORDER BY esa.employee_id, esa.effective_from DESC
         `;
 
-        const result = await pool.query(query, params);
+        const shifts = await pool.query(shiftQuery, employeeIds);
+
+        // Build roster in application layer
+        const roster = [];
+        for (const employee of employees.rows) {
+            for (const day of weekDays) {
+                const dayDate = new Date(day);
+                const activeShift = shifts.rows.find(s => 
+                    s.employee_id === employee.id &&
+                    new Date(s.effective_from) <= dayDate &&
+                    (!s.effective_to || new Date(s.effective_to) >= dayDate)
+                );
+
+                roster.push({
+                    employee_id: employee.id,
+                    full_name: employee.full_name,
+                    department_name: employee.department_name || employee.department || 'Unassigned',
+                    day: day,
+                    shift_id: activeShift?.shift_id || null,
+                    shift_name: activeShift?.shift_name || null,
+                    start_time: activeShift?.start_time || null,
+                    end_time: activeShift?.end_time || null,
+                });
+            }
+        }
 
         res.json({
             week_start: weekStart,
-            roster: result.rows,
+            roster: roster,
         });
     } catch (err) {
         if (err.message && err.message.includes('week_start')) {

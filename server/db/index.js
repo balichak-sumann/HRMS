@@ -52,11 +52,19 @@ const rewriteAgeExpressions = (sql) => sql.replace(
     'TIMESTAMPDIFF(YEAR, $1, CURDATE())'
 );
 
-const rewriteExtract = (sql) => sql
-    .replace(/EXTRACT\(EPOCH\s+FROM\s+([^)]+)\)/gi, 'UNIX_TIMESTAMP($1)')
-    .replace(/EXTRACT\(MONTH FROM ([^)]+)\)/gi, 'MONTH($1)')
-    .replace(/EXTRACT\(DAY FROM ([^)]+)\)/gi, 'DAY($1)')
-    .replace(/EXTRACT\(YEAR FROM ([^)]+)\)/gi, 'YEAR($1)');
+const rewriteExtract = (sql) => {
+    // Handle EXTRACT(EPOCH FROM (date1 - date2)) pattern for time differences
+    let result = sql.replace(
+        /EXTRACT\(EPOCH\s+FROM\s+\(([^-]+)\s*-\s*([^)]+)\)\)/gi,
+        '(UNIX_TIMESTAMP($1) - UNIX_TIMESTAMP($2))'
+    );
+    // Then handle other EXTRACT(EPOCH ...) patterns
+    result = result.replace(/EXTRACT\(EPOCH\s+FROM\s+([^)]+)\)/gi, 'UNIX_TIMESTAMP($1)');
+    result = result.replace(/EXTRACT\(MONTH FROM ([^)]+)\)/gi, 'MONTH($1)');
+    result = result.replace(/EXTRACT\(DAY FROM ([^)]+)\)/gi, 'DAY($1)');
+    result = result.replace(/EXTRACT\(YEAR FROM ([^)]+)\)/gi, 'YEAR($1)');
+    return result;
+};
 
 const rewriteIntervals = (sql) => sql
     .replace(/NOW\(\)\s*-\s*INTERVAL\s*'([0-9]+)\s+days'/gi, 'DATE_SUB(NOW(), INTERVAL $1 DAY)')
