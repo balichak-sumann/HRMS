@@ -18,7 +18,8 @@ const io = require('socket.io')(server, {
         methods: ["GET", "POST"]
     }
 });
-const PORT = process.env.PORT || 5001;
+const PORT = Number(process.env.PORT || 5001);
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(cors());
@@ -259,6 +260,11 @@ if (process.env.NODE_ENV === 'production') {
     });
 }
 
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+server.on('error', (err) => {
+    console.error('[Startup] Server failed to bind:', err.message);
+    process.exit(1);
+});
+
+server.listen(PORT, HOST, () => {
+    console.log(`[Startup] Server running on ${HOST}:${PORT}`);
 });
