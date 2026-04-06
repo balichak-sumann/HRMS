@@ -1,13 +1,13 @@
 # HR Suite Local Setup Guide
 
-Follow these steps to set up the project on a new system with a local PostgreSQL database.
+Follow these steps to set up the project on a new system with a local MySQL or MariaDB database.
 
 ## 1. Prerequisites
 - **Node.js**: Install from [nodejs.org](https://nodejs.org/)
-- **PostgreSQL**: Install and ensure it's running.
+- **MySQL/MariaDB**: Install and ensure it's running.
 
 ## 2. Database Setup
-1. Create a database named `website` in your PostgreSQL instance.
+1. Create a database named `website` in your MySQL instance.
 2. Go to the `server` directory:
    ```bash
    cd server
@@ -17,11 +17,11 @@ Follow these steps to set up the project on a new system with a local PostgreSQL
    copy .env.example .env
    ```
 4. Update `DATABASE_URL` in the `.env` file with your credentials:
-   `DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/website`
+   `DATABASE_URL=mysql://root:YOUR_PASSWORD@localhost:3306/website`
    `PORT=5001`
 
 ## 3. Run Automated Migration
-This command will automatically create all tables and a default HR user:
+This command will automatically apply the MySQL schema and seed default setup data:
 ```bash
 npm run db:setup
 ```

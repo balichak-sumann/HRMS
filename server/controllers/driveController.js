@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const path = require('path');
 const fs = require('fs');
 

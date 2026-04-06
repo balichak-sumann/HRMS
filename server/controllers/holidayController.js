@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const fetch = require('node-fetch');
 
 const pool = new Pool({

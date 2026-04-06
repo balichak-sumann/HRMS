@@ -5,12 +5,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "db:setup": "prisma migrate deploy && node db/setup.js",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:status": "prisma migrate status",
-    "db:studio": "prisma studio",
-    "db:seed:profiles": "cross-env SEED_DEFAULT_USERS=true node db/setup.js",
+    "db:apply:mysql-schema": "node scripts/apply-mysql-schema.js",
+    "db:setup": "node db/setup.js",
+    "db:migrate": "node scripts/apply-mysql-schema.js",
+    "db:deploy": "node scripts/apply-mysql-schema.js",
+    "db:status": "node -e \"console.log('MySQL schema is managed by server/mysql/hostinger_import.sql')\"",
+    "db:studio": "node -e \"console.log('Prisma Studio removed. Use phpMyAdmin/MySQL tools instead.')\"",
+    "db:seed:profiles": "node db/setup.js",
     "db:seed:lookups": "node scripts/seedLookups.js",
     "db:seed:all": "npm run db:seed:profiles && npm run db:seed:lookups",
     "db:seed:employees": "node db/seedEmployeeDetails.js",
@@ -27,15 +28,11 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
+    "mysql2": "^3.15.3",
     "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
     "nodemailer": "^8.0.1",
     "pdfkit": "^0.18.0",
-    "pg": "^8.20.0",
     "socket.io": "^4.8.3"
-  },
-  "devDependencies": {
-    "@prisma/client": "^7.6.0",
-    "prisma": "^7.6.0"
   }
 }

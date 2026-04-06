@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { Pool, types } = require('pg');
+const { Pool, types } = require('./db');
 
 // Fix: Return DATE columns as plain 'YYYY-MM-DD' strings instead of
 // timezone-shifted JavaScript Date objects (prevents IST offset bug)
@@ -235,8 +235,18 @@ if (process.env.CELEBRATIONS_RUN_ON_STARTUP === 'true') {
 }
 
 // Test Route
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'IndusInnovate Server Running', database: 'Connected' });
+app.get('/api/health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1 AS ok');
+        res.json({ status: 'IndusInnovate Server Running', database: 'Connected' });
+    } catch (err) {
+        console.error('[Health] Database check failed:', err.message);
+        res.status(503).json({
+            status: 'IndusInnovate Server Running',
+            database: 'Disconnected',
+            error: 'Database connection failed',
+        });
+    }
 });
 
 if (process.env.NODE_ENV === 'production') {

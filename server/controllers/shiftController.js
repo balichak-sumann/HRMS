@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const { sendShiftAssignmentEmail } = require('../services/emailService');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });

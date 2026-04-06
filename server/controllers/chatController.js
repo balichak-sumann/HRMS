@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const { sendChatMessageNotificationEmail } = require('../services/emailService');
 
 const pool = new Pool({

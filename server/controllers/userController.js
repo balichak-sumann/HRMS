@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const bcrypt = require('bcryptjs');
 
 const pool = new Pool({

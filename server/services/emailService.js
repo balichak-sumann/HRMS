@@ -7,6 +7,10 @@ const { Buffer } = require('buffer');
 const emailPort = parseInt(process.env.EMAIL_PORT || '587', 10);
 const emailSecure = String(process.env.EMAIL_USE_SSL || (emailPort === 465 ? 'true' : 'false')).toLowerCase() === 'true';
 const emailRequireTLS = String(process.env.EMAIL_USE_TLS || 'true').toLowerCase() === 'true';
+const useConsoleEmail = String(process.env.USE_CONSOLE_EMAIL || 'false').toLowerCase() === 'true';
+const emailUser = process.env.EMAIL_HOST_USER || process.env.EMAIL_USER || '';
+const emailPass = process.env.EMAIL_HOST_PASSWORD || process.env.EMAIL_PASS || '';
+const emailHost = process.env.EMAIL_HOST || 'smtppro.zoho.in';
 
 const toRatio = (value, fallback = 0) => {
     const n = Number(value);
@@ -51,18 +55,43 @@ const getMonthlySalaryBreakdown = (monthlyBase, settings = {}) => {
     };
 };
 
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtppro.zoho.in',
+const transporter = useConsoleEmail ? null : nodemailer.createTransport({
+    host: emailHost,
     port: emailPort,
     secure: emailSecure,
     requireTLS: emailRequireTLS,
+    connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT_MS || '10000', 10),
+    greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT_MS || '10000', 10),
+    socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT_MS || '15000', 10),
     auth: {
-        user: process.env.EMAIL_HOST_USER || process.env.EMAIL_USER,
-        pass: process.env.EMAIL_HOST_PASSWORD || process.env.EMAIL_PASS,
+        user: emailUser,
+        pass: emailPass,
     },
 });
 
-const FROM = process.env.DEFAULT_FROM_EMAIL || process.env.EMAIL_FROM || `"IndusInnovate Technologies" <${process.env.EMAIL_HOST_USER || process.env.EMAIL_USER}>`;
+const FROM = process.env.DEFAULT_FROM_EMAIL || process.env.EMAIL_FROM || `"IndusInnovate Technologies" <${emailUser}>`;
+
+const logConsoleEmail = ({ to, subject, html, attachments }) => {
+    console.log('[Email:ConsoleMode]', JSON.stringify({
+        to,
+        subject,
+        html_preview: String(html || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+        attachments: Array.isArray(attachments) ? attachments.map((item) => item.filename || 'attachment') : [],
+    }, null, 2));
+};
+
+const sendMail = async (mailOptions) => {
+    if (useConsoleEmail) {
+        logConsoleEmail(mailOptions);
+        return { accepted: [mailOptions.to], rejected: [], consoleMode: true };
+    }
+
+    if (!emailUser || !emailPass) {
+        throw new Error('SMTP credentials are not configured');
+    }
+
+    return transporter.sendMail(mailOptions);
+};
 
 // ─── Generate Offer Letter PDF ───────────────────────────────────
 const generateOfferLetterPDF = (offerData, settings = {}) => {
@@ -179,7 +208,7 @@ const generateOfferLetterPDF = (offerData, settings = {}) => {
 
 // ─── Send Welcome Email ──────────────────────────────────────────
 const sendWelcomeEmail = async ({ to, name, email, password, role, resetLink }) => {
-    const info = await transporter.sendMail({
+    const info = await sendMail({
         from: FROM,
         to,
         subject: 'Welcome to IndusInnovate Technologies – Your Account Details',
@@ -210,7 +239,7 @@ const sendWelcomeEmail = async ({ to, name, email, password, role, resetLink }) 
 
 // ─── Send Password Reset Email ────────────────────────────────────
 const sendPasswordResetEmail = async ({ to, name, resetLink }) => {
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: 'Password Reset Request – IndusInnovate Technologies',
@@ -232,7 +261,7 @@ const sendPasswordResetEmail = async ({ to, name, resetLink }) => {
 
 // ─── Send Login OTP Email ───────────────────────────────────────
 const sendLoginOtpEmail = async ({ to, name, otp, expiresMinutes = 10 }) => {
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: 'Your Login OTP - IndusInnovate Technologies',
@@ -258,7 +287,7 @@ const sendLoginOtpEmail = async ({ to, name, otp, expiresMinutes = 10 }) => {
 // ─── Send Leave Approval/Rejection Email ─────────────────────────
 const sendLeaveStatusEmail = async ({ to, name, status, leaveType, fromDate, toDate, remarks }) => {
     const isApproved = status === 'Approved';
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `Leave Request ${status} – IndusInnovate Technologies`,
@@ -287,7 +316,7 @@ const sendPayslipEmail = async ({ to, name, month, year, netSalary, attachmentBu
         throw new Error('Payslip attachment is required to send email');
     }
 
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `Your Payslip for ${month} ${year} – IndusInnovate Technologies`,
@@ -319,7 +348,7 @@ const sendPayslipEmail = async ({ to, name, month, year, netSalary, attachmentBu
 
 // ─── Send Meeting Invite Email ───────────────────────────────────
 const sendMeetingInvite = async ({ to, name, title, scheduledAt, agenda, meetingLink }) => {
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `Meeting Invite: ${title} – IndusInnovate Technologies`,
@@ -352,7 +381,7 @@ const sendAccountStatusEmail = async ({ to, name, status }) => {
     const icon = isActive ? '✅' : '⚠️';
     const portalUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
 
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `${heading} – IndusInnovate Technologies`,
@@ -379,7 +408,7 @@ const sendAccountStatusEmail = async ({ to, name, status }) => {
 
 // ─── Send Chat Message Notification Email (Optional) ───────────
 const sendChatMessageNotificationEmail = async ({ to, recipientName, senderName, messagePreview }) => {
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `New message from ${senderName} – IndusInnovate Technologies`,
@@ -405,7 +434,7 @@ const sendChatMessageNotificationEmail = async ({ to, recipientName, senderName,
 // ─── Send Shift Assignment Email (Optional) ─────────────────────
 const sendShiftAssignmentEmail = async ({ to, name, shiftName, startTime, endTime, effectiveFrom }) => {
     const shiftWindow = `${String(startTime || '').slice(0, 5)} - ${String(endTime || '').slice(0, 5)}`;
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `Shift Assigned: ${shiftName} – IndusInnovate Technologies`,
@@ -431,7 +460,7 @@ const sendShiftAssignmentEmail = async ({ to, name, shiftName, startTime, endTim
 
 // ─── Send Onboarding Assignment Email (Optional) ─────────────────
 const sendOnboardingAssignedEmail = async ({ to, name, templateName }) => {
-    await transporter.sendMail({
+    await sendMail({
         from: FROM,
         to,
         subject: `Onboarding Assigned: ${templateName} – IndusInnovate Technologies`,
@@ -489,7 +518,7 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
     }
 
     try {
-        await transporter.sendMail({
+        await sendMail({
         from: FROM,
         to,
         subject: `${isOffer ? 'Offer Letter' : 'Joining Letter'} – IndusInnovate Technologies`,
@@ -588,6 +617,7 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
 };
 
 module.exports = {
+    isConsoleEmailEnabled: () => useConsoleEmail,
     sendWelcomeEmail,
     sendPasswordResetEmail,
     sendLoginOtpEmail,

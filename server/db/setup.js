@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Pool } = require('pg');
+const { Pool } = require('./index');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');

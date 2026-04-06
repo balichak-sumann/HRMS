@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const { createOnboardingCaseFromTemplate } = require('../services/onboardingService');
 const { sendOnboardingAssignedEmail } = require('../services/emailService');
 

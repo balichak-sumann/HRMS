@@ -1,5 +1,5 @@
 require('dotenv').config({ path: './server/.env' });
-const { Pool } = require('pg');
+const { Pool } = require('./db');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function test() {

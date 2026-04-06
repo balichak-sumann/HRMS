@@ -5,7 +5,7 @@ A full-stack HR and collaboration platform with role-based dashboards, employee 
 ## Tech Stack
 
 - Frontend: React 19, Vite, React Router, Socket.IO Client, Recharts, Lucide Icons
-- Backend: Node.js, Express 5, Socket.IO, PostgreSQL (pg)
+- Backend: Node.js, Express 5, Socket.IO, MySQL (mysql2)
 - Auth/Security: JWT, token blacklist, role-based authorization
 - Storage: Local uploads directory served by backend
 - PDF/Export: @react-pdf/renderer, html-to-image
@@ -59,8 +59,8 @@ A full-stack HR and collaboration platform with role-based dashboards, employee 
    - This will seed the default admin, HR, and employee profiles if the env vars are set.
 
 ## Notes
-- Only run one migration tool (Prisma or node-pg-migrate) per database, unless you know what you are doing.
-- If you encounter migration errors, check your database state and migration history.
+- Database schema is applied through the MySQL SQL file in `server/mysql/hostinger_import.sql`.
+- If you encounter migration errors, check your MySQL database state and applied tables/indexes.
 - For more details, see the scripts and server/README.md if available.
 - Personal chat and group chat
 - Group member management (add members, leave group)
@@ -138,7 +138,7 @@ Full schema: [server/db/init.sql](server/db/init.sql)
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL running locally
+- MySQL or MariaDB running locally
 
 ### Quick Start (Recommended)
 
@@ -180,7 +180,7 @@ npm run dev
 Create [server/.env](server/.env) with values similar to:
 
 ```env
-DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/website
+DATABASE_URL=mysql://root:YOUR_PASSWORD@localhost:3306/website
 PORT=5001
 JWT_SECRET=your_jwt_secret
 ```
@@ -206,6 +206,8 @@ Backend scripts in [server/package.json](server/package.json):
 
 - npm start
 - npm run db:setup
+- npm run db:migrate
+- npm run db:seed:all
 
 ## Deployment Notes
 

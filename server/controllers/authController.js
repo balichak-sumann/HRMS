@@ -1,9 +1,9 @@
-const { Pool } = require('pg');
+const { Pool } = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { randomUUID: uuidv4, randomInt } = require('crypto');
 const { logManualAction } = require('../middleware/auditLogger');
-const { sendPasswordResetEmail, sendLoginOtpEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendLoginOtpEmail, isConsoleEmailEnabled } = require('../services/emailService');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -205,12 +205,18 @@ const login = async (req, res) => {
             { expiresIn: '15m' }
         );
 
-        res.json({
+        const responsePayload = {
             requiresOtp: true,
             message: `OTP sent to ${maskEmail(user.email)}`,
             pre_auth_token: preAuthToken,
             otp_expires_in_minutes: LOGIN_OTP_EXPIRY_MINUTES,
-        });
+        };
+
+        if (isConsoleEmailEnabled() && process.env.NODE_ENV !== 'production') {
+            responsePayload.debug_otp = otpCode;
+        }
+
+        res.json(responsePayload);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
