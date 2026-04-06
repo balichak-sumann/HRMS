@@ -253,13 +253,23 @@ app.get('/api/health', async (req, res) => {
 
 if (process.env.NODE_ENV === 'production') {
     const distPath = path.resolve(__dirname, '../dist');
-    app.get('*', (req, res, next) => {
+    app.get(/.*/, (req, res, next) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/socket.io')) {
             return next();
         }
         return res.sendFile(path.join(distPath, 'index.html'));
     });
 }
+
+process.on('uncaughtException', (err) => {
+    console.error('[Startup] Uncaught exception:', err && err.stack ? err.stack : err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[Startup] Unhandled rejection:', reason);
+    process.exit(1);
+});
 
 server.on('error', (err) => {
     console.error('[Startup] Server failed to bind:', err.message);
