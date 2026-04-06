@@ -11,7 +11,15 @@ import { SocketProvider, useSocket } from './context/SocketContext';
 import CallModal from './components/Chat/CallModal';
 import './index.css';
 
-const lazyPage = (path) => lazy(() => import(path));
+const pageModules = import.meta.glob('./pages/*.{jsx,js}');
+
+const lazyPage = (path) => lazy(async () => {
+  const loader = pageModules[`${path}.jsx`] || pageModules[`${path}.js`] || pageModules[path];
+  if (!loader) {
+    throw new Error(`Lazy page module not found for path: ${path}`);
+  }
+  return loader();
+});
 
 const LoginPage = lazyPage('./pages/LoginPage');
 const ForgotPasswordPage = lazyPage('./pages/ForgotPasswordPage');
