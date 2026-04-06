@@ -18,8 +18,9 @@ const io = require('socket.io')(server, {
         methods: ["GET", "POST"]
     }
 });
-const PORT = Number(process.env.PORT || 5001);
+const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
+console.log(`[Startup] PORT env=${process.env.PORT || '(unset)'} HOST env=${process.env.HOST || '(unset)'}`);
 
 // Middleware
 app.use(cors());
