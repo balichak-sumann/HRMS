@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import { PDFViewer } from '@react-pdf/renderer';
+import { PDFViewer, pdf } from '@react-pdf/renderer';
 import PayslipPDF from '../components/Payroll/PayslipPDF';
 import {
     ArrowLeft,
@@ -453,7 +453,6 @@ const HRPayrollEmployeePage = () => {
         }
 
         try {
-            const { pdf } = await import('@react-pdf/renderer');
             const blob = await pdf(<PayslipPDF payslip={payslip} employee={selectedEmp} />).toBlob();
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -687,7 +686,6 @@ const HRPayrollEmployeePage = () => {
                                 }
                                 try {
                                     setGenerating(true);
-                                    const { pdf } = await import('@react-pdf/renderer');
                                     const blob = await pdf(<PayslipPDF payslip={payslip} employee={selectedEmp} />).toBlob();
                                     const formData = new FormData();
                                     const fileName = `Payslip_${selectedEmp.full_name}_${payslip.month}_${payslip.year}.pdf`;
