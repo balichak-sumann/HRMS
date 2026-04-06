@@ -534,30 +534,62 @@ const getMyOverview = async (req, res) => {
             [cycle.id, me.id]
         );
 
-        const selfAppraisal = await pool.query(
-            `SELECT sa.*, COALESCE(json_agg(json_build_object('goal_id', sai.goal_id, 'rating', sai.rating, 'comment', sai.comment))
-             FILTER (WHERE sai.id IS NOT NULL), '[]') AS items
-             FROM self_appraisals sa
-             LEFT JOIN self_appraisal_items sai ON sai.self_appraisal_id = sa.id
-             WHERE sa.cycle_id = $1 AND sa.employee_id = $2
-             GROUP BY sa.id
+        // Fetch self appraisal main record
+        const selfAppraisalRes = await pool.query(
+            `SELECT * FROM self_appraisals
+             WHERE cycle_id = $1 AND employee_id = $2
              LIMIT 1`,
             [cycle.id, me.id]
         );
+        
+        let selfAppraisal = null;
+        if (selfAppraisalRes.rows.length > 0) {
+            const sa = selfAppraisalRes.rows[0];
+            const selfItems = await pool.query(
+                `SELECT goal_id, rating, comment FROM self_appraisal_items
+                 WHERE self_appraisal_id = $1
+                 ORDER BY created_at DESC`,
+                [sa.id]
+            );
+            selfAppraisal = {
+                ...sa,
+                items: selfItems.rows.map(item => ({
+                    goal_id: item.goal_id,
+                    rating: item.rating,
+                    comment: item.comment
+                }))
+            };
+        }
 
-        const managerAppraisal = await pool.query(
-            `SELECT ma.*, m.full_name AS manager_name,
-                    COALESCE(json_agg(json_build_object('goal_id', mai.goal_id, 'rating', mai.rating, 'comment', mai.comment))
-                    FILTER (WHERE mai.id IS NOT NULL), '[]') AS items
+        // Fetch manager appraisal main record
+        const managerAppraisalRes = await pool.query(
+            `SELECT ma.*, m.full_name AS manager_name
              FROM manager_appraisals ma
-             LEFT JOIN manager_appraisal_items mai ON mai.manager_appraisal_id = ma.id
              LEFT JOIN employees m ON m.id = ma.manager_id
              WHERE ma.cycle_id = $1 AND ma.employee_id = $2
-             GROUP BY ma.id, m.full_name
              ORDER BY ma.submitted_at DESC
              LIMIT 1`,
             [cycle.id, me.id]
         );
+        
+        let managerAppraisal = null;
+        if (managerAppraisalRes.rows.length > 0) {
+            const ma = managerAppraisalRes.rows[0];
+            const managerItems = await pool.query(
+                `SELECT goal_id, rating, comment FROM manager_appraisal_items
+                 WHERE manager_appraisal_id = $1
+                 ORDER BY created_at DESC`,
+                [ma.id]
+            );
+            managerAppraisal = {
+                ...ma,
+                items: managerItems.rows.map(item => ({
+                    goal_id: item.goal_id,
+                    rating: item.rating,
+                    comment: item.comment
+                }))
+            };
+        }
 
         const isManager = await hasDirectReports(me.id);
         let team = [];
@@ -601,8 +633,8 @@ const getMyOverview = async (req, res) => {
                 res.json({
             current_cycle: cycle,
             goals: goals.rows,
-            self_appraisal: selfAppraisal.rows[0] || null,
-            manager_appraisal: managerAppraisal.rows[0] || null,
+            self_appraisal: selfAppraisal || null,
+            manager_appraisal: managerAppraisal || null,
             is_manager: isManager,
             team,
             team_goals: teamGoals

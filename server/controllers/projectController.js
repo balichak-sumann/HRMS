@@ -12,8 +12,7 @@ const getProjects = async (req, res) => {
 
         if (['hr', 'admin'].includes(req.user.role)) {
             query = `
-                SELECT p.*, 
-                (SELECT json_agg(e.full_name) FROM project_members pm JOIN employees e ON pm.employee_id = e.id WHERE pm.project_id = p.id) as team_names
+                SELECT p.* 
                 FROM projects p
                 ORDER BY p.deadline ASC
             `;
@@ -30,7 +29,24 @@ const getProjects = async (req, res) => {
         }
 
         const result = await pool.query(query, params);
-        res.json(result.rows);
+        
+        // Fetch team members for each project
+        const projects = await Promise.all(
+            result.rows.map(async (project) => {
+                const membersRes = await pool.query(
+                    `SELECT e.full_name FROM project_members pm 
+                     JOIN employees e ON pm.employee_id = e.id 
+                     WHERE pm.project_id = $1`,
+                    [project.id]
+                );
+                return {
+                    ...project,
+                    team_names: membersRes.rows.map(m => m.full_name)
+                };
+            })
+        );
+        
+        res.json(projects);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });

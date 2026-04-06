@@ -171,30 +171,32 @@ const getDeclarationWithItems = async (client, declarationId) => {
     if (declarationRes.rows.length === 0) return null;
 
     const itemsRes = await client.query(
-        `SELECT i.*,
-                COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id', p.id,
-                            'file_path', p.file_path,
-                            'file_name', p.file_name,
-                            'file_size', p.file_size,
-                            'created_at', p.created_at
-                        )
-                    ) FILTER (WHERE p.id IS NOT NULL),
-                    '[]'
-                ) AS proofs
+        `SELECT i.*
          FROM income_tax_declaration_items i
-         LEFT JOIN income_tax_declaration_proofs p ON p.item_id = i.id
          WHERE i.declaration_id = $1
-         GROUP BY i.id
          ORDER BY i.created_at ASC`,
         [declarationId]
     );
 
+    // Fetch proofs for each item
+    const items = await Promise.all(
+        itemsRes.rows.map(async (item) => {
+            const proofsRes = await client.query(
+                `SELECT id, file_path, file_name, file_size, created_at
+                 FROM income_tax_declaration_proofs
+                 WHERE item_id = $1`,
+                [item.id]
+            );
+            return {
+                ...item,
+                proofs: proofsRes.rows
+            };
+        })
+    );
+
     return {
         ...declarationRes.rows[0],
-        items: itemsRes.rows,
+        items: items,
     };
 };
 
