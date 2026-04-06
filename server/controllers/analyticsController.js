@@ -146,18 +146,22 @@ const sendCelebrationMessage = async (req, res) => {
         }
 
         const inserted = await pool.query(
-            `WITH inserted AS (
-                INSERT INTO messages (sender_id, receiver_id, content)
-                VALUES ($1, $2, $3)
-                RETURNING *
-            )
-            SELECT i.*, e.full_name AS sender_name
-            FROM inserted i
-            JOIN employees e ON e.id = i.sender_id`,
+            `INSERT INTO messages (sender_id, receiver_id, content)
+             VALUES ($1, $2, $3)`,
             [senderId, employeeId, String(message).trim()]
         );
 
-        const payload = inserted.rows[0];
+        const messageRes = await pool.query(
+            `SELECT m.*, e.full_name AS sender_name
+             FROM messages m
+             JOIN employees e ON e.id = m.sender_id
+             WHERE m.sender_id = $1 AND m.receiver_id = $2
+             ORDER BY m.created_at DESC
+             LIMIT 1`,
+            [senderId, employeeId]
+        );
+
+        const payload = messageRes.rows[0];
         const roomId = [senderId, employeeId].sort().join('_');
         req.io.to(roomId).emit('receive_message', payload);
         req.io.to(employeeId).emit('receive_message', payload);

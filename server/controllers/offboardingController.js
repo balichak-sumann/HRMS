@@ -195,11 +195,11 @@ const startOffboarding = async (req, res) => {
         }
 
         const assetTableCheck = await client.query(
-            `SELECT to_regclass('public.assets') AS assets_table,
-                    to_regclass('public.asset_assignments') AS assignments_table`
+            `SELECT COUNT(*) AS assets_exists FROM information_schema.tables 
+             WHERE table_schema = 'u945818629_HRMS' AND table_name = 'assets'`
         );
 
-        if (assetTableCheck.rows[0]?.assets_table && assetTableCheck.rows[0]?.assignments_table) {
+        if (assetTableCheck.rows[0]?.assets_exists > 0) {
             const activeAssetsRes = await client.query(
                 `SELECT aa.id AS assignment_id,
                         aa.assigned_date,

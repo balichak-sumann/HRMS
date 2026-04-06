@@ -53,6 +53,7 @@ const rewriteAgeExpressions = (sql) => sql.replace(
 );
 
 const rewriteExtract = (sql) => sql
+    .replace(/EXTRACT\(EPOCH\s+FROM\s+([^)]+)\)/gi, 'UNIX_TIMESTAMP($1)')
     .replace(/EXTRACT\(MONTH FROM ([^)]+)\)/gi, 'MONTH($1)')
     .replace(/EXTRACT\(DAY FROM ([^)]+)\)/gi, 'DAY($1)')
     .replace(/EXTRACT\(YEAR FROM ([^)]+)\)/gi, 'YEAR($1)');
