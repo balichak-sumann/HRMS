@@ -407,17 +407,9 @@ const forgotPassword = async (req, res) => {
         }
 
         const result = await pool.query(
-            `SELECT
-                p.*,
-                e.full_name AS employee_full_name,
-                e.email AS employee_email
+            `SELECT p.*
              FROM profiles p
-             LEFT JOIN employees e
-               ON LOWER(TRIM(p.email)) = LOWER(TRIM(e.email))
-               OR (p.employee_id IS NOT NULL AND p.employee_id = e.employee_id)
              WHERE LOWER(TRIM(p.email)) = $1
-                OR LOWER(TRIM(e.email)) = $1
-             ORDER BY CASE WHEN LOWER(TRIM(p.email)) = $1 THEN 0 ELSE 1 END
              LIMIT 1`,
             [normalizedEmail]
         );
@@ -443,7 +435,7 @@ const forgotPassword = async (req, res) => {
         await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE profile_id = $1', [user.id]);
 
         await pool.query(
-            "INSERT INTO password_reset_tokens (profile_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')",
+            'INSERT INTO password_reset_tokens (profile_id, token, expires_at) VALUES ($1, $2, DATE_ADD(NOW(), INTERVAL 24 HOUR))',
             [user.id, token]
         );
 
@@ -453,7 +445,16 @@ const forgotPassword = async (req, res) => {
         }
         const resetLink = `${baseURL}/reset-password?token=${token}`;
 
-        const name = user.employee_full_name || normalizedEmail.split('@')[0];
+        const employeeResult = await pool.query(
+            `SELECT full_name
+             FROM employees
+             WHERE (employee_id IS NOT NULL AND employee_id = $1)
+                OR LOWER(TRIM(email)) = $2
+             LIMIT 1`,
+            [user.employee_id || '', normalizedEmail]
+        );
+
+        const name = employeeResult.rows[0]?.full_name || normalizedEmail.split('@')[0];
         const recipientEmail = String(user.email || normalizedEmail).trim().toLowerCase();
 
         try {
@@ -465,7 +466,7 @@ const forgotPassword = async (req, res) => {
 
         res.json({ message: 'Password reset link has been sent to your email address.' });
     } catch (err) {
-        console.error(err.message);
+        console.error('[Forgot Password] Error:', err && err.stack ? err.stack : err);
         res.status(500).json({ error: 'Server error' });
     }
 };
