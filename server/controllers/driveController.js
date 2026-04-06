@@ -181,19 +181,36 @@ const deleteFolder = async (req, res) => {
         }
 
         // Gather files in the folder subtree so physical files can be removed from disk.
-        const filesRes = await client.query(
-            `WITH RECURSIVE folder_tree AS (
-                SELECT id FROM folders WHERE id = $1
-                UNION ALL
-                SELECT f.id
-                FROM folders f
-                JOIN folder_tree ft ON f.parent_id = ft.id
-             )
-             SELECT storage_path
-             FROM files
-             WHERE folder_id IN (SELECT id FROM folder_tree)`,
-            [id]
-        );
+        // Build folder tree using application-level recursion (replaces WITH RECURSIVE)
+        const folderIds = [id];
+        const allFolderIds = new Set();
+        
+        while (folderIds.length > 0) {
+            const folderId = folderIds.shift();
+            if (allFolderIds.has(folderId)) continue;
+            allFolderIds.add(folderId);
+            
+            const childFolders = await client.query(
+                'SELECT id FROM folders WHERE parent_id = $1',
+                [folderId]
+            );
+            
+            for (const child of childFolders.rows) {
+                folderIds.push(child.id);
+            }
+        }
+
+        // Fetch all files in the folder tree
+        const folderArray = Array.from(allFolderIds);
+        let filesRes = { rows: [] };
+        if (folderArray.length > 0) {
+            filesRes = await client.query(
+                `SELECT storage_path
+                 FROM files
+                 WHERE folder_id = ANY($1)`,
+                [folderArray]
+            );
+        }
 
         await client.query('DELETE FROM folders WHERE id = $1', [id]);
         await client.query('COMMIT');
