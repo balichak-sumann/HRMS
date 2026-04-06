@@ -59,6 +59,9 @@ const rewriteExtract = (sql) => sql
 
 const rewriteIntervals = (sql) => sql
     .replace(/NOW\(\)\s*-\s*INTERVAL\s*'([0-9]+)\s+days'/gi, 'DATE_SUB(NOW(), INTERVAL $1 DAY)')
+    .replace(/NOW\(\)\s*-\s*INTERVAL\s*'([0-9]+)\s+hours?'/gi, 'DATE_SUB(NOW(), INTERVAL $1 HOUR)')
+    .replace(/NOW\(\)\s*\+\s*INTERVAL\s*'([0-9]+)\s+days?'/gi, 'DATE_ADD(NOW(), INTERVAL $1 DAY)')
+    .replace(/NOW\(\)\s*\+\s*INTERVAL\s*'([0-9]+)\s+hours?'/gi, 'DATE_ADD(NOW(), INTERVAL $1 HOUR)')
     .replace(/CURRENT_DATE\s*\+\s*INTERVAL\s*'([0-9]+)\s+month'/gi, 'DATE_ADD(CURRENT_DATE, INTERVAL $1 MONTH)')
     .replace(/NOW\(\)\s*\+\s*\(\s*\$([0-9]+)\s*\|\|\s*' minutes'\s*\)\s*interval/gi, 'DATE_ADD(NOW(), INTERVAL $1 MINUTE)');
 
