@@ -377,6 +377,7 @@ CREATE TABLE `leaves` (
     `end_date` DATE,
     `days` DECIMAL,
     `reason` TEXT,
+    `attachment_url` TEXT,
     `status` TEXT DEFAULT 'Pending',
     `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP,
     `reviewed_by` CHAR(36),
