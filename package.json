@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "start": "node scripts/start.cjs",
+    "prebuild": "npm install --prefix server",
     "dev:all": "node scripts/dev-all.js",
     "install:all": "npm install && npm install --prefix server",
     "deploy": "npm run --prefix server db:deploy",
