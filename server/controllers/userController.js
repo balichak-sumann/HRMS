@@ -5,6 +5,13 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+const mapProfileRoleToEmployeeRole = (role) => {
+    const normalized = String(role || '').toLowerCase();
+    if (normalized === 'admin') return 'Administrator';
+    if (normalized === 'hr') return 'HR Manager';
+    return 'Employee';
+};
+
 // ─── Get user profile ────────────────────────────────────────────
 const getProfile = async (req, res) => {
     try {
@@ -15,7 +22,13 @@ const getProfile = async (req, res) => {
                    e.dob,
                    e.address
             FROM profiles p
-            LEFT JOIN employees e ON p.email = e.email
+                        LEFT JOIN employees e
+                            ON LOWER(TRIM(p.email)) = LOWER(TRIM(e.email))
+                            OR (
+                                        p.employee_id IS NOT NULL
+                                AND e.employee_id IS NOT NULL
+                                AND p.employee_id = e.employee_id
+                            )
             WHERE p.id = $1
         `, [req.user.id]);
 
@@ -127,7 +140,13 @@ const updateProfile = async (req, res) => {
         profileUpdateQuery += ' WHERE id = $1';
         await client.query(profileUpdateQuery, profileParams);
 
-        const empCheck = await client.query('SELECT id FROM employees WHERE email = $1', [currentEmail]);
+        const empCheck = await client.query(
+            `SELECT id
+             FROM employees
+             WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+             LIMIT 1`,
+            [currentEmail]
+        );
         if (empCheck.rows.length > 0) {
             let empUpdateQuery = 'UPDATE employees SET updated_at = NOW()';
             let empParams = [currentEmail];
@@ -166,8 +185,27 @@ const updateProfile = async (req, res) => {
                 empParams.push(profilePhoto);
             }
 
-            empUpdateQuery += ' WHERE email = $1';
+            empUpdateQuery += ' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))';
             await client.query(empUpdateQuery, empParams);
+        } else {
+            const derivedName = (typeof name === 'string' && name.trim())
+                ? name.trim()
+                : String(currentEmail || '').split('@')[0] || 'User';
+
+            await client.query(
+                `INSERT INTO employees (full_name, email, role, department, status, avatar_url, dob, address, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+                [
+                    derivedName,
+                    currentEmail,
+                    mapProfileRoleToEmployeeRole(currentRole),
+                    'General',
+                    'Active',
+                    profilePhoto || null,
+                    dob || null,
+                    address || null,
+                ]
+            );
         }
 
         await client.query('COMMIT');

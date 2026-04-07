@@ -9,7 +9,7 @@ const userController = require('../controllers/userController');
 // Configure multer for profile picture uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dir = 'uploads/profiles';
+        const dir = path.join(__dirname, '..', 'uploads', 'profiles');
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
