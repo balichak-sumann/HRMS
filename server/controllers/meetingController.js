@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const { Pool } = require('../db');
 const { sendMeetingInvite } = require('../services/emailService');
 
@@ -14,7 +15,7 @@ const cleanupExpiredMeetings = async () => {
             SET status = 'expired' 
             WHERE status = 'active' 
             AND first_person_joined_at IS NULL 
-            AND date_time < NOW() - INTERVAL '3 hours'
+            AND date_time < DATE_SUB(NOW(), INTERVAL 3 HOUR)
         `);
     } catch (err) {
         console.error('[Meeting Cleanup] Error:', err.message);
@@ -48,17 +49,46 @@ const createMeeting = async (req, res) => {
 
         const room_id = Math.random().toString(36).substring(7);
         const room_url = `https://indusinnovate.daily.co/${room_id}`;
+        const meetingId = randomUUID();
+        const meetingType = meeting_type || 'scheduled';
+        const meetingDuration = duration || 60;
 
-        const result = await pool.query(
-            'INSERT INTO meetings (title, agenda, date_time, duration, room_url, created_by, meeting_type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-            [title, agenda, date_time, duration || 60, room_url, creator_id, meeting_type || 'scheduled']
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            await client.query(
+                'INSERT INTO meetings (id, title, agenda, date_time, duration, room_url, created_by, meeting_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [meetingId, title, agenda, date_time, meetingDuration, room_url, creator_id, meetingType]
+            );
+
+            if (participants && participants.length > 0) {
+                for (const pId of participants) {
+                    await client.query(
+                        'INSERT INTO meeting_participants (meeting_id, employee_id) VALUES ($1, $2)',
+                        [meetingId, pId]
+                    );
+                }
+            }
+
+            await client.query('COMMIT');
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
+
+        const meetingResult = await pool.query(
+            `SELECT m.*, e.full_name as creator_name
+             FROM meetings m
+             JOIN employees e ON m.created_by = e.id
+             WHERE m.id = $1`,
+            [meetingId]
         );
-        const meeting = result.rows[0];
+        const meeting = meetingResult.rows[0];
 
         if (participants && participants.length > 0) {
-            const values = participants.map(pId => `('${meeting.id}', '${pId}')`).join(',');
-            await pool.query(`INSERT INTO meeting_participants (meeting_id, employee_id) VALUES ${values}`);
-
             // Notify and email each participant
             for (const pId of participants) {
                 const pRes = await pool.query(
@@ -68,45 +98,54 @@ const createMeeting = async (req, res) => {
                     [pId]
                 );
                 const participant = pRes.rows[0];
-                if (participant) {
-                    // Socket notification
-                    if (req.io && participant.profile_id) {
-                        const notifMsg = `${creator_name || 'Admin'} invited you to the meeting "${title}".`;
-                        const notification = await pool.query(
-                            `INSERT INTO notifications (user_id, title, message, type)
-                             VALUES ($1, $2, $3, $4)
-                             RETURNING *`,
-                            [participant.profile_id, 'Meeting Invite', notifMsg, 'meeting']
-                        );
-                        req.io.to(participant.profile_id).emit('notification_created', notification.rows[0]);
-                        
-                        // Only trigger the "Join Now" popup (meeting_invite) if meeting is starting within 5 minutes (or is instant)
-                        const startsIn = date_time ? (new Date(date_time).getTime() - Date.now()) : 0;
-                        if (meeting_type === 'instant' || startsIn <= 5 * 60 * 1000) {
-                            req.io.to(participant.profile_id).emit('meeting_invite', {
-                                meetingId: meeting.id,
-                                title,
-                                agenda,
-                                date_time,
-                                message: notifMsg,
-                                inviterName: creator_name || 'Admin',
-                            });
-                        }
+                if (!participant) continue;
+
+                // Socket notification
+                if (req.io && participant.profile_id) {
+                    const notifMsg = `${creator_name || 'Admin'} invited you to the meeting "${title}".`;
+                    const notificationId = randomUUID();
+                    await pool.query(
+                        `INSERT INTO notifications (id, user_id, title, message, type)
+                         VALUES ($1, $2, $3, $4, $5)`,
+                        [notificationId, participant.profile_id, 'Meeting Invite', notifMsg, 'meeting']
+                    );
+
+                    const notificationResult = await pool.query(
+                        `SELECT id, user_id, title, message, type, is_read, created_at
+                         FROM notifications
+                         WHERE id = $1`,
+                        [notificationId]
+                    );
+
+                    req.io.to(participant.profile_id).emit('notification_created', notificationResult.rows[0]);
+                    
+                    // Only trigger the "Join Now" popup (meeting_invite) if meeting is starting within 5 minutes (or is instant)
+                    const startsIn = date_time ? (new Date(date_time).getTime() - Date.now()) : 0;
+                    if (meetingType === 'instant' || startsIn <= 5 * 60 * 1000) {
+                        req.io.to(participant.profile_id).emit('meeting_invite', {
+                            meetingId: meeting.id,
+                            title,
+                            agenda,
+                            date_time,
+                            message: notifMsg,
+                            inviterName: creator_name || 'Admin',
+                        });
                     }
-                    // Email
-                    if (participant.email) {
-                        try {
-                            await sendMeetingInvite({
-                                to: participant.email,
-                                name: participant.full_name || participant.email,
-                                title,
-                                scheduledAt: date_time,
-                                agenda,
-                                meetingLink: room_url,
-                            });
-                        } catch (emailErr) {
-                            console.warn('Failed to send meeting invite email:', emailErr.message);
-                        }
+                }
+
+                // Email
+                if (participant.email) {
+                    try {
+                        await sendMeetingInvite({
+                            to: participant.email,
+                            name: participant.full_name || participant.email,
+                            title,
+                            scheduledAt: date_time,
+                            agenda,
+                            meetingLink: room_url,
+                        });
+                    } catch (emailErr) {
+                        console.warn('Failed to send meeting invite email:', emailErr.message);
                     }
                 }
             }
@@ -205,8 +244,12 @@ const getMeetingById = async (req, res) => {
 const endMeeting = async (req, res) => {
     try {
         const { id } = req.params;
+        await pool.query("UPDATE meetings SET status = 'completed' WHERE id = $1", [id]);
         const result = await pool.query(
-            "UPDATE meetings SET status = 'completed' WHERE id = $1 RETURNING *",
+            `SELECT m.*, e.full_name as creator_name
+             FROM meetings m
+             JOIN employees e ON m.created_by = e.id
+             WHERE m.id = $1`,
             [id]
         );
 
@@ -243,11 +286,11 @@ const addParticipant = async (req, res) => {
 
         let participantRow = existingResult.rows[0] || null;
         if (!participantRow) {
-            const insertResult = await pool.query(
-                'INSERT INTO meeting_participants (meeting_id, employee_id) VALUES ($1, $2) RETURNING *',
+            await pool.query(
+                'INSERT INTO meeting_participants (meeting_id, employee_id) VALUES ($1, $2)',
                 [id, employee_id]
             );
-            participantRow = insertResult.rows[0];
+            participantRow = { meeting_id: id, employee_id };
         }
 
         // Resolve profile id for notification delivery
@@ -272,11 +315,18 @@ const addParticipant = async (req, res) => {
         const profileId = targetProfileRes.rows[0]?.profile_id || null;
 
         if (profileId) {
+            const notificationId = randomUUID();
+            await pool.query(
+                `INSERT INTO notifications (id, user_id, title, message, type)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [notificationId, profileId, 'Meeting Invite', inviteMessage, 'meeting']
+            );
+
             const notification = await pool.query(
-                `INSERT INTO notifications (user_id, title, message, type)
-                 VALUES ($1, $2, $3, $4)
-                 RETURNING *`,
-                [profileId, 'Meeting Invite', inviteMessage, 'meeting']
+                `SELECT id, user_id, title, message, type, is_read, created_at
+                 FROM notifications
+                 WHERE id = $1`,
+                [notificationId]
             );
 
             // Socket notification
