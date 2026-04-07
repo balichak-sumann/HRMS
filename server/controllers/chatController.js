@@ -233,16 +233,23 @@ const sendMessage = async (req, res) => {
 
         if (!sender_id) return res.status(404).json({ error: 'Profile not found' });
 
-        const result = await pool.query(`
-            WITH inserted AS (
-                INSERT INTO messages (sender_id, receiver_id, group_id, content, attachment_url) 
-                VALUES ($1, $2, $3, $4, $5) 
-                RETURNING *
-            )
-            SELECT i.*, e.full_name as sender_name 
-            FROM inserted i
-            JOIN employees e ON i.sender_id = e.id
-        `, [sender_id, receiver_id || null, group_id || null, content, attachment_url || null]);
+        await pool.query(
+            `INSERT INTO messages (sender_id, receiver_id, group_id, content, attachment_url)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [sender_id, receiver_id || null, group_id || null, content, attachment_url || null]
+        );
+
+        const result = await pool.query(
+            `SELECT m.*, e.full_name as sender_name
+             FROM messages m
+             JOIN employees e ON m.sender_id = e.id
+             WHERE m.sender_id = $1
+               AND ((m.receiver_id = $2) OR ($2 IS NULL AND m.receiver_id IS NULL))
+               AND ((m.group_id = $3) OR ($3 IS NULL AND m.group_id IS NULL))
+             ORDER BY m.created_at DESC, m.id DESC
+             LIMIT 1`,
+            [sender_id, receiver_id || null, group_id || null]
+        );
 
         const message = result.rows[0];
 
@@ -263,13 +270,14 @@ const sendMessage = async (req, res) => {
                          FROM employees e
                          JOIN profiles p
                            ON LOWER(TRIM(p.email)) = LOWER(TRIM(e.email))
-                           OR (p.employee_id IS NOT NULL AND p.employee_id::text = e.id::text)
+                           OR (p.employee_id IS NOT NULL AND CAST(p.employee_id AS CHAR) = CAST(e.id AS CHAR))
                            OR (p.employee_id IS NOT NULL AND e.employee_id IS NOT NULL AND p.employee_id = e.employee_id)
                          WHERE e.id = $1
                          ORDER BY
                             CASE WHEN LOWER(TRIM(p.email)) = LOWER(TRIM(e.email)) THEN 0 ELSE 1 END,
-                            CASE WHEN p.employee_id::text = e.id::text THEN 0 ELSE 1 END,
-                            p.updated_at DESC NULLS LAST
+                            CASE WHEN CAST(p.employee_id AS CHAR) = CAST(e.id AS CHAR) THEN 0 ELSE 1 END,
+                            CASE WHEN p.updated_at IS NULL THEN 1 ELSE 0 END,
+                            p.updated_at DESC
                          LIMIT 1`,
                         [receiver_id]
                     );
