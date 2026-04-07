@@ -80,6 +80,7 @@ app.use('/api/salary-revisions', require('./routes/salaryRevisions'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/surveys', require('./routes/surveys'));
 app.use('/api/lookups', require('./routes/lookups'));
+app.use('/api/contact', require('./routes/contact'));
 
 // Socket.io Logic
 const onlineUsers = new Map(); // userId -> socketId

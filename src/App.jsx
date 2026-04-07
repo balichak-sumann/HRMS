@@ -22,6 +22,7 @@ const lazyPage = (path) => lazy(async () => {
 });
 
 const LoginPage = lazyPage('./pages/LoginPage');
+const LandingPage = lazyPage('./pages/LandingPage');
 const ForgotPasswordPage = lazyPage('./pages/ForgotPasswordPage');
 const ResetPasswordPage = lazyPage('./pages/ResetPasswordPage');
 const HRDashboard = lazyPage('./pages/HRDashboard');
@@ -145,6 +146,7 @@ function App() {
           >
             <Routes>
             {/* Public Route */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -309,8 +311,7 @@ function App() {
             } />
 
             {/* Redirects */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
         </Router>

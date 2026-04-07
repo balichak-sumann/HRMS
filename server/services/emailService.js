@@ -616,6 +616,46 @@ const sendOfferLetterEmail = async ({ to, candidateName, role, positionTitle, de
     }
 };
 
+const sendContactSubmissionNotification = async ({ name, email, company, submittedAt }) => {
+    const targetEmail = process.env.EMAIL_HOST_USER || process.env.DEFAULT_FROM_EMAIL;
+    if (!targetEmail) {
+        throw new Error('Contact notification target email is not configured');
+    }
+
+    await sendMail({
+        from: FROM,
+        to: targetEmail,
+        subject: 'New Contact Request - IndusOneHR Landing Page',
+        html: `
+        <div style="font-family:Inter,Arial,sans-serif;max-width:640px;margin:0 auto;background:#ffffff;">
+            <div style="background:linear-gradient(135deg,#1E3A8A,#3B82F6);padding:24px;border-radius:10px 10px 0 0;text-align:center;">
+                <h2 style="color:white;margin:0;font-size:22px;">IndusOneHR Contact Request</h2>
+            </div>
+            <div style="padding:24px;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 10px 10px;">
+                <p style="margin:0 0 14px;color:#374151;">A new contact request was submitted from the public landing page.</p>
+                <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                    <tr>
+                        <td style="padding:8px 0;color:#6B7280;width:120px;"><strong>Name</strong></td>
+                        <td style="padding:8px 0;color:#111827;">${name}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 0;color:#6B7280;"><strong>Email</strong></td>
+                        <td style="padding:8px 0;color:#111827;">${email}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 0;color:#6B7280;"><strong>Company</strong></td>
+                        <td style="padding:8px 0;color:#111827;">${company}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 0;color:#6B7280;"><strong>Submitted At</strong></td>
+                        <td style="padding:8px 0;color:#111827;">${submittedAt}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>`,
+    });
+};
+
 module.exports = {
     isConsoleEmailEnabled: () => useConsoleEmail,
     sendWelcomeEmail,
@@ -629,4 +669,5 @@ module.exports = {
     sendShiftAssignmentEmail,
     sendOnboardingAssignedEmail,
     sendOfferLetterEmail,
+    sendContactSubmissionNotification,
 };

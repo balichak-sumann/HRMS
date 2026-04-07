@@ -58,6 +58,9 @@ const parseTimeToMinutes = (timeValue) => {
     return Number(match[1]) * 60 + Number(match[2]);
 };
 
+const LATE_AFTER_MINUTES = 10 * 60;
+const EARLY_BEFORE_MINUTES = 18 * 60;
+
 const getShiftForDate = async (employeeId, attendanceDate) => {
     const result = await pool.query(
 
@@ -141,11 +144,9 @@ const checkIn = async (req, res) => {
             });
         }
 
-        const assignedShift = await getShiftForDate(employee_id, attendanceDate);
         const checkInAt = buildTimestampForDate(attendanceDate);
         const checkInTime = checkInAt.getHours() * 60 + checkInAt.getMinutes();
-        const shiftStartMinutes = parseTimeToMinutes(assignedShift?.start_time);
-        const status = shiftStartMinutes != null && checkInTime > shiftStartMinutes ? 'Late' : 'Present';
+        const status = checkInTime > LATE_AFTER_MINUTES ? 'Late' : 'Present';
 
         // Always create a new record for multiple check-ins
         const result = await pool.query(
@@ -199,9 +200,19 @@ const checkOut = async (req, res) => {
             return res.status(400).json({ error: 'No active check-in found to check out.' });
         }
 
+        const record = result.rows[0];
+        const checkOutTime = checkOutAt.getHours() * 60 + checkOutAt.getMinutes();
+
+        if (checkOutTime < EARLY_BEFORE_MINUTES) {
+            await pool.query(
+                "UPDATE attendance SET status = 'Early' WHERE id = $1",
+                [record.id]
+            );
+            record.status = 'Early';
+        }
+
         // Integrity check: if checkout time is before checkin (e.g. clock drift or manual backdating issue)
         // Adjust checkout to match checkin so at least it's 0 duration
-        const record = result.rows[0];
         if (new Date(record.check_out) < new Date(record.check_in)) {
             await pool.query(
                 "UPDATE attendance SET check_out = check_in WHERE id = $1",
@@ -326,6 +337,7 @@ const getMonthlyAttendanceExport = async (req, res) => {
                 e.department,
                 COALESCE(SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END), 0) AS present_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Late' THEN 1 ELSE 0 END), 0) AS late_days,
+                COALESCE(SUM(CASE WHEN a.status = 'Early' THEN 1 ELSE 0 END), 0) AS early_days,
                 COALESCE(SUM(CASE WHEN a.status = 'On Leave' THEN 1 ELSE 0 END), 0) AS on_leave_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END), 0) AS absent_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Half-Day' THEN 1 ELSE 0 END), 0) AS half_day_count,
