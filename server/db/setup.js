@@ -77,18 +77,14 @@ async function setupDatabase() {
             const salt = await bcrypt.genSalt(10);
             const hash = await bcrypt.hash(user.password, salt);
 
-            await pool.query(
-                `INSERT INTO profiles (email, role, password_hash, employee_id, status, is_first_login)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [user.email, user.role, hash, user.employeeId, 'active', true]
-            );
-
+            let linkedEmployeeUuid = null;
             if (user.employeeProfile) {
                 const existingEmployee = await pool.query('SELECT id FROM employees WHERE email = $1', [user.email]);
                 if (existingEmployee.rows.length === 0) {
-                    await pool.query(
+                    const createdEmployee = await pool.query(
                         `INSERT INTO employees (full_name, email, role, department, employee_id, status)
-                         VALUES ($1, $2, $3, $4, $5, $6)`,
+                         VALUES ($1, $2, $3, $4, $5, $6)
+                         RETURNING id`,
                         [
                             user.employeeProfile.full_name,
                             user.email,
@@ -98,8 +94,17 @@ async function setupDatabase() {
                             user.employeeProfile.status,
                         ]
                     );
+                    linkedEmployeeUuid = createdEmployee.rows[0]?.id || null;
+                } else {
+                    linkedEmployeeUuid = existingEmployee.rows[0]?.id || null;
                 }
             }
+
+            await pool.query(
+                `INSERT INTO profiles (email, role, password_hash, employee_id, employee_uuid, status, is_first_login)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [user.email, user.role, hash, user.employeeId, linkedEmployeeUuid, 'active', true]
+            );
 
             console.log(`✅ Seeded ${user.key} account: ${user.email}`);
             const passwordEnvKey = user.key === 'SUPERADMIN'

@@ -12,9 +12,82 @@ const mapProfileRoleToEmployeeRole = (role) => {
     return 'Employee';
 };
 
+const linkProfileToEmployee = async (client, profileId) => {
+    const profileRes = await client.query(
+        `SELECT id, email, role, employee_id, employee_uuid
+         FROM profiles
+         WHERE id = $1
+         LIMIT 1`,
+        [profileId]
+    );
+
+    if (profileRes.rows.length === 0) {
+        return null;
+    }
+
+    const profile = profileRes.rows[0];
+    const employeeRes = await client.query(
+        `SELECT id, email, employee_id
+         FROM employees
+         WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+            OR (
+                    $2 IS NOT NULL
+                AND employee_id IS NOT NULL
+                AND LOWER(TRIM(employee_id)) = LOWER(TRIM($2))
+            )
+         ORDER BY CASE WHEN LOWER(TRIM(email)) = LOWER(TRIM($1)) THEN 0 ELSE 1 END, updated_at DESC
+         LIMIT 1`,
+        [profile.email, profile.employee_id || null]
+    );
+
+    if (employeeRes.rows.length === 0) {
+        return profile;
+    }
+
+    const employee = employeeRes.rows[0];
+    const profileEmpCode = String(profile.employee_id || '').trim();
+    const employeeEmpCode = String(employee.employee_id || '').trim();
+    const profileEmployeeUuid = String(profile.employee_uuid || '').trim();
+    const employeeUuid = String(employee.id || '').trim();
+
+    if (!employeeEmpCode && profileEmpCode) {
+        await client.query(
+            `UPDATE employees
+             SET employee_id = $1,
+                 updated_at = NOW()
+             WHERE id = $2`,
+            [profileEmpCode, employee.id]
+        );
+    }
+
+    if (employeeEmpCode && profileEmpCode.toLowerCase() !== employeeEmpCode.toLowerCase()) {
+        await client.query(
+            `UPDATE profiles
+             SET employee_id = $1,
+                 updated_at = NOW()
+             WHERE id = $2`,
+            [employeeEmpCode, profile.id]
+        );
+    }
+
+    if (employeeUuid && profileEmployeeUuid !== employeeUuid) {
+        await client.query(
+            `UPDATE profiles
+             SET employee_uuid = $1,
+                 updated_at = NOW()
+             WHERE id = $2`,
+            [employeeUuid, profile.id]
+        );
+    }
+
+    return profile;
+};
+
 // ─── Get user profile ────────────────────────────────────────────
 const getProfile = async (req, res) => {
     try {
+        await linkProfileToEmployee(pool, req.user.id);
+
         const result = await pool.query(`
             SELECT p.id, p.email, p.role, p.created_at,
                    COALESCE(e.full_name, p.email) as name,
@@ -23,11 +96,12 @@ const getProfile = async (req, res) => {
                    e.address
             FROM profiles p
                         LEFT JOIN employees e
-                            ON LOWER(TRIM(p.email)) = LOWER(TRIM(e.email))
+                            ON p.employee_uuid = e.id
+                            OR LOWER(TRIM(p.email)) = LOWER(TRIM(e.email))
                             OR (
                                         p.employee_id IS NOT NULL
                                 AND e.employee_id IS NOT NULL
-                                AND p.employee_id = e.employee_id
+                                AND LOWER(TRIM(p.employee_id)) = LOWER(TRIM(e.employee_id))
                             )
             WHERE p.id = $1
         `, [req.user.id]);
@@ -207,6 +281,8 @@ const updateProfile = async (req, res) => {
                 ]
             );
         }
+
+        await linkProfileToEmployee(client, req.user.id);
 
         await client.query('COMMIT');
         res.json({ message: 'Profile updated successfully', profilePhoto });

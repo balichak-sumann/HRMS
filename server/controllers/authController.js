@@ -22,6 +22,54 @@ const maskEmail = (email) => {
 
 const signLoginToken = (userPayload) => jwt.sign(userPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
+const syncProfileEmployeeCode = async (profileId, email, profileEmployeeCode) => {
+    const employeeRes = await pool.query(
+    `SELECT id, employee_id
+         FROM employees
+         WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+            OR (
+                    $2 IS NOT NULL
+                AND employee_id IS NOT NULL
+                AND LOWER(TRIM(employee_id)) = LOWER(TRIM($2))
+            )
+         ORDER BY CASE WHEN LOWER(TRIM(email)) = LOWER(TRIM($1)) THEN 0 ELSE 1 END, updated_at DESC
+         LIMIT 1`,
+        [email, profileEmployeeCode || null]
+    );
+
+    if (employeeRes.rows.length === 0) {
+        return {
+            employeeCode: profileEmployeeCode || null,
+            employeeUuid: null,
+        };
+    }
+
+    const employeeUuid = employeeRes.rows[0]?.id || null;
+    const employeeCode = employeeRes.rows[0]?.employee_id || null;
+    const currentCode = profileEmployeeCode || null;
+
+    if (employeeCode && String(currentCode || '').trim().toLowerCase() !== String(employeeCode).trim().toLowerCase()) {
+        await pool.query(
+            'UPDATE profiles SET employee_id = $1, employee_uuid = $2, updated_at = NOW() WHERE id = $3',
+            [employeeCode, employeeUuid, profileId]
+        );
+        return {
+            employeeCode,
+            employeeUuid,
+        };
+    }
+
+    await pool.query(
+        'UPDATE profiles SET employee_uuid = $1, updated_at = NOW() WHERE id = $2 AND (employee_uuid IS NULL OR employee_uuid <> $1)',
+        [employeeUuid, profileId]
+    );
+
+    return {
+        employeeCode: currentCode,
+        employeeUuid,
+    };
+};
+
 const isBounceEvent = (eventType, eventPayload) => {
     const typeText = String(eventType || '').toLowerCase();
     if (typeText.includes('bounce') || typeText.includes('reject') || typeText.includes('fail') || typeText.includes('complaint')) {
@@ -157,8 +205,8 @@ const login = async (req, res) => {
             }
         }
 
-        const emp = await pool.query('SELECT id FROM employees WHERE email = $1', [user.email]);
-        const employee_uuid = emp.rows[0]?.id || null;
+        const syncedProfileEmployee = await syncProfileEmployeeCode(user.id, user.email, user.employee_id || null);
+        const employee_uuid = syncedProfileEmployee.employeeUuid;
 
         const otpCode = String(randomInt(100000, 1000000));
         const otpSessionId = uuidv4();
@@ -195,7 +243,7 @@ const login = async (req, res) => {
                 role: user.role,
                 email: user.email,
                 name: user.full_name || user.email,
-                employee_id: user.employee_id || null,
+                employee_id: syncedProfileEmployee.employeeCode,
                 employee_uuid,
                 requested_role: normalizedRequestedRole || null,
                 purpose: 'login_otp',
@@ -290,15 +338,15 @@ const verifyLoginOtp = async (req, res) => {
             }
         }
 
-        const emp = await pool.query('SELECT id FROM employees WHERE email = $1', [user.email]);
-        const employee_uuid = emp.rows[0]?.id || null;
+        const syncedProfileEmployee = await syncProfileEmployeeCode(user.id, user.email, user.employee_id || null);
+        const employee_uuid = syncedProfileEmployee.employeeUuid;
 
         const token = signLoginToken({
             id: user.id,
             role: user.role,
             email: user.email,
             name: user.full_name || user.email,
-            employee_id: user.employee_id || null,
+            employee_id: syncedProfileEmployee.employeeCode,
             employee_uuid,
         });
 
@@ -317,7 +365,7 @@ const verifyLoginOtp = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 full_name: user.full_name,
-                employee_id: user.employee_id,
+                employee_id: syncedProfileEmployee.employeeCode,
                 employee_uuid,
                 is_first_login: user.is_first_login ?? true,
                 status: user.status,

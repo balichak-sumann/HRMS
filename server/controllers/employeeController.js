@@ -421,8 +421,8 @@ const createEmployee = async (req, res) => {
         const hash = await bcrypt.hash(tempPassword, salt);
 
         const profileResult = await client.query(
-            'INSERT INTO profiles (email, password_hash, role, employee_id, is_first_login, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email',
-            [normalizedEmail, hash, profileRole, newEmployee.rows[0].id, true, 'pending_activation']
+            'INSERT INTO profiles (email, password_hash, role, employee_id, employee_uuid, is_first_login, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email',
+            [normalizedEmail, hash, profileRole, normalizedEmployeeCode || null, newEmployee.rows[0].id, true, 'pending_activation']
         );
         const profile = profileResult.rows[0];
 
@@ -635,7 +635,8 @@ const updateEmployee = async (req, res) => {
             const linkedProfile = await pool.query(
                 `SELECT id
                  FROM profiles
-                 WHERE employee_id = $1
+                      WHERE employee_uuid = $1
+                          OR employee_id = $1
                     OR email = $2
                     OR email = $3
                  LIMIT 1`,
@@ -714,6 +715,18 @@ const updateEmployee = async (req, res) => {
                 [normalizedAccountRole, targetProfileId]
             );
         }
+
+        await pool.query(
+            `UPDATE profiles
+             SET employee_uuid = $1,
+                 employee_id = CASE
+                     WHEN $2 IS NOT NULL THEN $2
+                     ELSE employee_id
+                 END,
+                 updated_at = NOW()
+             WHERE email = $3`,
+            [req.params.id, normalizedEmployeeCode || null, currentEmployeeEmail]
+        );
 
         res.json(result.rows[0]);
     } catch (err) {

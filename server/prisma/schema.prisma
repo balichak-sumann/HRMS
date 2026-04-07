@@ -327,6 +327,7 @@ model employees {
   payroll                                                                        payroll[]
   peer_feedback_peer_feedback_employee_idToemployees                             peer_feedback[]                 @relation("peer_feedback_employee_idToemployees")
   peer_feedback_peer_feedback_reviewer_idToemployees                             peer_feedback[]                 @relation("peer_feedback_reviewer_idToemployees")
+  profiles_profiles_employee_uuidToemployees                                     profiles[]                      @relation("profiles_employee_uuidToemployees")
   project_members                                                                project_members[]
   projects                                                                       projects[]
   salary_revisions_salary_revisions_approved_byToemployees                       salary_revisions[]              @relation("salary_revisions_approved_byToemployees")
@@ -976,6 +977,7 @@ model profiles {
   password_hash         String                  @db.Text
   created_at            DateTime?               @default(now())
   employee_id           String?                 @unique(length: 191) @db.Text
+  employee_uuid         String?                 @db.Char(36)
   is_first_login        Boolean?                @default(true)
   failed_login_attempts Int?                    @default(0)
   locked_at             DateTime?
@@ -987,6 +989,9 @@ model profiles {
   offer_letters         offer_letters[]
   password_reset_tokens password_reset_tokens[]
   payroll               payroll[]
+  employees             employees?              @relation("profiles_employee_uuidToemployees", fields: [employee_uuid], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([employee_uuid], map: "idx_profiles_employee_uuid")
 }
 
 model project_members {
