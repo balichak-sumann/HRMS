@@ -180,8 +180,8 @@ const assignShiftToEmployee = async (req, res) => {
             const beforeRes = await client.query(
                 `SELECT shift_id, effective_from FROM employee_shift_assignments
                  WHERE employee_id = $1
-                   AND effective_from <= $2::date
-                   AND (effective_to IS NULL OR effective_to >= $2::date)
+                                     AND effective_from <= $2
+                                     AND (effective_to IS NULL OR effective_to >= $2)
                  ORDER BY effective_from DESC, created_at DESC
                  LIMIT 1`,
                 [employee_id, effectiveFrom]
@@ -193,8 +193,8 @@ const assignShiftToEmployee = async (req, res) => {
             await client.query(
                 `DELETE FROM employee_shift_assignments
                  WHERE employee_id = $1
-                   AND effective_from <= $2::date
-                   AND (effective_to IS NULL OR effective_to >= $3::date)`,
+                                     AND effective_from <= $2
+                                     AND (effective_to IS NULL OR effective_to >= $3)`,
                 [employee_id, effectiveTo, effectiveFrom]
             );
 
@@ -205,7 +205,7 @@ const assignShiftToEmployee = async (req, res) => {
                     await client.query(
                         `INSERT INTO employee_shift_assignments (
                             employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
-                         ) VALUES ($1, $2, $3::date, ($4::date - INTERVAL '1 day')::date, $5, NOW())`,
+                         ) VALUES ($1, $2, $3, DATE_SUB($4, INTERVAL 1 DAY), $5, NOW())`,
                         [employee_id, previousShiftId, prevStartStr, effectiveFrom, actorId]
                     );
                 }
@@ -224,7 +224,7 @@ const assignShiftToEmployee = async (req, res) => {
                 await client.query(
                     `INSERT INTO employee_shift_assignments (
                         employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
-                     ) VALUES ($1, $2, ($3::date + INTERVAL '1 day')::date, NULL, $4, NOW())`,
+                     ) VALUES ($1, $2, DATE_ADD($3, INTERVAL 1 DAY), NULL, $4, NOW())`,
                     [employee_id, previousShiftId, effectiveTo, actorId]
                 );
             }
@@ -233,18 +233,18 @@ const assignShiftToEmployee = async (req, res) => {
             await client.query(
                 `DELETE FROM employee_shift_assignments
                  WHERE employee_id = $1
-                   AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                   AND (effective_to IS NULL OR effective_to >= $2)`,
                 [employee_id, effectiveFrom]
             );
 
             // Also terminate any assignment that spans across our start date
             await client.query(
                 `UPDATE employee_shift_assignments
-                 SET effective_to = ($2::date - INTERVAL '1 day')::date,
+                 SET effective_to = DATE_SUB($2, INTERVAL 1 DAY),
                      updated_at = NOW()
                  WHERE employee_id = $1
-                   AND effective_from < $2::date
-                   AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                   AND effective_from < $2
+                   AND (effective_to IS NULL OR effective_to >= $2)`,
                 [employee_id, effectiveFrom]
             );
         }
@@ -325,8 +325,8 @@ const assignShiftToDepartment = async (req, res) => {
                 const beforeRes = await client.query(
                     `SELECT shift_id, effective_from FROM employee_shift_assignments
                      WHERE employee_id = $1
-                       AND effective_from <= $2::date
-                       AND (effective_to IS NULL OR effective_to >= $2::date)
+                           AND effective_from <= $2
+                           AND (effective_to IS NULL OR effective_to >= $2)
                      ORDER BY effective_from DESC, created_at DESC
                      LIMIT 1`,
                     [row.id, effectiveFrom]
@@ -337,8 +337,8 @@ const assignShiftToDepartment = async (req, res) => {
                 await client.query(
                     `DELETE FROM employee_shift_assignments
                      WHERE employee_id = $1
-                       AND effective_from <= $2::date
-                       AND (effective_to IS NULL OR effective_to >= $3::date)`,
+                                             AND effective_from <= $2
+                                             AND (effective_to IS NULL OR effective_to >= $3)`,
                     [row.id, effectiveTo, effectiveFrom]
                 );
 
@@ -349,7 +349,7 @@ const assignShiftToDepartment = async (req, res) => {
                         await client.query(
                             `INSERT INTO employee_shift_assignments (
                                 employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
-                             ) VALUES ($1, $2, $3::date, ($4::date - INTERVAL '1 day')::date, $5, NOW())`,
+                             ) VALUES ($1, $2, $3, DATE_SUB($4, INTERVAL 1 DAY), $5, NOW())`,
                             [row.id, previousShiftId, prevStartStr, effectiveFrom, actorId]
                         );
                     }
@@ -368,7 +368,7 @@ const assignShiftToDepartment = async (req, res) => {
                     await client.query(
                         `INSERT INTO employee_shift_assignments (
                             employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
-                         ) VALUES ($1, $2, ($3::date + INTERVAL '1 day')::date, NULL, $4, NOW())`,
+                         ) VALUES ($1, $2, DATE_ADD($3, INTERVAL 1 DAY), NULL, $4, NOW())`,
                         [row.id, previousShiftId, effectiveTo, actorId]
                     );
                 }
@@ -377,16 +377,16 @@ const assignShiftToDepartment = async (req, res) => {
                 await client.query(
                     `DELETE FROM employee_shift_assignments
                      WHERE employee_id = $1
-                       AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                       AND (effective_to IS NULL OR effective_to >= $2)`,
                     [row.id, effectiveFrom]
                 );
                 await client.query(
                     `UPDATE employee_shift_assignments
-                     SET effective_to = ($2::date - INTERVAL '1 day')::date,
+                     SET effective_to = DATE_SUB($2, INTERVAL 1 DAY),
                          updated_at = NOW()
                      WHERE employee_id = $1
-                       AND effective_from < $2::date
-                       AND (effective_to IS NULL OR effective_to >= $2::date)`,
+                       AND effective_from < $2
+                       AND (effective_to IS NULL OR effective_to >= $2)`,
                     [row.id, effectiveFrom]
                 );
             }

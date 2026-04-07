@@ -46,16 +46,16 @@ const getActorEmployeeId = async (req, client = pool) => {
 
 const getLatestApprovedRevisionForDate = async (employeeId, onOrBeforeDate, client = pool) => {
 
-    const result = await client.query(
-        `SELECT *
-         FROM salary_revisions
-         WHERE employee_id = $1
-           AND status = 'approved'
-           AND effective_date <= $2::date
-                 ORDER BY effective_date DESC, approved_at IS NULL ASC, approved_at DESC, created_at DESC
-         LIMIT 1`,
-        [employeeId, onOrBeforeDate]
-    );
+                const result = await client.query(
+                        `SELECT *
+                         FROM salary_revisions
+                         WHERE employee_id = $1
+                             AND status = 'approved'
+                             AND effective_date <= $2
+                         ORDER BY effective_date DESC, approved_at IS NULL ASC, approved_at DESC, created_at DESC
+                         LIMIT 1`,
+                        [employeeId, onOrBeforeDate]
+                );
 
     return result.rows[0] || null;
 };
@@ -350,7 +350,7 @@ const listPendingApprovals = async (req, res) => {
              JOIN employees e ON e.id = sr.employee_id
              LEFT JOIN employees initiator ON initiator.id = sr.initiated_by
              WHERE sr.status = 'pending'
-               AND ($1::uuid IS NULL OR sr.initiated_by IS DISTINCT FROM $1::uuid)
+                             AND ($1 IS NULL OR COALESCE(sr.initiated_by, '') <> $1)
              ORDER BY sr.created_at DESC`,
             [actorId]
         );

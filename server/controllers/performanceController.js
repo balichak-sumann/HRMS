@@ -437,41 +437,38 @@ const getHRDashboard = async (req, res) => {
 
 
 
-        const rows = await pool.query(
-            `WITH goal_stats AS (
-                SELECT cycle_id, employee_id, COUNT(*)::int AS goals_count
-                FROM goals
-                GROUP BY cycle_id, employee_id
-            ),
-            self_stats AS (
-                SELECT sa.cycle_id, sa.employee_id, sa.id AS sa_id,
-                       ROUND(AVG(sai.rating)::numeric, 2) AS self_avg
-                FROM self_appraisals sa
-                LEFT JOIN self_appraisal_items sai ON sai.self_appraisal_id = sa.id
-                GROUP BY sa.cycle_id, sa.employee_id, sa.id
-            ),
-            manager_stats AS (
-                SELECT ma.cycle_id, ma.employee_id, ma.id AS ma_id,
-                       ROUND(AVG(mai.rating)::numeric, 2) AS manager_avg
-                FROM manager_appraisals ma
-                LEFT JOIN manager_appraisal_items mai ON mai.manager_appraisal_id = ma.id
-                GROUP BY ma.cycle_id, ma.employee_id, ma.id
-            )
-            SELECT ap.cycle_id,
-                    e.id AS employee_id,
-                    e.full_name,
-                    COALESCE(gs.goals_count, 0) AS goals_count,
-                    CASE WHEN ss.sa_id IS NULL THEN FALSE ELSE TRUE END AS self_submitted,
-                    CASE WHEN ms.ma_id IS NULL THEN FALSE ELSE TRUE END AS manager_submitted,
-                    ss.self_avg,
-                    ms.manager_avg
-             FROM appraisal_participants ap
-             JOIN employees e ON e.id = ap.employee_id
-             LEFT JOIN goal_stats gs ON gs.cycle_id = ap.cycle_id AND gs.employee_id = e.id
-             LEFT JOIN self_stats ss ON ss.cycle_id = ap.cycle_id AND ss.employee_id = e.id
-             LEFT JOIN manager_stats ms ON ms.cycle_id = ap.cycle_id AND ms.employee_id = e.id
-             ORDER BY e.full_name ASC`
-        );
+         const rows = await pool.query(
+             `SELECT ap.cycle_id,
+                  e.id AS employee_id,
+                  e.full_name,
+                  COALESCE(gs.goals_count, 0) AS goals_count,
+                  CASE WHEN ss.sa_id IS NULL THEN FALSE ELSE TRUE END AS self_submitted,
+                  CASE WHEN ms.ma_id IS NULL THEN FALSE ELSE TRUE END AS manager_submitted,
+                  ss.self_avg,
+                  ms.manager_avg
+              FROM appraisal_participants ap
+              JOIN employees e ON e.id = ap.employee_id
+              LEFT JOIN (
+              SELECT cycle_id, employee_id, COUNT(*) AS goals_count
+              FROM goals
+              GROUP BY cycle_id, employee_id
+              ) gs ON gs.cycle_id = ap.cycle_id AND gs.employee_id = e.id
+              LEFT JOIN (
+              SELECT sa.cycle_id, sa.employee_id, sa.id AS sa_id,
+                  ROUND(AVG(sai.rating), 2) AS self_avg
+              FROM self_appraisals sa
+              LEFT JOIN self_appraisal_items sai ON sai.self_appraisal_id = sa.id
+              GROUP BY sa.cycle_id, sa.employee_id, sa.id
+              ) ss ON ss.cycle_id = ap.cycle_id AND ss.employee_id = e.id
+              LEFT JOIN (
+              SELECT ma.cycle_id, ma.employee_id, ma.id AS ma_id,
+                  ROUND(AVG(mai.rating), 2) AS manager_avg
+              FROM manager_appraisals ma
+              LEFT JOIN manager_appraisal_items mai ON mai.manager_appraisal_id = ma.id
+              GROUP BY ma.cycle_id, ma.employee_id, ma.id
+              ) ms ON ms.cycle_id = ap.cycle_id AND ms.employee_id = e.id
+              ORDER BY e.full_name ASC`
+         );
 
         const byCycle = cycles.rows.map((cycle) => {
             const employees = rows.rows
@@ -617,7 +614,7 @@ const getMyOverview = async (req, res) => {
                 const goalRes = await pool.query(
                     `SELECT id, employee_id, title, description, target, progress
                      FROM goals
-                     WHERE cycle_id = $1 AND employee_id = ANY($2::uuid[])
+                     WHERE cycle_id = $1 AND employee_id IN ($2)
                      ORDER BY created_at DESC`,
                     [cycle.id, team.map((t) => t.id)]
                 );
