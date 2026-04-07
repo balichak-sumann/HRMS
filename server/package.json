@@ -5,12 +5,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "db:apply:mysql-schema": "node scripts/apply-mysql-schema.js",
+    "prisma:generate": "prisma generate",
+    "prisma:pull": "prisma db pull",
     "db:setup": "node db/setup.js",
-    "db:migrate": "node scripts/apply-mysql-schema.js",
-    "db:deploy": "node scripts/apply-mysql-schema.js",
-    "db:status": "node -e \"console.log('MySQL schema is managed by server/mysql/hostinger_import.sql')\"",
-    "db:studio": "node -e \"console.log('Prisma Studio removed. Use phpMyAdmin/MySQL tools instead.')\"",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:studio": "prisma studio",
     "db:seed:profiles": "node db/setup.js",
     "db:seed:lookups": "node scripts/seedLookups.js",
     "db:seed:all": "npm run db:seed:profiles && npm run db:seed:lookups",
@@ -22,6 +23,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/client": "^6.16.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -33,6 +35,7 @@
     "node-fetch": "^2.7.0",
     "nodemailer": "^8.0.4",
     "pdfkit": "^0.18.0",
+    "prisma": "^6.16.2",
     "socket.io": "^4.8.3"
   },
   "overrides": {

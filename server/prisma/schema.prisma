@@ -1,0 +1,1184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model announcements {
+  id                    String                  @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  title                 String                  @db.Text
+  content               String                  @db.Text
+  author_id             String?                 @db.Char(36)
+  created_at            DateTime?               @default(now())
+  employees             employees?              @relation(fields: [author_id], references: [id], onUpdate: NoAction)
+  employee_celebrations employee_celebrations[]
+
+  @@index([author_id], map: "announcements_author_id_fkey")
+}
+
+model appraisal_cycles {
+  id                     String                   @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name                   String                   @db.Text
+  start_date             DateTime                 @db.Date
+  end_date               DateTime                 @db.Date
+  status                 String?                  @default("draft") @db.Text
+  created_by             String?                  @db.Char(36)
+  created_at             DateTime?                @default(now())
+  updated_at             DateTime?                @default(now())
+  employees              employees?               @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  appraisal_participants appraisal_participants[]
+  goals                  goals[]
+  manager_appraisals     manager_appraisals[]
+  peer_feedback          peer_feedback[]
+  self_appraisals        self_appraisals[]
+
+  @@index([created_by], map: "appraisal_cycles_created_by_fkey")
+}
+
+model appraisal_participants {
+  id               String            @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  cycle_id         String?           @db.Char(36)
+  employee_id      String?           @db.Char(36)
+  created_at       DateTime?         @default(now())
+  appraisal_cycles appraisal_cycles? @relation(fields: [cycle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees        employees?        @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([cycle_id, employee_id])
+  @@index([cycle_id], map: "idx_appraisal_participants_cycle")
+  @@index([employee_id], map: "idx_appraisal_participants_employee")
+}
+
+model asset_assignments {
+  id                                                 String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  asset_id                                           String     @db.Char(36)
+  employee_id                                        String     @db.Char(36)
+  assigned_date                                      DateTime   @db.Date
+  return_date                                        DateTime?  @db.Date
+  condition_notes                                    String?    @db.Text
+  assigned_by                                        String?    @db.Char(36)
+  returned_by                                        String?    @db.Char(36)
+  created_at                                         DateTime?  @default(now())
+  updated_at                                         DateTime?  @default(now())
+  assets                                             assets     @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_asset_assignments_assigned_byToemployees employees? @relation("asset_assignments_assigned_byToemployees", fields: [assigned_by], references: [id], onUpdate: NoAction)
+  employees_asset_assignments_employee_idToemployees employees  @relation("asset_assignments_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_asset_assignments_returned_byToemployees employees? @relation("asset_assignments_returned_byToemployees", fields: [returned_by], references: [id], onUpdate: NoAction)
+
+  @@index([asset_id], map: "asset_assignments_asset_id_fkey")
+  @@index([assigned_by], map: "asset_assignments_assigned_by_fkey")
+  @@index([returned_by], map: "asset_assignments_returned_by_fkey")
+  @@index([employee_id, return_date], map: "idx_asset_assignments_employee_active")
+}
+
+model assets {
+  id                String              @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name              String              @db.Text
+  asset_type        String              @db.Text
+  serial_number     String              @unique @db.VarChar(191)
+  purchase_date     DateTime?           @db.Date
+  asset_value       Decimal?            @db.Decimal(10, 0)
+  status            String              @default("available") @db.Text
+  created_by        String?             @db.Char(36)
+  created_at        DateTime?           @default(now())
+  updated_at        DateTime?           @default(now())
+  asset_assignments asset_assignments[]
+  employees         employees?          @relation(fields: [created_by], references: [id], onUpdate: Restrict)
+
+  @@index([created_by], map: "assets_created_by_fkey")
+  @@index([asset_type(length: 191), status(length: 191)], map: "idx_assets_type_status")
+}
+
+model attendance {
+  id           String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id  String?    @db.Char(36)
+  check_in     DateTime
+  check_out    DateTime?
+  status       String?    @db.Text
+  created_at   DateTime?  @default(now())
+  hours_worked Decimal?   @db.Decimal(10, 0)
+  location     String?    @db.Text
+  employees    employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "attendance_employee_id_fkey")
+}
+
+model audit_logs {
+  id         String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  user_email String    @db.Text
+  full_name  String    @db.Text
+  action     String    @db.Text
+  module     String    @db.Text
+  ip_address String?   @db.Text
+  details    String?   @db.Text
+  created_at DateTime? @default(now())
+  user_id    String?   @db.Char(36)
+  profiles   profiles? @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([user_id], map: "audit_logs_user_id_fkey")
+}
+
+model chat_group_members {
+  group_id    String      @db.Char(36)
+  employee_id String      @db.Char(36)
+  joined_at   DateTime?   @default(now())
+  employees   employees   @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  chat_groups chat_groups @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([group_id, employee_id])
+  @@index([employee_id], map: "chat_group_members_employee_id_fkey")
+}
+
+model chat_groups {
+  id                 String               @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name               String               @db.Text
+  created_at         DateTime?            @default(now())
+  created_by         String?              @db.Char(36)
+  chat_group_members chat_group_members[]
+  employees          employees?           @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  messages           messages[]
+
+  @@index([created_by], map: "chat_groups_created_by_fkey")
+}
+
+model complaints {
+  id                                          String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                 String?    @db.Char(36)
+  category                                    String     @db.Text
+  description                                 String     @db.Text
+  attachment_url                              String?    @db.Text
+  is_anonymous                                Boolean?   @default(false)
+  status                                      String?    @default("Open") @db.Text
+  created_at                                  DateTime?  @default(now())
+  reviewed_by                                 String?    @db.Char(36)
+  attachment                                  String?    @db.Text
+  employees_complaints_employee_idToemployees employees? @relation("complaints_employee_idToemployees", fields: [employee_id], references: [id], onUpdate: NoAction)
+  employees_complaints_reviewed_byToemployees employees? @relation("complaints_reviewed_byToemployees", fields: [reviewed_by], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id], map: "complaints_employee_id_fkey")
+  @@index([reviewed_by], map: "complaints_reviewed_by_fkey")
+}
+
+model daily_reports {
+  id          String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  project_id  String?    @db.Char(36)
+  employee_id String?    @db.Char(36)
+  work_done   String     @db.Text
+  hours       Decimal    @db.Decimal(10, 0)
+  blockers    String?    @db.Text
+  created_at  DateTime?  @default(now())
+  date        DateTime?  @default(dbgenerated("(curdate())")) @db.Date
+  hours_spent Decimal?   @db.Decimal(10, 0)
+  employees   employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  projects    projects?  @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "daily_reports_employee_id_fkey")
+  @@index([project_id], map: "daily_reports_project_id_fkey")
+}
+
+model departments {
+  id          String      @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name        String      @unique(length: 191) @db.Text
+  description String?     @db.Text
+  created_at  DateTime?   @default(now())
+  updated_at  DateTime?   @default(now())
+  employees   employees[]
+  surveys     surveys[]
+}
+
+model documents {
+  id          String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name        String     @db.Text
+  type        String?    @db.Text
+  file_url    String     @db.Text
+  employee_id String?    @db.Char(36)
+  status      String?    @default("Pending") @db.Text
+  uploaded_by String?    @db.Char(36)
+  created_at  DateTime?  @default(now())
+  file_path   String?    @db.Text
+  employees   employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles    profiles?  @relation(fields: [uploaded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([employee_id], map: "documents_employee_id_fkey")
+  @@index([uploaded_by], map: "documents_uploaded_by_fkey")
+}
+
+model employee_celebrations {
+  id               String         @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id      String         @db.Char(36)
+  celebration_type String         @db.Text
+  celebration_date DateTime       @db.Date
+  announcement_id  String?        @db.Char(36)
+  created_at       DateTime?      @default(now())
+  announcements    announcements? @relation(fields: [announcement_id], references: [id], onUpdate: NoAction)
+  employees        employees      @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, celebration_type(length: 191), celebration_date], map: "employee_celebrations_employee_id_celebration_type_celebrat_key")
+  @@index([announcement_id], map: "employee_celebrations_announcement_id_fkey")
+  @@index([celebration_date, celebration_type(length: 191)], map: "idx_employee_celebrations_date")
+}
+
+model employee_shift_assignments {
+  id                                                          String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                                 String     @db.Char(36)
+  shift_id                                                    String     @db.Char(36)
+  effective_from                                              DateTime   @db.Date
+  effective_to                                                DateTime?  @db.Date
+  assigned_by                                                 String?    @db.Char(36)
+  created_at                                                  DateTime?  @default(now())
+  updated_at                                                  DateTime?  @default(now())
+  employees_employee_shift_assignments_assigned_byToemployees employees? @relation("employee_shift_assignments_assigned_byToemployees", fields: [assigned_by], references: [id], onUpdate: NoAction)
+  employees_employee_shift_assignments_employee_idToemployees employees  @relation("employee_shift_assignments_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  shifts                                                      shifts     @relation(fields: [shift_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([assigned_by], map: "employee_shift_assignments_assigned_by_fkey")
+  @@index([employee_id, effective_from, effective_to], map: "idx_shift_assignments_employee_dates")
+  @@index([shift_id], map: "idx_shift_assignments_shift")
+}
+
+model employees {
+  id                                                                             String                          @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  full_name                                                                      String                          @db.Text
+  email                                                                          String                          @unique(length: 191) @db.Text
+  role                                                                           String?                         @db.Text
+  department                                                                     String?                         @default("Engineering") @db.Text
+  phone                                                                          String?                         @db.Text
+  joining_date                                                                   DateTime?                       @db.Date
+  salary                                                                         Decimal?                        @db.Decimal(10, 0)
+  status                                                                         String?                         @default("Active") @db.Text
+  avatar_url                                                                     String?                         @db.Text
+  created_at                                                                     DateTime?                       @default(now())
+  designation                                                                    String?                         @db.Text
+  reporting_manager_id                                                           String?                         @db.Char(36)
+  employee_id                                                                    String?                         @unique(length: 191) @db.Text
+  updated_at                                                                     DateTime?                       @default(now())
+  manager_id                                                                     String?                         @db.Char(36)
+  department_id                                                                  String?                         @db.Char(36)
+  dob                                                                            DateTime?                       @db.Date
+  pan                                                                            String?                         @db.Text
+  bank_account                                                                   String?                         @db.Text
+  bank_name                                                                      String?                         @db.Text
+  location                                                                       String?                         @db.Text
+  address                                                                        String?                         @db.Text
+  personal_email                                                                 String?                         @db.Text
+  emergency_contact                                                              String?                         @db.Text
+  technology                                                                     String?                         @db.Text
+  experience_years                                                               Decimal?                        @db.Decimal(10, 0)
+  aadhaar_card                                                                   String?                         @db.Text
+  salary_revision_history_enabled                                                Boolean                         @default(false)
+  announcements                                                                  announcements[]
+  appraisal_cycles                                                               appraisal_cycles[]
+  appraisal_participants                                                         appraisal_participants[]
+  asset_assignments_asset_assignments_assigned_byToemployees                     asset_assignments[]             @relation("asset_assignments_assigned_byToemployees")
+  asset_assignments_asset_assignments_employee_idToemployees                     asset_assignments[]             @relation("asset_assignments_employee_idToemployees")
+  asset_assignments_asset_assignments_returned_byToemployees                     asset_assignments[]             @relation("asset_assignments_returned_byToemployees")
+  assets                                                                         assets[]
+  attendance                                                                     attendance[]
+  chat_group_members                                                             chat_group_members[]
+  chat_groups                                                                    chat_groups[]
+  complaints_complaints_employee_idToemployees                                   complaints[]                    @relation("complaints_employee_idToemployees")
+  complaints_complaints_reviewed_byToemployees                                   complaints[]                    @relation("complaints_reviewed_byToemployees")
+  daily_reports                                                                  daily_reports[]
+  documents                                                                      documents[]
+  employee_celebrations                                                          employee_celebrations[]
+  employee_shift_assignments_employee_shift_assignments_assigned_byToemployees   employee_shift_assignments[]    @relation("employee_shift_assignments_assigned_byToemployees")
+  employee_shift_assignments_employee_shift_assignments_employee_idToemployees   employee_shift_assignments[]    @relation("employee_shift_assignments_employee_idToemployees")
+  departments                                                                    departments?                    @relation(fields: [department_id], references: [id], onUpdate: NoAction)
+  employees_employees_manager_idToemployees                                      employees?                      @relation("employees_manager_idToemployees", fields: [manager_id], references: [id], onUpdate: NoAction)
+  other_employees_employees_manager_idToemployees                                employees[]                     @relation("employees_manager_idToemployees")
+  employees_employees_reporting_manager_idToemployees                            employees?                      @relation("employees_reporting_manager_idToemployees", fields: [reporting_manager_id], references: [id], onUpdate: NoAction)
+  other_employees_employees_reporting_manager_idToemployees                      employees[]                     @relation("employees_reporting_manager_idToemployees")
+  expense_claims_expense_claims_employee_idToemployees                           expense_claims[]                @relation("expense_claims_employee_idToemployees")
+  expense_claims_expense_claims_reviewer_idToemployees                           expense_claims[]                @relation("expense_claims_reviewer_idToemployees")
+  file_shares_file_shares_employee_idToemployees                                 file_shares[]                   @relation("file_shares_employee_idToemployees")
+  file_shares_file_shares_shared_byToemployees                                   file_shares[]                   @relation("file_shares_shared_byToemployees")
+  files                                                                          files[]
+  folders                                                                        folders[]
+  goals                                                                          goals[]
+  helpdesk_comments                                                              helpdesk_comments[]
+  helpdesk_tickets_helpdesk_tickets_assigned_toToemployees                       helpdesk_tickets[]              @relation("helpdesk_tickets_assigned_toToemployees")
+  helpdesk_tickets_helpdesk_tickets_employee_idToemployees                       helpdesk_tickets[]              @relation("helpdesk_tickets_employee_idToemployees")
+  income_tax_declaration_proofs                                                  income_tax_declaration_proofs[]
+  income_tax_declarations                                                        income_tax_declarations[]
+  leave_balances                                                                 leave_balances[]
+  leave_encashment_policy                                                        leave_encashment_policy[]
+  leave_encashment_requests_leave_encashment_requests_employee_idToemployees     leave_encashment_requests[]     @relation("leave_encashment_requests_employee_idToemployees")
+  leave_encashment_requests_leave_encashment_requests_reviewer_idToemployees     leave_encashment_requests[]     @relation("leave_encashment_requests_reviewer_idToemployees")
+  leaves_leaves_employee_idToemployees                                           leaves[]                        @relation("leaves_employee_idToemployees")
+  leaves_leaves_reviewed_byToemployees                                           leaves[]                        @relation("leaves_reviewed_byToemployees")
+  manager_appraisals_manager_appraisals_employee_idToemployees                   manager_appraisals[]            @relation("manager_appraisals_employee_idToemployees")
+  manager_appraisals_manager_appraisals_manager_idToemployees                    manager_appraisals[]            @relation("manager_appraisals_manager_idToemployees")
+  meeting_participants                                                           meeting_participants[]
+  meetings                                                                       meetings[]
+  messages_messages_receiver_idToemployees                                       messages[]                      @relation("messages_receiver_idToemployees")
+  messages_messages_sender_idToemployees                                         messages[]                      @relation("messages_sender_idToemployees")
+  offboarding_cases_offboarding_cases_employee_idToemployees                     offboarding_cases[]             @relation("offboarding_cases_employee_idToemployees")
+  offboarding_cases_offboarding_cases_finalized_byToemployees                    offboarding_cases[]             @relation("offboarding_cases_finalized_byToemployees")
+  offboarding_cases_offboarding_cases_started_byToemployees                      offboarding_cases[]             @relation("offboarding_cases_started_byToemployees")
+  offboarding_checklist_items_offboarding_checklist_items_assigned_toToemployees offboarding_checklist_items[]   @relation("offboarding_checklist_items_assigned_toToemployees")
+  offboarding_checklist_items_offboarding_checklist_items_cleared_byToemployees  offboarding_checklist_items[]   @relation("offboarding_checklist_items_cleared_byToemployees")
+  offboarding_exit_interviews                                                    offboarding_exit_interviews[]
+  onboarding_case_tasks                                                          onboarding_case_tasks[]
+  onboarding_cases_onboarding_cases_assigned_byToemployees                       onboarding_cases[]              @relation("onboarding_cases_assigned_byToemployees")
+  onboarding_cases_onboarding_cases_employee_idToemployees                       onboarding_cases[]              @relation("onboarding_cases_employee_idToemployees")
+  onboarding_templates                                                           onboarding_templates[]
+  payroll                                                                        payroll[]
+  peer_feedback_peer_feedback_employee_idToemployees                             peer_feedback[]                 @relation("peer_feedback_employee_idToemployees")
+  peer_feedback_peer_feedback_reviewer_idToemployees                             peer_feedback[]                 @relation("peer_feedback_reviewer_idToemployees")
+  project_members                                                                project_members[]
+  projects                                                                       projects[]
+  salary_revisions_salary_revisions_approved_byToemployees                       salary_revisions[]              @relation("salary_revisions_approved_byToemployees")
+  salary_revisions_salary_revisions_employee_idToemployees                       salary_revisions[]              @relation("salary_revisions_employee_idToemployees")
+  salary_revisions_salary_revisions_initiated_byToemployees                      salary_revisions[]              @relation("salary_revisions_initiated_byToemployees")
+  self_appraisals                                                                self_appraisals[]
+  survey_responses                                                               survey_responses[]
+  surveys                                                                        surveys[]
+  tasks                                                                          tasks[]
+
+  @@index([reporting_manager_id], map: "employees_reporting_manager_id_fkey")
+  @@index([department_id], map: "idx_employees_department_id")
+  @@index([manager_id], map: "idx_employees_manager_id")
+}
+
+model expense_claims {
+  id                                              String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                     String     @db.Char(36)
+  category                                        String     @db.Text
+  amount                                          Decimal    @db.Decimal(10, 0)
+  expense_date                                    DateTime   @db.Date
+  description                                     String?    @db.Text
+  receipt_url                                     String?    @db.Text
+  status                                          String     @default("Pending") @db.Text
+  reviewer_id                                     String?    @db.Char(36)
+  reviewer_comment                                String?    @db.Text
+  reviewed_at                                     DateTime?
+  reimbursed_payroll_id                           String?    @db.Char(36)
+  created_at                                      DateTime?  @default(now())
+  updated_at                                      DateTime?  @default(now())
+  employees_expense_claims_employee_idToemployees employees  @relation("expense_claims_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payroll                                         payroll?   @relation(fields: [reimbursed_payroll_id], references: [id], onUpdate: NoAction)
+  employees_expense_claims_reviewer_idToemployees employees? @relation("expense_claims_reviewer_idToemployees", fields: [reviewer_id], references: [id], onUpdate: NoAction)
+
+  @@index([reviewer_id], map: "expense_claims_reviewer_id_fkey")
+  @@index([employee_id], map: "idx_expense_claims_employee")
+  @@index([reimbursed_payroll_id], map: "idx_expense_claims_reimbursed")
+  @@index([status(length: 191)], map: "idx_expense_claims_status")
+}
+
+model file_shares {
+  file_id                                      String     @db.Char(36)
+  employee_id                                  String     @db.Char(36)
+  shared_by                                    String?    @db.Char(36)
+  shared_at                                    DateTime?  @default(now())
+  employees_file_shares_employee_idToemployees employees  @relation("file_shares_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  files                                        files      @relation(fields: [file_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_file_shares_shared_byToemployees   employees? @relation("file_shares_shared_byToemployees", fields: [shared_by], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([file_id, employee_id])
+  @@index([employee_id], map: "file_shares_employee_id_fkey")
+  @@index([shared_by], map: "file_shares_shared_by_fkey")
+}
+
+model files {
+  id           String        @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name         String        @db.Text
+  folder_id    String?       @db.Char(36)
+  owner_id     String?       @db.Char(36)
+  size         BigInt
+  mime_type    String?       @db.Text
+  storage_path String        @db.Text
+  created_at   DateTime?     @default(now())
+  is_shared    Boolean?      @default(false)
+  folder       String?       @db.Text
+  file_shares  file_shares[]
+  folders      folders?      @relation(fields: [folder_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees    employees?    @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([folder_id], map: "files_folder_id_fkey")
+  @@index([owner_id], map: "files_owner_id_fkey")
+}
+
+model folders {
+  id            String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name          String     @db.Text
+  parent_id     String?    @db.Char(36)
+  owner_id      String?    @db.Char(36)
+  is_company    Boolean?   @default(false)
+  is_hr_only    Boolean?   @default(false)
+  created_at    DateTime?  @default(now())
+  files         files[]
+  employees     employees? @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  folders       folders?   @relation("foldersTofolders", fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other_folders folders[]  @relation("foldersTofolders")
+
+  @@index([owner_id], map: "folders_owner_id_fkey")
+  @@index([parent_id], map: "folders_parent_id_fkey")
+}
+
+model goals {
+  id                      String                    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  cycle_id                String?                   @db.Char(36)
+  employee_id             String?                   @db.Char(36)
+  title                   String                    @db.Text
+  description             String?                   @db.Text
+  target                  String                    @db.Text
+  progress                Int?                      @default(0)
+  created_at              DateTime?                 @default(now())
+  updated_at              DateTime?                 @default(now())
+  appraisal_cycles        appraisal_cycles?         @relation(fields: [cycle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees               employees?                @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  manager_appraisal_items manager_appraisal_items[]
+  self_appraisal_items    self_appraisal_items[]
+
+  @@index([employee_id], map: "goals_employee_id_fkey")
+  @@index([cycle_id, employee_id], map: "idx_goals_cycle_employee")
+}
+
+model helpdesk_attachments {
+  id               String           @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  ticket_id        String           @db.Char(36)
+  file_path        String           @db.Text
+  file_name        String           @db.Text
+  file_size        Int?
+  created_at       DateTime?        @default(now())
+  helpdesk_tickets helpdesk_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ticket_id], map: "helpdesk_attachments_ticket_id_fkey")
+}
+
+model helpdesk_comments {
+  id               String           @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  ticket_id        String           @db.Char(36)
+  user_id          String           @db.Char(36)
+  comment_text     String           @db.Text
+  created_at       DateTime?        @default(now())
+  updated_at       DateTime?        @default(now())
+  helpdesk_tickets helpdesk_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees        employees        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ticket_id, created_at(sort: Desc)], map: "idx_helpdesk_comments_ticket")
+  @@index([user_id], map: "idx_helpdesk_comments_user")
+}
+
+model helpdesk_tickets {
+  id                                                String                 @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                       String                 @db.Char(36)
+  category                                          String                 @db.Text
+  subject                                           String                 @db.Text
+  description                                       String                 @db.Text
+  priority                                          String                 @default("medium") @db.Text
+  status                                            String                 @default("open") @db.Text
+  assigned_to                                       String?                @db.Char(36)
+  created_at                                        DateTime?              @default(now())
+  updated_at                                        DateTime?              @default(now())
+  resolved_at                                       DateTime?
+  closed_at                                         DateTime?
+  helpdesk_attachments                              helpdesk_attachments[]
+  helpdesk_comments                                 helpdesk_comments[]
+  employees_helpdesk_tickets_assigned_toToemployees employees?             @relation("helpdesk_tickets_assigned_toToemployees", fields: [assigned_to], references: [id], onUpdate: NoAction)
+  employees_helpdesk_tickets_employee_idToemployees employees              @relation("helpdesk_tickets_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([assigned_to, status(length: 191)], map: "idx_helpdesk_tickets_assigned_to")
+  @@index([category(length: 191), status(length: 191), created_at(sort: Desc)], map: "idx_helpdesk_tickets_category")
+  @@index([employee_id], map: "idx_helpdesk_tickets_employee")
+  @@index([status(length: 191), created_at(sort: Desc)], map: "idx_helpdesk_tickets_status")
+}
+
+model holidays {
+  id         String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name       String    @db.Text
+  date       DateTime  @db.Date
+  type       String?   @default("National") @db.Text
+  label      String?   @db.Text
+  created_at DateTime? @default(now())
+}
+
+model income_tax_declaration_items {
+  id                            String                          @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  declaration_id                String                          @db.Char(36)
+  section_code                  String                          @db.Text
+  item_label                    String                          @db.Text
+  declared_amount               Decimal                         @default(0) @db.Decimal(10, 0)
+  approved_amount               Decimal?                        @db.Decimal(10, 0)
+  status                        String                          @default("pending") @db.Text
+  hr_comment                    String?                         @db.Text
+  created_at                    DateTime?                       @default(now())
+  updated_at                    DateTime?                       @default(now())
+  income_tax_declarations       income_tax_declarations         @relation(fields: [declaration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  income_tax_declaration_proofs income_tax_declaration_proofs[]
+
+  @@index([declaration_id, section_code(length: 191), status(length: 191)], map: "idx_income_tax_items_declaration")
+}
+
+model income_tax_declaration_proofs {
+  id                           String                       @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  item_id                      String                       @db.Char(36)
+  file_path                    String                       @db.Text
+  file_name                    String                       @db.Text
+  file_size                    BigInt?
+  uploaded_by                  String?                      @db.Char(36)
+  created_at                   DateTime?                    @default(now())
+  income_tax_declaration_items income_tax_declaration_items @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees                    employees?                   @relation(fields: [uploaded_by], references: [id], onUpdate: NoAction)
+
+  @@index([item_id], map: "idx_income_tax_proofs_item")
+  @@index([uploaded_by], map: "income_tax_declaration_proofs_uploaded_by_fkey")
+}
+
+model income_tax_declarations {
+  id                           String                         @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                  String                         @db.Char(36)
+  financial_year               String                         @db.Text
+  status                       String                         @default("draft") @db.Text
+  submitted_at                 DateTime?
+  reviewed_at                  DateTime?
+  created_at                   DateTime?                      @default(now())
+  updated_at                   DateTime?                      @default(now())
+  version                      Int                            @default(1)
+  income_tax_declaration_items income_tax_declaration_items[]
+  employees                    employees                      @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, financial_year(length: 191), version], map: "idx_income_tax_decl_employee_year_version")
+  @@index([employee_id, financial_year(length: 191)], map: "idx_income_tax_decl_employee_year")
+  @@index([status(length: 191)], map: "idx_income_tax_decl_status")
+}
+
+model leave_balances {
+  id                String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id       String?    @db.Char(36)
+  year              Int
+  casual_total      Int?       @default(12)
+  casual_used       Int?       @default(0)
+  sick_total        Int?       @default(12)
+  sick_used         Int?       @default(0)
+  earned_total      Int?       @default(15)
+  earned_used       Int?       @default(0)
+  comp_off_total    Int?       @default(0)
+  comp_off_used     Int?       @default(0)
+  casual_encashed   Int?       @default(0)
+  sick_encashed     Int?       @default(0)
+  earned_encashed   Int?       @default(0)
+  comp_off_encashed Int?       @default(0)
+  employees         employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, year])
+  @@index([employee_id, year], map: "idx_leave_bal_emp_year")
+}
+
+model leave_encashment_policy {
+  id                     String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  encashable_leave_types String?    @db.LongText
+  max_days_per_year      Int
+  payout_formula         String     @db.Text
+  updated_by             String?    @db.Char(36)
+  created_at             DateTime?  @default(now())
+  updated_at             DateTime?  @default(now())
+  employees              employees? @relation(fields: [updated_by], references: [id], onUpdate: NoAction)
+
+  @@index([updated_by], map: "leave_encashment_policy_updated_by_fkey")
+}
+
+model leave_encashment_requests {
+  id                                                         String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                                String     @db.Char(36)
+  leave_type                                                 String     @db.Text
+  days_requested                                             Int
+  encashment_amount                                          Decimal    @default(0) @db.Decimal(10, 0)
+  request_year                                               Int
+  status                                                     String     @default("Pending") @db.Text
+  reviewer_id                                                String?    @db.Char(36)
+  reviewer_comment                                           String?    @db.Text
+  reviewed_at                                                DateTime?
+  reimbursed_payroll_id                                      String?    @db.Char(36)
+  created_at                                                 DateTime?  @default(now())
+  updated_at                                                 DateTime?  @default(now())
+  employees_leave_encashment_requests_employee_idToemployees employees  @relation("leave_encashment_requests_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payroll                                                    payroll?   @relation(fields: [reimbursed_payroll_id], references: [id], onUpdate: NoAction)
+  employees_leave_encashment_requests_reviewer_idToemployees employees? @relation("leave_encashment_requests_reviewer_idToemployees", fields: [reviewer_id], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id, request_year], map: "idx_leave_encashment_requests_employee_year")
+  @@index([reimbursed_payroll_id], map: "idx_leave_encashment_requests_reimbursed")
+  @@index([status(length: 191)], map: "idx_leave_encashment_requests_status")
+  @@index([reviewer_id], map: "leave_encashment_requests_reviewer_id_fkey")
+}
+
+model leaves {
+  id                                      String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                             String?    @db.Char(36)
+  leave_type                              String?    @db.Text
+  start_date                              DateTime?  @db.Date
+  end_date                                DateTime?  @db.Date
+  days                                    Decimal?   @db.Decimal(10, 0)
+  reason                                  String?    @db.Text
+  attachment_url                          String?    @db.Text
+  status                                  String?    @default("Pending") @db.Text
+  created_at                              DateTime?  @default(now())
+  reviewed_by                             String?    @db.Char(36)
+  reviewed_at                             DateTime?
+  employees_leaves_employee_idToemployees employees? @relation("leaves_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_leaves_reviewed_byToemployees employees? @relation("leaves_reviewed_byToemployees", fields: [reviewed_by], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id], map: "leaves_employee_id_fkey")
+  @@index([reviewed_by], map: "leaves_reviewed_by_fkey")
+}
+
+model manager_appraisal_items {
+  id                   String              @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  manager_appraisal_id String?             @db.Char(36)
+  goal_id              String?             @db.Char(36)
+  rating               Int
+  comment              String?             @db.Text
+  created_at           DateTime?           @default(now())
+  goals                goals?              @relation(fields: [goal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  manager_appraisals   manager_appraisals? @relation(fields: [manager_appraisal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([goal_id], map: "manager_appraisal_items_goal_id_fkey")
+  @@index([manager_appraisal_id], map: "manager_appraisal_items_manager_appraisal_id_fkey")
+}
+
+model manager_appraisals {
+  id                                                  String                    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  cycle_id                                            String?                   @db.Char(36)
+  employee_id                                         String?                   @db.Char(36)
+  manager_id                                          String?                   @db.Char(36)
+  feedback                                            String?                   @db.Text
+  submitted_at                                        DateTime?
+  created_at                                          DateTime?                 @default(now())
+  employee_comment                                    String?                   @db.Text
+  employee_comment_at                                 DateTime?
+  manager_appraisal_items                             manager_appraisal_items[]
+  appraisal_cycles                                    appraisal_cycles?         @relation(fields: [cycle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_manager_appraisals_employee_idToemployees employees?                @relation("manager_appraisals_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_manager_appraisals_manager_idToemployees  employees?                @relation("manager_appraisals_manager_idToemployees", fields: [manager_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([cycle_id, employee_id, manager_id])
+  @@index([cycle_id, employee_id], map: "idx_manager_appraisals_cycle_employee")
+  @@index([employee_id], map: "manager_appraisals_employee_id_fkey")
+  @@index([manager_id], map: "manager_appraisals_manager_id_fkey")
+}
+
+model meeting_participants {
+  meeting_id  String    @db.Char(36)
+  employee_id String    @db.Char(36)
+  employees   employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  meetings    meetings  @relation(fields: [meeting_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([meeting_id, employee_id])
+  @@index([employee_id], map: "meeting_participants_employee_id_fkey")
+}
+
+model meetings {
+  id                     String                 @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  title                  String                 @db.Text
+  agenda                 String?                @db.Text
+  date_time              DateTime
+  duration               Int?                   @default(60)
+  room_url               String?                @db.Text
+  created_by             String?                @db.Char(36)
+  created_at             DateTime?              @default(now())
+  scheduled_at           DateTime?
+  duration_minutes       Int?
+  meeting_link           String?                @db.Text
+  status                 String?                @default("active") @db.Text
+  meeting_type           String?                @default("scheduled") @db.Text
+  last_person_left_at    DateTime?
+  first_person_joined_at DateTime?
+  meeting_participants   meeting_participants[]
+  employees              employees?             @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+
+  @@index([created_by], map: "meetings_created_by_fkey")
+}
+
+model messages {
+  id                                        String       @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  sender_id                                 String?      @db.Char(36)
+  receiver_id                               String?      @db.Char(36)
+  group_id                                  String?      @db.Char(36)
+  content                                   String       @db.Text
+  attachment_url                            String?      @db.Text
+  created_at                                DateTime?    @default(now())
+  is_read                                   Boolean?     @default(false)
+  attachment                                String?      @db.Text
+  chat_groups                               chat_groups? @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_messages_receiver_idToemployees employees?   @relation("messages_receiver_idToemployees", fields: [receiver_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_messages_sender_idToemployees   employees?   @relation("messages_sender_idToemployees", fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([group_id], map: "messages_group_id_fkey")
+  @@index([receiver_id], map: "messages_receiver_id_fkey")
+  @@index([sender_id], map: "messages_sender_id_fkey")
+}
+
+model notifications {
+  id         String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  user_id    String?   @db.Char(36)
+  title      String    @db.Text
+  message    String    @db.Text
+  type       String?   @default("info") @db.Text
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now())
+  profiles   profiles? @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "notifications_user_id_fkey")
+}
+
+model offboarding_cases {
+  id                                                  String                        @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                         String                        @db.Char(36)
+  last_working_date                                   DateTime                      @db.Date
+  reason                                              String                        @db.Text
+  reason_details                                      String?                       @db.Text
+  status                                              String                        @default("in_progress") @db.Text
+  started_by                                          String?                       @db.Char(36)
+  finalized_by                                        String?                       @db.Char(36)
+  finalized_at                                        DateTime?
+  created_at                                          DateTime?                     @default(now())
+  updated_at                                          DateTime?                     @default(now())
+  employees_offboarding_cases_employee_idToemployees  employees                     @relation("offboarding_cases_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_offboarding_cases_finalized_byToemployees employees?                    @relation("offboarding_cases_finalized_byToemployees", fields: [finalized_by], references: [id], onUpdate: NoAction)
+  employees_offboarding_cases_started_byToemployees   employees?                    @relation("offboarding_cases_started_byToemployees", fields: [started_by], references: [id], onUpdate: NoAction)
+  offboarding_checklist_items                         offboarding_checklist_items[]
+  offboarding_exit_interviews                         offboarding_exit_interviews?
+
+  @@index([status(length: 191), created_at(sort: Desc)], map: "idx_offboarding_cases_status")
+  @@index([employee_id], map: "offboarding_cases_employee_id_fkey")
+  @@index([finalized_by], map: "offboarding_cases_finalized_by_fkey")
+  @@index([started_by], map: "offboarding_cases_started_by_fkey")
+}
+
+model offboarding_checklist_items {
+  id                                                           String            @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  case_id                                                      String            @db.Char(36)
+  task_code                                                    String            @db.Text
+  task_title                                                   String            @db.Text
+  assigned_role                                                String            @db.Text
+  assigned_to                                                  String?           @db.Char(36)
+  is_cleared                                                   Boolean           @default(false)
+  cleared_by                                                   String?           @db.Char(36)
+  cleared_at                                                   DateTime?
+  notes                                                        String?           @db.Text
+  sort_order                                                   Int               @default(0)
+  created_at                                                   DateTime?         @default(now())
+  updated_at                                                   DateTime?         @default(now())
+  employees_offboarding_checklist_items_assigned_toToemployees employees?        @relation("offboarding_checklist_items_assigned_toToemployees", fields: [assigned_to], references: [id], onUpdate: NoAction)
+  offboarding_cases                                            offboarding_cases @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_offboarding_checklist_items_cleared_byToemployees  employees?        @relation("offboarding_checklist_items_cleared_byToemployees", fields: [cleared_by], references: [id], onUpdate: NoAction)
+
+  @@unique([case_id, task_code(length: 191)])
+  @@index([assigned_to, assigned_role(length: 191), is_cleared], map: "idx_offboarding_checklist_assignee")
+  @@index([case_id, sort_order], map: "idx_offboarding_checklist_case")
+  @@index([cleared_by], map: "offboarding_checklist_items_cleared_by_fkey")
+}
+
+model offboarding_exit_interviews {
+  id                 String            @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  case_id            String            @unique @db.Char(36)
+  employee_id        String            @db.Char(36)
+  reason_for_leaving String            @db.Text
+  experience_rating  Int
+  feedback           String?           @db.Text
+  submitted_at       DateTime?         @default(now())
+  updated_at         DateTime?         @default(now())
+  offboarding_cases  offboarding_cases @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees          employees         @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "offboarding_exit_interviews_employee_id_fkey")
+}
+
+model offer_letters {
+  id             String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  candidate_name String    @db.Text
+  role           String    @db.Text
+  department     String    @db.Text
+  ctc            Decimal   @db.Decimal(10, 0)
+  joining_date   DateTime  @db.Date
+  status         String?   @default("Generated") @db.Text
+  created_at     DateTime? @default(now())
+  email          String?   @db.Text
+  type           String?   @default("offer") @db.Text
+  file_path      String?   @db.Text
+  generated_by   String?   @db.Char(36)
+  profiles       profiles? @relation(fields: [generated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([generated_by], map: "offer_letters_generated_by_fkey")
+}
+
+model onboarding_case_tasks {
+  id                        String                     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  case_id                   String?                    @db.Char(36)
+  template_task_id          String?                    @db.Char(36)
+  title                     String                     @db.Text
+  description               String?                    @db.Text
+  requires_document         Boolean?                   @default(false)
+  is_completed              Boolean?                   @default(false)
+  completed_at              DateTime?
+  completed_by              String?                    @db.Char(36)
+  document_url              String?                    @db.Text
+  sort_order                Int?                       @default(0)
+  created_at                DateTime?                  @default(now())
+  updated_at                DateTime?                  @default(now())
+  onboarding_cases          onboarding_cases?          @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees                 employees?                 @relation(fields: [completed_by], references: [id], onUpdate: NoAction)
+  onboarding_template_tasks onboarding_template_tasks? @relation(fields: [template_task_id], references: [id], onUpdate: NoAction)
+
+  @@index([case_id, sort_order], map: "idx_onboarding_case_tasks_case")
+  @@index([completed_by], map: "onboarding_case_tasks_completed_by_fkey")
+  @@index([template_task_id], map: "onboarding_case_tasks_template_task_id_fkey")
+}
+
+model onboarding_cases {
+  id                                                String                  @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                       String?                 @db.Char(36)
+  template_id                                       String?                 @db.Char(36)
+  status                                            String?                 @default("active") @db.Text
+  assigned_by                                       String?                 @db.Char(36)
+  started_at                                        DateTime?               @default(now())
+  completed_at                                      DateTime?
+  created_at                                        DateTime?               @default(now())
+  updated_at                                        DateTime?               @default(now())
+  onboarding_case_tasks                             onboarding_case_tasks[]
+  employees_onboarding_cases_assigned_byToemployees employees?              @relation("onboarding_cases_assigned_byToemployees", fields: [assigned_by], references: [id], onUpdate: NoAction)
+  employees_onboarding_cases_employee_idToemployees employees?              @relation("onboarding_cases_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  onboarding_templates                              onboarding_templates?   @relation(fields: [template_id], references: [id], onUpdate: NoAction)
+
+  @@index([assigned_by], map: "onboarding_cases_assigned_by_fkey")
+  @@index([employee_id], map: "onboarding_cases_employee_id_fkey")
+  @@index([template_id], map: "onboarding_cases_template_id_fkey")
+}
+
+model onboarding_template_tasks {
+  id                    String                  @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  template_id           String?                 @db.Char(36)
+  title                 String                  @db.Text
+  description           String?                 @db.Text
+  requires_document     Boolean?                @default(false)
+  sort_order            Int?                    @default(0)
+  created_at            DateTime?               @default(now())
+  onboarding_case_tasks onboarding_case_tasks[]
+  onboarding_templates  onboarding_templates?   @relation(fields: [template_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([template_id, sort_order], map: "idx_onboarding_template_tasks_template")
+}
+
+model onboarding_templates {
+  id                        String                      @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name                      String                      @db.Text
+  description               String?                     @db.Text
+  created_by                String?                     @db.Char(36)
+  created_at                DateTime?                   @default(now())
+  updated_at                DateTime?                   @default(now())
+  onboarding_cases          onboarding_cases[]
+  onboarding_template_tasks onboarding_template_tasks[]
+  employees                 employees?                  @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+
+  @@index([created_by], map: "onboarding_templates_created_by_fkey")
+}
+
+model password_reset_tokens {
+  id         String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  profile_id String?   @db.Char(36)
+  token      String    @unique(length: 191) @db.Text
+  expires_at DateTime
+  used       Boolean?  @default(false)
+  created_at DateTime? @default(now())
+  profiles   profiles? @relation(fields: [profile_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([profile_id], map: "password_reset_tokens_profile_id_fkey")
+}
+
+model payroll {
+  id                        String                      @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id               String?                     @db.Char(36)
+  month                     String                      @db.Text
+  year                      Int
+  basic_salary              Decimal                     @db.Decimal(10, 0)
+  allowances                Decimal?                    @default(0) @db.Decimal(10, 0)
+  deductions                Decimal?                    @default(0) @db.Decimal(10, 0)
+  net_salary                Decimal                     @db.Decimal(10, 0)
+  status                    String?                     @default("Pending") @db.Text
+  created_at                DateTime?                   @default(now())
+  generated_by              String?                     @db.Char(36)
+  sent_at                   DateTime?
+  pf                        Decimal?                    @default(0) @db.Decimal(10, 0)
+  tds                       Decimal?                    @default(0) @db.Decimal(10, 0)
+  hra                       Decimal?                    @default(0) @db.Decimal(10, 0)
+  ptax                      Decimal?                    @default(200) @db.Decimal(10, 0)
+  conveyance                Decimal?                    @default(0) @db.Decimal(10, 0)
+  special_allowance         Decimal?                    @default(0) @db.Decimal(10, 0)
+  emp_code                  String?                     @db.Text
+  designation               String?                     @db.Text
+  department                String?                     @db.Text
+  location                  String?                     @db.Text
+  processed_days            Int?                        @default(31)
+  paid_days                 Int?                        @default(31)
+  pan_no                    String?                     @db.Text
+  bank_account              String?                     @db.Text
+  bank_name                 String?                     @db.Text
+  pf_employee               Decimal?                    @default(0) @db.Decimal(10, 0)
+  pf_employer               Decimal?                    @default(0) @db.Decimal(10, 0)
+  esi_employee              Decimal?                    @default(0) @db.Decimal(10, 0)
+  esi_employer              Decimal?                    @default(0) @db.Decimal(10, 0)
+  reimbursements            Decimal?                    @default(0) @db.Decimal(10, 0)
+  leave_encashment          Decimal?                    @default(0) @db.Decimal(10, 0)
+  expense_claims            expense_claims[]
+  leave_encashment_requests leave_encashment_requests[]
+  employees                 employees?                  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles                  profiles?                   @relation(fields: [generated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([employee_id], map: "payroll_employee_id_fkey")
+  @@index([generated_by], map: "payroll_generated_by_fkey")
+}
+
+model payroll_statutory_settings {
+  id                String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  pf_employee_rate  Decimal   @db.Decimal(10, 0)
+  pf_employer_rate  Decimal   @db.Decimal(10, 0)
+  esi_employee_rate Decimal   @db.Decimal(10, 0)
+  esi_employer_rate Decimal   @db.Decimal(10, 0)
+  created_at        DateTime? @default(now())
+  updated_at        DateTime? @default(now())
+}
+
+model payroll_tds_slabs {
+  id          String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  income_from Decimal   @db.Decimal(10, 0)
+  income_to   Decimal?  @db.Decimal(10, 0)
+  rate        Decimal   @db.Decimal(10, 0)
+  created_at  DateTime? @default(now())
+  updated_at  DateTime? @default(now())
+  name        String?   @default("") @db.Text
+}
+
+model peer_feedback {
+  id                                             String            @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  cycle_id                                       String?           @db.Char(36)
+  employee_id                                    String?           @db.Char(36)
+  reviewer_id                                    String?           @db.Char(36)
+  rating                                         Int
+  comment                                        String?           @db.Text
+  is_anonymous                                   Boolean?          @default(false)
+  created_at                                     DateTime?         @default(now())
+  appraisal_cycles                               appraisal_cycles? @relation(fields: [cycle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_peer_feedback_employee_idToemployees employees?        @relation("peer_feedback_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_peer_feedback_reviewer_idToemployees employees?        @relation("peer_feedback_reviewer_idToemployees", fields: [reviewer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([cycle_id, employee_id, reviewer_id])
+  @@index([cycle_id, employee_id], map: "idx_peer_feedback_cycle_employee")
+  @@index([employee_id], map: "peer_feedback_employee_id_fkey")
+  @@index([reviewer_id], map: "peer_feedback_reviewer_id_fkey")
+}
+
+model profiles {
+  id                    String                  @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  email                 String                  @unique(length: 191) @db.Text
+  role                  String?                 @db.Text
+  password_hash         String                  @db.Text
+  created_at            DateTime?               @default(now())
+  employee_id           String?                 @unique(length: 191) @db.Text
+  is_first_login        Boolean?                @default(true)
+  failed_login_attempts Int?                    @default(0)
+  locked_at             DateTime?
+  status                String?                 @default("active") @db.Text
+  updated_at            DateTime?               @default(now())
+  audit_logs            audit_logs[]
+  documents             documents[]
+  notifications         notifications[]
+  offer_letters         offer_letters[]
+  password_reset_tokens password_reset_tokens[]
+  payroll               payroll[]
+}
+
+model project_members {
+  project_id      String    @db.Char(36)
+  employee_id     String    @db.Char(36)
+  role            String?   @db.Text
+  role_in_project String?   @db.Text
+  joined_at       DateTime? @default(now())
+  employees       employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  projects        projects  @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([project_id, employee_id])
+  @@index([employee_id], map: "project_members_employee_id_fkey")
+}
+
+model projects {
+  id              String            @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name            String            @db.Text
+  client          String            @db.Text
+  deadline        DateTime?         @db.Date
+  status          String?           @default("Active") @db.Text
+  progress        Int?              @default(0)
+  created_at      DateTime?         @default(now())
+  description     String?           @db.Text
+  start_date      DateTime?         @db.Date
+  created_by      String?           @db.Char(36)
+  daily_reports   daily_reports[]
+  project_members project_members[]
+  employees       employees?        @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  tasks           tasks[]
+
+  @@index([created_by], map: "projects_created_by_fkey")
+}
+
+model salary_revisions {
+  id                                                 String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id                                        String     @db.Char(36)
+  effective_date                                     DateTime   @db.Date
+  proposed_basic_salary                              Decimal    @db.Decimal(10, 0)
+  proposed_hra                                       Decimal    @db.Decimal(10, 0)
+  proposed_allowances                                Decimal    @db.Decimal(10, 0)
+  proposed_total_ctc                                 Decimal    @db.Decimal(10, 0)
+  status                                             String     @default("pending") @db.Text
+  initiated_by                                       String?    @db.Char(36)
+  approved_by                                        String?    @db.Char(36)
+  approver_comment                                   String?    @db.Text
+  initiated_at                                       DateTime?  @default(now())
+  approved_at                                        DateTime?
+  created_at                                         DateTime?  @default(now())
+  updated_at                                         DateTime?  @default(now())
+  employees_salary_revisions_approved_byToemployees  employees? @relation("salary_revisions_approved_byToemployees", fields: [approved_by], references: [id], onUpdate: NoAction)
+  employees_salary_revisions_employee_idToemployees  employees  @relation("salary_revisions_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees_salary_revisions_initiated_byToemployees employees? @relation("salary_revisions_initiated_byToemployees", fields: [initiated_by], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id, effective_date(sort: Desc), created_at(sort: Desc)], map: "idx_salary_revisions_employee_effective")
+  @@index([status(length: 191), created_at(sort: Desc)], map: "idx_salary_revisions_status")
+  @@index([approved_by], map: "salary_revisions_approved_by_fkey")
+  @@index([initiated_by], map: "salary_revisions_initiated_by_fkey")
+}
+
+model self_appraisal_items {
+  id                String           @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  self_appraisal_id String?          @db.Char(36)
+  goal_id           String?          @db.Char(36)
+  rating            Int
+  comment           String?          @db.Text
+  created_at        DateTime?        @default(now())
+  goals             goals?           @relation(fields: [goal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  self_appraisals   self_appraisals? @relation(fields: [self_appraisal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([goal_id], map: "self_appraisal_items_goal_id_fkey")
+  @@index([self_appraisal_id], map: "self_appraisal_items_self_appraisal_id_fkey")
+}
+
+model self_appraisals {
+  id                   String                 @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  cycle_id             String?                @db.Char(36)
+  employee_id          String?                @db.Char(36)
+  overall_comment      String?                @db.Text
+  submitted_at         DateTime?
+  created_at           DateTime?              @default(now())
+  self_appraisal_items self_appraisal_items[]
+  appraisal_cycles     appraisal_cycles?      @relation(fields: [cycle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees            employees?             @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([cycle_id, employee_id])
+  @@index([cycle_id, employee_id], map: "idx_self_appraisals_cycle_employee")
+  @@index([employee_id], map: "self_appraisals_employee_id_fkey")
+}
+
+model shifts {
+  id                         String                       @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name                       String                       @unique(length: 191) @db.Text
+  start_time                 DateTime                     @db.Time(6)
+  end_time                   DateTime                     @db.Time(6)
+  created_at                 DateTime?                    @default(now())
+  updated_at                 DateTime?                    @default(now())
+  employee_shift_assignments employee_shift_assignments[]
+}
+
+model survey_answers {
+  id               String           @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  response_id      String           @db.Char(36)
+  question_id      String           @db.Char(36)
+  answer_text      String           @db.Text
+  survey_questions survey_questions @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  survey_responses survey_responses @relation(fields: [response_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([question_id], map: "idx_survey_answers_question")
+  @@index([response_id], map: "survey_answers_response_id_fkey")
+}
+
+model survey_questions {
+  id             String           @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  survey_id      String           @db.Char(36)
+  question_text  String           @db.Text
+  question_type  String           @db.Text
+  options_json   String?          @db.Text
+  order_index    Int              @default(0)
+  created_at     DateTime?        @default(now())
+  survey_answers survey_answers[]
+  surveys        surveys          @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([survey_id, order_index], map: "idx_survey_questions_survey_order")
+}
+
+model survey_responses {
+  id             String           @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  survey_id      String           @db.Char(36)
+  employee_id    String?          @db.Char(36)
+  submitted_at   DateTime?        @default(now())
+  survey_answers survey_answers[]
+  employees      employees?       @relation(fields: [employee_id], references: [id], onUpdate: NoAction)
+  surveys        surveys          @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([survey_id, employee_id])
+  @@index([survey_id, submitted_at(sort: Desc)], map: "idx_survey_responses_survey")
+  @@index([employee_id], map: "survey_responses_employee_id_fkey")
+}
+
+model surveys {
+  id                   String             @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  title                String             @db.Text
+  description          String?            @db.Text
+  created_by           String?            @db.Char(36)
+  target_type          String             @default("all") @db.Text
+  target_department_id String?            @db.Char(36)
+  is_anonymous         Boolean            @default(false)
+  deadline             DateTime?          @db.Date
+  status               String             @default("draft") @db.Text
+  created_at           DateTime?          @default(now())
+  survey_questions     survey_questions[]
+  survey_responses     survey_responses[]
+  employees            employees?         @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  departments          departments?       @relation(fields: [target_department_id], references: [id], onUpdate: NoAction)
+
+  @@index([status(length: 191), target_type(length: 191), created_at(sort: Desc)], map: "idx_surveys_status_target")
+  @@index([created_by], map: "surveys_created_by_fkey")
+  @@index([target_department_id], map: "surveys_target_department_id_fkey")
+}
+
+model system_lookups {
+  id         String   @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  category   String
+  value      String
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+
+  @@unique([category, value], map: "idx_system_lookups_unique")
+  @@index([category, is_active], map: "idx_system_lookups_category")
+}
+
+model tasks {
+  id          String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  project_id  String?    @db.Char(36)
+  title       String     @db.Text
+  assignee_id String?    @db.Char(36)
+  status      String?    @default("todo") @db.Text
+  created_at  DateTime?  @default(now())
+  description String?    @db.Text
+  due_date    DateTime?  @db.Date
+  employees   employees? @relation(fields: [assignee_id], references: [id], onUpdate: NoAction)
+  projects    projects?  @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([assignee_id], map: "tasks_assignee_id_fkey")
+  @@index([project_id], map: "tasks_project_id_fkey")
+}
+
+model token_blacklist {
+  id             String    @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  token          String    @unique(length: 191) @db.Text
+  invalidated_at DateTime? @default(now())
+  expires_at     DateTime
+}

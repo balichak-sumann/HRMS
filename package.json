@@ -10,7 +10,7 @@
     "dev:all": "node scripts/dev-all.js",
     "install:all": "npm install && npm install --prefix server",
     "deploy": "npm run --prefix server db:deploy",
-    "migrate": "node scripts/migrate.cjs",
+    "migrate": "npm run --prefix server db:deploy",
     "seed": "node scripts/seed.cjs",
     "build": "vite build",
     "lint": "eslint .",
