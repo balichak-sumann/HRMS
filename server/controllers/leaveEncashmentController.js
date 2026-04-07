@@ -13,6 +13,33 @@ const LEAVE_TYPE_TO_COLUMNS = {
 
 const round2 = (value) => Number((Math.round((Number(value) || 0) * 100) / 100).toFixed(2));
 
+const parseEncashableLeaveTypes = (rawValue) => {
+    if (Array.isArray(rawValue)) return rawValue;
+    if (rawValue == null) return [];
+
+    if (typeof rawValue === 'string') {
+        const trimmed = rawValue.trim();
+        if (!trimmed) return [];
+        try {
+            const parsed = JSON.parse(trimmed);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            // Backward-compatible fallback for comma-delimited legacy values.
+            return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+        }
+    }
+
+    return [];
+};
+
+const normalizePolicyRow = (row) => {
+    if (!row) return null;
+    return {
+        ...row,
+        encashable_leave_types: parseEncashableLeaveTypes(row.encashable_leave_types),
+    };
+};
+
 
 
 const getActorEmployeeId = async (req) => {
@@ -45,7 +72,7 @@ const getPolicyInternal = async (client) => {
          LIMIT 1`
     );
 
-    return result.rows[0] || null;
+    return normalizePolicyRow(result.rows[0] || null);
 };
 
 const getAvailableDaysForType = async (client, employeeId, year, leaveType) => {
@@ -130,6 +157,7 @@ const updatePolicy = async (req, res) => {
         if (invalid.length > 0) {
             return res.status(400).json({ error: `Invalid leave types: ${invalid.join(', ')}` });
         }
+        const serializedTypes = JSON.stringify(uniqueTypes);
 
         const maxDays = Number(max_days_per_year);
         if (!Number.isInteger(maxDays) || maxDays <= 0) {
@@ -159,9 +187,9 @@ const updatePolicy = async (req, res) => {
                     updated_by
                  ) VALUES ($1, $2, $3, $4)
                  RETURNING *`,
-                [uniqueTypes, maxDays, formula, actorId]
+                [serializedTypes, maxDays, formula, actorId]
             );
-            return res.json(inserted.rows[0]);
+            return res.json(normalizePolicyRow(inserted.rows[0]));
         }
 
         const result = await pool.query(
@@ -173,10 +201,10 @@ const updatePolicy = async (req, res) => {
                  updated_at = NOW()
              WHERE id = $5
              RETURNING *`,
-            [uniqueTypes, maxDays, formula, actorId, existing.rows[0].id]
+            [serializedTypes, maxDays, formula, actorId, existing.rows[0].id]
         );
 
-        return res.json(result.rows[0]);
+        return res.json(normalizePolicyRow(result.rows[0]));
     } catch (err) {
         console.error('updatePolicy error:', err.message);
         res.status(500).json({ error: 'Server error' });
