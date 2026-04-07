@@ -5,6 +5,28 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+const syncProfilesIntoEmployees = async () => {
+    await pool.query(`
+        INSERT INTO employees (full_name, email, role, department, employee_id, status)
+        SELECT
+            COALESCE(NULLIF(TRIM(REPLACE(SUBSTRING_INDEX(p.email, '@', 1), '.', ' ')), ''), 'User') AS full_name,
+            p.email,
+            CASE
+                WHEN LOWER(COALESCE(p.role, '')) = 'admin' THEN 'Administrator'
+                WHEN LOWER(COALESCE(p.role, '')) = 'hr' THEN 'HR Manager'
+                ELSE 'Employee'
+            END AS role,
+            'General' AS department,
+            p.employee_id,
+            'Active' AS status
+        FROM profiles p
+        LEFT JOIN employees e ON LOWER(TRIM(e.email)) = LOWER(TRIM(p.email))
+        WHERE e.id IS NULL
+          AND p.email IS NOT NULL
+          AND (p.status IS NULL OR LOWER(p.status) <> 'inactive')
+    `);
+};
+
 const isEmailNotificationEnabled = () => {
     const value = String(process.env.CHAT_MESSAGE_EMAIL_NOTIFICATIONS || '').toLowerCase();
     return value === '1' || value === 'true' || value === 'yes';
@@ -13,6 +35,8 @@ const isEmailNotificationEnabled = () => {
 // ─── Get contacts ────────────────────────────────────────────────
 const getContacts = async (req, res) => {
     try {
+        await syncProfilesIntoEmployees();
+
         const emp = await pool.query(`
             SELECT e.id FROM employees e 
             JOIN profiles p ON e.email = p.email OR e.employee_id = p.employee_id 
@@ -26,7 +50,7 @@ const getContacts = async (req, res) => {
             (SELECT created_at FROM messages WHERE (sender_id = $1 AND receiver_id = employees.id) OR (sender_id = employees.id AND receiver_id = $1) ORDER BY created_at DESC LIMIT 1) as last_time
             FROM employees 
             WHERE email != $2
-            ORDER BY last_time DESC NULLS LAST, full_name ASC
+            ORDER BY last_time IS NULL ASC, last_time DESC, full_name ASC
         `, [myUuid, req.user.email]);
 
         const onlineUsers = req.io.onlineUsers;
@@ -45,6 +69,8 @@ const getContacts = async (req, res) => {
 // ─── Get groups ──────────────────────────────────────────────────
 const getGroups = async (req, res) => {
     try {
+        await syncProfilesIntoEmployees();
+
         const result = await pool.query(`
             SELECT g.* 
             FROM chat_groups g
