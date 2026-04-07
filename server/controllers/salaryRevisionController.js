@@ -52,7 +52,7 @@ const getLatestApprovedRevisionForDate = async (employeeId, onOrBeforeDate, clie
          WHERE employee_id = $1
            AND status = 'approved'
            AND effective_date <= $2::date
-         ORDER BY effective_date DESC, approved_at DESC NULLS LAST, created_at DESC
+                 ORDER BY effective_date DESC, approved_at IS NULL ASC, approved_at DESC, created_at DESC
          LIMIT 1`,
         [employeeId, onOrBeforeDate]
     );

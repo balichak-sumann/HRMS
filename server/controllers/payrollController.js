@@ -12,6 +12,30 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+let payrollSchemaEnsured = false;
+
+const ensurePayrollSchemaCompatibility = async () => {
+    if (payrollSchemaEnsured) return;
+
+    await pool.query(`
+        ALTER TABLE payroll_statutory_settings
+        ADD COLUMN IF NOT EXISTS basic_ratio DECIMAL(10,4) DEFAULT 0.4,
+        ADD COLUMN IF NOT EXISTS hra_ratio DECIMAL(10,4) DEFAULT 0.2,
+        ADD COLUMN IF NOT EXISTS conveyance_amount DECIMAL(10,4) DEFAULT 0.2,
+        ADD COLUMN IF NOT EXISTS fixed_pf_deduction DECIMAL(10,2) DEFAULT 1800,
+        ADD COLUMN IF NOT EXISTS fixed_employer_pf_deduction DECIMAL(10,2) DEFAULT 1800,
+        ADD COLUMN IF NOT EXISTS fixed_insurance_deduction DECIMAL(10,2) DEFAULT 450,
+        ADD COLUMN IF NOT EXISTS fixed_ptax_deduction DECIMAL(10,2) DEFAULT 200
+    `);
+
+    await pool.query(`
+        ALTER TABLE payroll
+        ADD COLUMN IF NOT EXISTS gross_salary DECIMAL(10,2) DEFAULT NULL
+    `);
+
+    payrollSchemaEnsured = true;
+};
+
 
 
 const MONTH_MAP = {
@@ -172,6 +196,7 @@ const getAttendanceSummary = async (employeeId, month, year) => {
 
 
 const getStatutorySettingsData = async () => {
+    await ensurePayrollSchemaCompatibility();
 
     const settingsRes = await pool.query(
         `SELECT id,
@@ -195,7 +220,7 @@ const getStatutorySettingsData = async () => {
     const slabsRes = await pool.query(
         `SELECT id, name, income_from, income_to, rate
          FROM payroll_tds_slabs
-         ORDER BY income_from ASC, income_to ASC NULLS LAST`
+            ORDER BY income_from ASC, income_to IS NULL ASC, income_to ASC`
     );
 
     if (!settingsRes.rows[0]) {
@@ -577,6 +602,7 @@ const updateStatutorySettings = async (req, res) => {
 
     const client = await pool.connect();
     try {
+        await ensurePayrollSchemaCompatibility();
         await client.query('BEGIN');
 
         const settingsRes = await client.query(

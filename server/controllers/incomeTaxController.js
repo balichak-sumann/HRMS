@@ -700,7 +700,15 @@ const getForm16SummaryCore = async (employeeId, financialYear, client = pool) =>
     }
 
     const payrollIncomeRes = await client.query(
-        `SELECT COALESCE(SUM(gross_salary), 0) AS total_income,
+        `SELECT COALESCE(SUM(
+                    COALESCE(basic_salary, 0)
+                    + COALESCE(hra, 0)
+                    + COALESCE(conveyance, 0)
+                    + COALESCE(special_allowance, 0)
+                    + COALESCE(allowances, 0)
+                    + COALESCE(reimbursements, 0)
+                    + COALESCE(leave_encashment, 0)
+                ), 0) AS total_income,
                 COALESCE(SUM(tds), 0) AS total_tds
          FROM payroll
          WHERE employee_id = $1
