@@ -575,7 +575,11 @@ const HRPayrollEmployeePage = () => {
                         <div style={{ borderTop: '1px solid var(--border)', padding: '16px 24px', background: '#FCFCFD' }}>
                             <p style={{ fontSize: '13px', fontWeight: '700', marginBottom: '12px' }}>Payslip Details (Editable)</p>
                             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-                                {metricsLoading ? 'Calculating attendance days...' : 'Paid/Processed days are auto-calculated from attendance (Mon-Fri, month start to month end). All figures below are in INR (₹).'}
+                                {metricsLoading
+                                    ? 'Calculating attendance days...'
+                                    : isHr
+                                        ? 'Paid/Processed days are auto-calculated from attendance (calendar month). All figures below are in INR (₹).'
+                                        : 'As admin, you can override Paid Days before saving payroll. All figures below are in INR (₹).'}
                             </p>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -612,7 +616,19 @@ const HRPayrollEmployeePage = () => {
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Paid Days</label>
-                                    <input className="input-field" type="number" value={payslip.paid_days || 0} readOnly />
+                                    <input
+                                        className="input-field"
+                                        type="number"
+                                        min="0"
+                                        max={payslip.processed_days || 0}
+                                        step="0.5"
+                                        value={payslip.paid_days || 0}
+                                        onChange={(e) => {
+                                            if (isHr) return;
+                                            updateNumericField('paid_days', e.target.value);
+                                        }}
+                                        readOnly={isHr}
+                                    />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>PF Employer Contribution</label>

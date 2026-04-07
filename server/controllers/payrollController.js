@@ -338,6 +338,7 @@ const createPayroll = async (req, res) => {
         pan_no, bank_account, bank_name,
         employee_id, month, year, basic_salary, hra,
         conveyance, special_allowance, allowances, ptax, other_deduction,
+        paid_days,
         gross_salary
     } = req.body;
     const client = await pool.connect();
@@ -352,8 +353,21 @@ const createPayroll = async (req, res) => {
         }
 
         const attendance = await getAttendanceSummary(employee_id, month, year);
+        const isAdminOverrideAllowed = ['admin', 'Super Admin'].includes(req.user?.role);
+        let effectivePaidDays = attendance.paidDays;
+
+        if (isAdminOverrideAllowed && paid_days !== undefined && paid_days !== null && paid_days !== '') {
+            const parsedPaidDays = Number(paid_days);
+            if (!Number.isFinite(parsedPaidDays) || parsedPaidDays < 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'paid_days must be a non-negative number.' });
+            }
+
+            effectivePaidDays = round2(Math.min(parsedPaidDays, attendance.processedDays));
+        }
+
         const prorationFactor = attendance.processedDays > 0
-            ? attendance.paidDays / attendance.processedDays
+            ? effectivePaidDays / attendance.processedDays
             : 0;
 
         const approvedRevision = await getLatestApprovedRevisionForDate(employee_id, attendance.endDate, client);
@@ -480,7 +494,7 @@ const createPayroll = async (req, res) => {
             ) RETURNING *`,
             [
                 employee_id, month, year, emp_code, designation, department, location,
-                attendance.processedDays, attendance.paidDays, pan_no, bank_account, bank_name,
+                attendance.processedDays, effectivePaidDays, pan_no, bank_account, bank_name,
                 proratedBasic, proratedHra, proratedConveyance, proratedSpecialAllowance, proratedAllowances,
                 0,
                 0,
@@ -546,7 +560,7 @@ const createPayroll = async (req, res) => {
                 period_start: attendance.startDate,
                 period_end: attendance.endDate,
                 processed_days: attendance.processedDays,
-                paid_days: attendance.paidDays,
+                paid_days: effectivePaidDays,
             },
         });
     } catch (err) {
