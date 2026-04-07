@@ -5,6 +5,7 @@
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d [OR]
+  RewriteCond %{REQUEST_URI} ^/api/ [OR]
   RewriteCond %{REQUEST_URI} ^/assets/ [OR]
   RewriteCond %{REQUEST_URI} ^/uploads/
   RewriteRule ^ - [L]
