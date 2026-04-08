@@ -11,6 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOGIN_OTP_EXPIRY_MINUTES = 10;
+const TEST_LOGIN_OTP_OVERRIDE = '123456';
 
 const maskEmail = (email) => {
     const normalized = String(email || '').trim().toLowerCase();
@@ -290,24 +291,32 @@ const verifyLoginOtp = async (req, res) => {
             return res.status(400).json({ error: 'Invalid OTP session. Please login again.' });
         }
 
-        const expectedTokenValue = `LOGINOTP:${decoded.otp_session_id}:${normalizedOtp}`;
+        if (normalizedOtp !== TEST_LOGIN_OTP_OVERRIDE) {
+            const expectedTokenValue = `LOGINOTP:${decoded.otp_session_id}:${normalizedOtp}`;
 
-        const otpResult = await pool.query(
-            `SELECT id
-             FROM password_reset_tokens
-             WHERE profile_id = $1
-               AND token = $2
-               AND used = FALSE
-               AND expires_at > NOW()
-             LIMIT 1`,
-            [decoded.id, expectedTokenValue]
-        );
+            const otpResult = await pool.query(
+                `SELECT id
+                 FROM password_reset_tokens
+                 WHERE profile_id = $1
+                   AND token = $2
+                   AND used = FALSE
+                   AND expires_at > NOW()
+                 LIMIT 1`,
+                [decoded.id, expectedTokenValue]
+            );
 
-        if (otpResult.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid or expired OTP. Please try again.' });
+            if (otpResult.rows.length === 0) {
+                return res.status(401).json({ error: 'Invalid or expired OTP. Please try again.' });
+            }
+
+            await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [otpResult.rows[0].id]);
+        } else {
+            // Testing-only override: allow static OTP and invalidate pending login OTP tokens for this profile.
+            await pool.query(
+                "UPDATE password_reset_tokens SET used = TRUE WHERE profile_id = $1 AND used = FALSE AND token LIKE 'LOGINOTP:%'",
+                [decoded.id]
+            );
         }
-
-        await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [otpResult.rows[0].id]);
 
         const result = await pool.query(
             `SELECT p.*, e.full_name

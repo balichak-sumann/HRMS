@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
@@ -97,6 +97,9 @@ const partnerLogos = [
 
 const LandingPage = () => {
   const { profile } = useAuth();
+  const landingRootRef = useRef(null);
+  const networkCanvasRef = useRef(null);
+  const pointerRef = useRef({ x: 0, y: 0, active: false });
   const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
   const [typedFeatureText, setTypedFeatureText] = useState('');
   const [typingPhase, setTypingPhase] = useState('typing');
@@ -115,6 +118,237 @@ const LandingPage = () => {
     }, 2400);
 
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const root = landingRootRef.current;
+    const canvas = networkCanvasRef.current;
+    if (!root || !canvas) return;
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let rafId = null;
+    let width = 0;
+    let height = 0;
+
+    const clusters = [];
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+    const buildClusters = () => {
+      clusters.length = 0;
+      const baseCount = width < 800 ? 6 : 9;
+
+      for (let i = 0; i < baseCount; i += 1) {
+        const centerX = Math.random() * width;
+        const centerY = Math.random() * height;
+        const nodeCount = 4 + Math.floor(Math.random() * 4);
+        const radius = width < 800 ? 56 : 72;
+        const nodes = [];
+
+        for (let j = 0; j < nodeCount; j += 1) {
+          nodes.push({
+            orbitRadius: radius * (0.35 + Math.random() * 0.7),
+            angle: Math.random() * Math.PI * 2,
+            speed: (Math.random() * 0.0015 + 0.0008) * (Math.random() > 0.5 ? 1 : -1),
+            size: 1.1 + Math.random() * 1.8,
+            wobblePhase: Math.random() * Math.PI * 2,
+            wobbleAmount: 3 + Math.random() * 6,
+          });
+        }
+
+        clusters.push({
+          x: centerX,
+          y: centerY,
+          vx: (Math.random() - 0.5) * 0.16,
+          vy: (Math.random() - 0.5) * 0.16,
+          driftPhase: Math.random() * Math.PI * 2,
+          nodes,
+        });
+      }
+    };
+
+    const resizeCanvas = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = root.clientWidth;
+      height = root.clientHeight;
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      pointerRef.current = {
+        x: width * 0.5,
+        y: Math.min(height * 0.35, 320),
+        active: true,
+      };
+
+      buildClusters();
+    };
+
+    const drawSciFiBackdrop = (time, pointer) => {
+      const gridSpacing = width < 900 ? 44 : 52;
+      const drift = (time * 0.018) % gridSpacing;
+
+      context.save();
+      context.globalCompositeOperation = 'source-over';
+
+      // Horizontal moving scan grid
+      for (let y = -gridSpacing; y < height + gridSpacing; y += gridSpacing) {
+        const yPos = y + drift;
+        const alpha = 0.04 + ((yPos % (gridSpacing * 3)) / (gridSpacing * 3)) * 0.08;
+        context.beginPath();
+        context.moveTo(0, yPos);
+        context.lineTo(width, yPos);
+        context.strokeStyle = `rgba(56, 189, 248, ${alpha.toFixed(3)})`;
+        context.lineWidth = 1;
+        context.stroke();
+      }
+
+      // Vertical cyber lines
+      const colSpacing = width < 900 ? 72 : 86;
+      const colDrift = (time * 0.01) % colSpacing;
+      for (let x = -colSpacing; x < width + colSpacing; x += colSpacing) {
+        const xPos = x + colDrift;
+        context.beginPath();
+        context.moveTo(xPos, 0);
+        context.lineTo(xPos, height);
+        context.strokeStyle = 'rgba(59, 130, 246, 0.035)';
+        context.lineWidth = 1;
+        context.stroke();
+      }
+
+      // Cursor-centered holographic glow and reveal aura
+      const pointerGlow = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 280);
+      pointerGlow.addColorStop(0, pointer.active ? 'rgba(56, 189, 248, 0.26)' : 'rgba(56, 189, 248, 0.12)');
+      pointerGlow.addColorStop(0.45, 'rgba(59, 130, 246, 0.12)');
+      pointerGlow.addColorStop(1, 'rgba(37, 99, 235, 0)');
+      context.fillStyle = pointerGlow;
+      context.fillRect(0, 0, width, height);
+
+      // Periodic top-to-bottom scan pulse
+      if (!reducedMotion) {
+        const scanY = (time * 0.09) % (height + 180) - 90;
+        const scanGradient = context.createLinearGradient(0, scanY - 22, 0, scanY + 22);
+        scanGradient.addColorStop(0, 'rgba(56, 189, 248, 0)');
+        scanGradient.addColorStop(0.45, 'rgba(56, 189, 248, 0.09)');
+        scanGradient.addColorStop(0.5, 'rgba(125, 211, 252, 0.18)');
+        scanGradient.addColorStop(0.55, 'rgba(56, 189, 248, 0.09)');
+        scanGradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        context.fillStyle = scanGradient;
+        context.fillRect(0, scanY - 24, width, 48);
+      }
+
+      context.restore();
+    };
+
+    const drawFrame = (timestamp) => {
+      const t = timestamp || 0;
+      context.clearRect(0, 0, width, height);
+
+      const pointer = pointerRef.current;
+      const nodeClouds = [];
+
+      drawSciFiBackdrop(t, pointer);
+
+      for (const cluster of clusters) {
+        if (!reducedMotion) {
+          cluster.driftPhase += 0.0025;
+          cluster.x += cluster.vx + Math.sin(cluster.driftPhase) * 0.04;
+          cluster.y += cluster.vy + Math.cos(cluster.driftPhase * 0.8) * 0.04;
+        }
+
+        if (cluster.x < -80 || cluster.x > width + 80) cluster.vx *= -1;
+        if (cluster.y < -80 || cluster.y > height + 80) cluster.vy *= -1;
+        cluster.x = clamp(cluster.x, -70, width + 70);
+        cluster.y = clamp(cluster.y, -70, height + 70);
+
+        const points = cluster.nodes.map((node) => {
+          if (!reducedMotion) node.angle += node.speed;
+          const pulse = Math.sin(t * 0.0016 + node.wobblePhase) * node.wobbleAmount;
+          const x = cluster.x + Math.cos(node.angle) * (node.orbitRadius + pulse * 0.08);
+          const y = cluster.y + Math.sin(node.angle) * (node.orbitRadius + pulse * 0.08);
+
+          return { x, y, size: node.size };
+        });
+
+        nodeClouds.push(points);
+      }
+
+      for (const points of nodeClouds) {
+        for (let i = 0; i < points.length; i += 1) {
+          for (let j = i + 1; j < points.length; j += 1) {
+            const a = points[i];
+            const b = points[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const distance = Math.hypot(dx, dy);
+            if (distance > 110) continue;
+
+            const midX = (a.x + b.x) / 2;
+            const midY = (a.y + b.y) / 2;
+            const pointerDistance = Math.hypot(midX - pointer.x, midY - pointer.y);
+            const revealBoost = pointer.active ? Math.max(0, 1 - pointerDistance / 280) : 0;
+            const alpha = 0.08 + (1 - distance / 110) * 0.24 + revealBoost * 0.52;
+
+            context.beginPath();
+            context.moveTo(a.x, a.y);
+            context.lineTo(b.x, b.y);
+            context.strokeStyle = `rgba(56, 189, 248, ${Math.min(alpha, 0.92)})`;
+            context.lineWidth = 0.55 + revealBoost * 1.6;
+            context.stroke();
+          }
+        }
+      }
+
+      for (const points of nodeClouds) {
+        for (const point of points) {
+          const pointerDistance = Math.hypot(point.x - pointer.x, point.y - pointer.y);
+          const revealBoost = pointer.active ? Math.max(0, 1 - pointerDistance / 280) : 0;
+          const radius = point.size + revealBoost * 2.15;
+
+          context.beginPath();
+          context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+          context.fillStyle = `rgba(186, 230, 253, ${0.38 + revealBoost * 0.58})`;
+          context.fill();
+
+          if (revealBoost > 0.18) {
+            context.beginPath();
+            context.arc(point.x, point.y, radius + 3 + revealBoost * 4, 0, Math.PI * 2);
+            context.strokeStyle = `rgba(56, 189, 248, ${0.12 + revealBoost * 0.3})`;
+            context.lineWidth = 0.6;
+            context.stroke();
+          }
+        }
+      }
+
+      if (pointer.active) {
+        context.beginPath();
+        context.arc(pointer.x, pointer.y, 72, 0, Math.PI * 2);
+        context.strokeStyle = 'rgba(56, 189, 248, 0.24)';
+        context.lineWidth = 1.2;
+        context.stroke();
+
+        context.beginPath();
+        context.arc(pointer.x, pointer.y, 116, 0, Math.PI * 2);
+        context.strokeStyle = 'rgba(59, 130, 246, 0.12)';
+        context.lineWidth = 0.9;
+        context.stroke();
+      }
+
+      rafId = window.requestAnimationFrame(drawFrame);
+    };
+
+    resizeCanvas();
+    rafId = window.requestAnimationFrame(drawFrame);
+    window.addEventListener('resize', resizeCanvas);
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', resizeCanvas);
+    };
   }, []);
 
   useEffect(() => {
@@ -188,12 +422,50 @@ const LandingPage = () => {
     }
   };
 
+  const updateSpotlightPosition = (clientX, clientY, active = true) => {
+    const root = landingRootRef.current;
+    if (!root) return;
+
+    const bounds = root.getBoundingClientRect();
+    pointerRef.current = {
+      x: clientX - bounds.left,
+      y: clientY - bounds.top,
+      active,
+    };
+  };
+
+  const onRootMouseMove = (event) => {
+    updateSpotlightPosition(event.clientX, event.clientY, true);
+  };
+
+  const onRootMouseLeave = () => {
+    pointerRef.current = { ...pointerRef.current, active: false };
+  };
+
+  const onRootTouchMove = (event) => {
+    const firstTouch = event.touches?.[0];
+    if (!firstTouch) return;
+    updateSpotlightPosition(firstTouch.clientX, firstTouch.clientY, true);
+  };
+
+  const onRootTouchEnd = () => {
+    pointerRef.current = { ...pointerRef.current, active: false };
+  };
+
   if (profile?.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
   if (profile?.role === 'hr') return <Navigate to="/hr/dashboard" replace />;
   if (profile?.role === 'employee') return <Navigate to="/employee/dashboard" replace />;
 
   return (
-    <main className="landing-root">
+    <main
+      ref={landingRootRef}
+      className="landing-root"
+      onMouseMove={onRootMouseMove}
+      onMouseLeave={onRootMouseLeave}
+      onTouchMove={onRootTouchMove}
+      onTouchEnd={onRootTouchEnd}
+    >
+      <canvas ref={networkCanvasRef} className="landing-network-canvas" aria-hidden="true" />
 
       <div className="landing-orb landing-orb-a" aria-hidden="true" />
       <div className="landing-orb landing-orb-b" aria-hidden="true" />
