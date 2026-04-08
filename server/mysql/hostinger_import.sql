@@ -105,6 +105,14 @@ CREATE TABLE `complaints` (
     `attachment` TEXT,
     CONSTRAINT `complaints_pkey` PRIMARY KEY (`id`)
 );
+CREATE TABLE `contact_submissions` (
+    `id` CHAR(36) NOT NULL DEFAULT (UUID()),
+    `name` VARCHAR(120) NOT NULL,
+    `email` VARCHAR(190) NOT NULL,
+    `company` VARCHAR(190) NOT NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    CONSTRAINT `contact_submissions_pkey` PRIMARY KEY (`id`)
+);
 CREATE TABLE `daily_reports` (
     `id` CHAR(36) NOT NULL DEFAULT (UUID()),
     `project_id` CHAR(36),
@@ -742,6 +750,7 @@ CREATE TABLE `surveys` (
     `target_department_id` CHAR(36),
     `is_anonymous` TINYINT(1) NOT NULL DEFAULT false,
     `deadline` DATE,
+    `survey_type` TEXT,
     `status` TEXT NOT NULL DEFAULT 'draft',
     `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `surveys_pkey` PRIMARY KEY (`id`)
@@ -772,6 +781,7 @@ CREATE INDEX `idx_asset_assignments_employee_active` ON `asset_assignments`(`emp
 CREATE UNIQUE INDEX `assets_serial_number_key` ON `assets`(`serial_number`(191));
 CREATE INDEX `idx_assets_type_status` ON `assets`(`asset_type`(191), `status`(191));
 CREATE UNIQUE INDEX `departments_name_key` ON `departments`(`name`(191));
+CREATE INDEX `idx_contact_submissions_created_at` ON `contact_submissions`(`created_at` DESC);
 CREATE INDEX `idx_employee_celebrations_date` ON `employee_celebrations`(`celebration_date`, `celebration_type`(191));
 CREATE UNIQUE INDEX `employee_celebrations_employee_id_celebration_type_celebrat_key` ON `employee_celebrations`(`employee_id`, `celebration_type`(191), `celebration_date`);
 CREATE INDEX `idx_shift_assignments_employee_dates` ON `employee_shift_assignments`(`employee_id`, `effective_from`, `effective_to`);

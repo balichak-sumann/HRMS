@@ -241,6 +241,18 @@ p {
   border-color: #d1d5db;
 }
 
+.attendance-status-badge.holiday {
+  background: #e0f2fe;
+  color: #075985;
+  border-color: #7dd3fc;
+}
+
+.attendance-status-badge.weekend {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+
 .grid-cols-4 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

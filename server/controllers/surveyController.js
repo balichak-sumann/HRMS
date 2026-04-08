@@ -55,6 +55,19 @@ const validateQuestion = (question) => {
     return null;
 };
 
+const hasColumn = async (client, tableName, columnName) => {
+    const result = await client.query(
+        `SELECT COUNT(*) AS count
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = $1
+           AND COLUMN_NAME = $2`,
+        [tableName, columnName]
+    );
+
+    return Number(result.rows?.[0]?.count || 0) > 0;
+};
+
 const createSurvey = async (req, res) => {
     const {
         title,
@@ -89,21 +102,43 @@ const createSurvey = async (req, res) => {
         await client.query('BEGIN');
 
         const creator = await resolveEmployee(req, client);
+        const hasSurveyTypeColumn = await hasColumn(client, 'surveys', 'survey_type');
+
+        const insertColumns = [
+            'title',
+            'description',
+            'created_by',
+            'target_type',
+            'target_department_id',
+            'is_anonymous',
+            'deadline',
+        ];
+
+        const insertValues = [
+            title,
+            description || null,
+            creator?.id || null,
+            target_type,
+            target_type === 'department' ? target_department_id : null,
+            !!is_anonymous,
+            deadline || null,
+        ];
+
+        if (hasSurveyTypeColumn) {
+            insertColumns.push('survey_type');
+            insertValues.push(survey_type || null);
+        }
+
+        insertColumns.push('status');
+        insertValues.push('draft');
+
+        const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
         const surveyResult = await client.query(
             `INSERT INTO surveys
-             (title, description, created_by, target_type, target_department_id, is_anonymous, deadline, survey_type, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft')
+             (${insertColumns.join(', ')})
+             VALUES (${placeholders})
              RETURNING *`,
-            [
-                title,
-                description || null,
-                creator?.id || null,
-                target_type,
-                target_type === 'department' ? target_department_id : null,
-                !!is_anonymous,
-                deadline || null,
-                survey_type || null,
-            ]
+            insertValues
         );
 
         const survey = surveyResult.rows[0];

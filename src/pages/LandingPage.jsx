@@ -133,38 +133,28 @@ const LandingPage = () => {
     let width = 0;
     let height = 0;
 
-    const clusters = [];
+    const particles = [];
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-    const buildClusters = () => {
-      clusters.length = 0;
-      const baseCount = width < 800 ? 6 : 9;
+    const buildParticleNetwork = () => {
+      particles.length = 0;
+      const area = width * height;
+      const particleCount = clamp(Math.round(area / 26000), 42, 96);
 
-      for (let i = 0; i < baseCount; i += 1) {
-        const centerX = Math.random() * width;
-        const centerY = Math.random() * height;
-        const nodeCount = 4 + Math.floor(Math.random() * 4);
-        const radius = width < 800 ? 56 : 72;
-        const nodes = [];
+      for (let i = 0; i < particleCount; i += 1) {
+        const upperBandBias = Math.random() < 0.72;
+        const x = Math.random() * width;
+        const y = upperBandBias
+          ? Math.random() * Math.max(height * 0.72, 120)
+          : Math.random() * height;
 
-        for (let j = 0; j < nodeCount; j += 1) {
-          nodes.push({
-            orbitRadius: radius * (0.35 + Math.random() * 0.7),
-            angle: Math.random() * Math.PI * 2,
-            speed: (Math.random() * 0.0015 + 0.0008) * (Math.random() > 0.5 ? 1 : -1),
-            size: 1.1 + Math.random() * 1.8,
-            wobblePhase: Math.random() * Math.PI * 2,
-            wobbleAmount: 3 + Math.random() * 6,
-          });
-        }
-
-        clusters.push({
-          x: centerX,
-          y: centerY,
-          vx: (Math.random() - 0.5) * 0.16,
-          vy: (Math.random() - 0.5) * 0.16,
-          driftPhase: Math.random() * Math.PI * 2,
-          nodes,
+        particles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 0.28,
+          vy: (Math.random() - 0.5) * 0.28,
+          size: 0.45 + Math.random() * 1.15,
+          pulse: Math.random() * Math.PI * 2,
         });
       }
     };
@@ -185,7 +175,7 @@ const LandingPage = () => {
         active: true,
       };
 
-      buildClusters();
+      buildParticleNetwork();
     };
 
     const drawSciFiBackdrop = (time, pointer) => {
@@ -198,11 +188,11 @@ const LandingPage = () => {
       // Horizontal moving scan grid
       for (let y = -gridSpacing; y < height + gridSpacing; y += gridSpacing) {
         const yPos = y + drift;
-        const alpha = 0.04 + ((yPos % (gridSpacing * 3)) / (gridSpacing * 3)) * 0.08;
+        const alpha = 0.02 + ((yPos % (gridSpacing * 3)) / (gridSpacing * 3)) * 0.05;
         context.beginPath();
         context.moveTo(0, yPos);
         context.lineTo(width, yPos);
-        context.strokeStyle = `rgba(56, 189, 248, ${alpha.toFixed(3)})`;
+        context.strokeStyle = `rgba(16, 185, 129, ${alpha.toFixed(3)})`;
         context.lineWidth = 1;
         context.stroke();
       }
@@ -215,16 +205,16 @@ const LandingPage = () => {
         context.beginPath();
         context.moveTo(xPos, 0);
         context.lineTo(xPos, height);
-        context.strokeStyle = 'rgba(59, 130, 246, 0.035)';
+        context.strokeStyle = 'rgba(6, 182, 212, 0.045)';
         context.lineWidth = 1;
         context.stroke();
       }
 
       // Cursor-centered holographic glow and reveal aura
-      const pointerGlow = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 280);
-      pointerGlow.addColorStop(0, pointer.active ? 'rgba(56, 189, 248, 0.26)' : 'rgba(56, 189, 248, 0.12)');
-      pointerGlow.addColorStop(0.45, 'rgba(59, 130, 246, 0.12)');
-      pointerGlow.addColorStop(1, 'rgba(37, 99, 235, 0)');
+      const pointerGlow = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 140);
+      pointerGlow.addColorStop(0, pointer.active ? 'rgba(34, 197, 94, 0.16)' : 'rgba(34, 197, 94, 0.08)');
+      pointerGlow.addColorStop(0.45, 'rgba(6, 182, 212, 0.08)');
+      pointerGlow.addColorStop(1, 'rgba(6, 182, 212, 0)');
       context.fillStyle = pointerGlow;
       context.fillRect(0, 0, width, height);
 
@@ -232,11 +222,11 @@ const LandingPage = () => {
       if (!reducedMotion) {
         const scanY = (time * 0.09) % (height + 180) - 90;
         const scanGradient = context.createLinearGradient(0, scanY - 22, 0, scanY + 22);
-        scanGradient.addColorStop(0, 'rgba(56, 189, 248, 0)');
-        scanGradient.addColorStop(0.45, 'rgba(56, 189, 248, 0.09)');
-        scanGradient.addColorStop(0.5, 'rgba(125, 211, 252, 0.18)');
-        scanGradient.addColorStop(0.55, 'rgba(56, 189, 248, 0.09)');
-        scanGradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        scanGradient.addColorStop(0, 'rgba(16, 185, 129, 0)');
+        scanGradient.addColorStop(0.45, 'rgba(16, 185, 129, 0.08)');
+        scanGradient.addColorStop(0.5, 'rgba(52, 211, 153, 0.14)');
+        scanGradient.addColorStop(0.55, 'rgba(16, 185, 129, 0.08)');
+        scanGradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
         context.fillStyle = scanGradient;
         context.fillRect(0, scanY - 24, width, 48);
       }
@@ -249,93 +239,82 @@ const LandingPage = () => {
       context.clearRect(0, 0, width, height);
 
       const pointer = pointerRef.current;
-      const nodeClouds = [];
+      const maxLinkDistance = width < 900 ? 145 : 175;
+      const pointerRadius = width < 900 ? 150 : 190;
 
       drawSciFiBackdrop(t, pointer);
 
-      for (const cluster of clusters) {
+      for (const particle of particles) {
         if (!reducedMotion) {
-          cluster.driftPhase += 0.0025;
-          cluster.x += cluster.vx + Math.sin(cluster.driftPhase) * 0.04;
-          cluster.y += cluster.vy + Math.cos(cluster.driftPhase * 0.8) * 0.04;
+          particle.pulse += 0.01;
+          particle.x += particle.vx + Math.sin(particle.pulse) * 0.02;
+          particle.y += particle.vy + Math.cos(particle.pulse * 0.8) * 0.02;
         }
 
-        if (cluster.x < -80 || cluster.x > width + 80) cluster.vx *= -1;
-        if (cluster.y < -80 || cluster.y > height + 80) cluster.vy *= -1;
-        cluster.x = clamp(cluster.x, -70, width + 70);
-        cluster.y = clamp(cluster.y, -70, height + 70);
-
-        const points = cluster.nodes.map((node) => {
-          if (!reducedMotion) node.angle += node.speed;
-          const pulse = Math.sin(t * 0.0016 + node.wobblePhase) * node.wobbleAmount;
-          const x = cluster.x + Math.cos(node.angle) * (node.orbitRadius + pulse * 0.08);
-          const y = cluster.y + Math.sin(node.angle) * (node.orbitRadius + pulse * 0.08);
-
-          return { x, y, size: node.size };
-        });
-
-        nodeClouds.push(points);
+        if (particle.x < 0 || particle.x > width) particle.vx *= -1;
+        if (particle.y < 0 || particle.y > height) particle.vy *= -1;
+        particle.x = clamp(particle.x, 0, width);
+        particle.y = clamp(particle.y, 0, height);
       }
 
-      for (const points of nodeClouds) {
-        for (let i = 0; i < points.length; i += 1) {
-          for (let j = i + 1; j < points.length; j += 1) {
-            const a = points[i];
-            const b = points[j];
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const distance = Math.hypot(dx, dy);
-            if (distance > 110) continue;
+      for (let i = 0; i < particles.length; i += 1) {
+        const a = particles[i];
+        let nearestIndex = -1;
+        let nearestDistance = Infinity;
 
-            const midX = (a.x + b.x) / 2;
-            const midY = (a.y + b.y) / 2;
-            const pointerDistance = Math.hypot(midX - pointer.x, midY - pointer.y);
-            const revealBoost = pointer.active ? Math.max(0, 1 - pointerDistance / 280) : 0;
-            const alpha = 0.08 + (1 - distance / 110) * 0.24 + revealBoost * 0.52;
-
-            context.beginPath();
-            context.moveTo(a.x, a.y);
-            context.lineTo(b.x, b.y);
-            context.strokeStyle = `rgba(56, 189, 248, ${Math.min(alpha, 0.92)})`;
-            context.lineWidth = 0.55 + revealBoost * 1.6;
-            context.stroke();
+        for (let j = i + 1; j < particles.length; j += 1) {
+          const b = particles[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = j;
           }
-        }
-      }
+          if (distance > maxLinkDistance) continue;
 
-      for (const points of nodeClouds) {
-        for (const point of points) {
-          const pointerDistance = Math.hypot(point.x - pointer.x, point.y - pointer.y);
-          const revealBoost = pointer.active ? Math.max(0, 1 - pointerDistance / 280) : 0;
-          const radius = point.size + revealBoost * 2.15;
+          const midX = (a.x + b.x) * 0.5;
+          const midY = (a.y + b.y) * 0.5;
+          const pointerDistance = Math.hypot(midX - pointer.x, midY - pointer.y);
+          const revealBoost = pointer.active ? Math.max(0, 1 - pointerDistance / pointerRadius) : 0;
+          const alpha = 0.12 + (1 - distance / maxLinkDistance) * 0.33 + revealBoost * 0.35;
 
           context.beginPath();
-          context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-          context.fillStyle = `rgba(186, 230, 253, ${0.38 + revealBoost * 0.58})`;
-          context.fill();
+          context.moveTo(a.x, a.y);
+          context.lineTo(b.x, b.y);
+          context.strokeStyle = `rgba(34, 197, 94, ${Math.min(alpha, 0.72)})`;
+          context.lineWidth = 0.28 + revealBoost * 0.55;
+          context.stroke();
+        }
 
-          if (revealBoost > 0.18) {
-            context.beginPath();
-            context.arc(point.x, point.y, radius + 3 + revealBoost * 4, 0, Math.PI * 2);
-            context.strokeStyle = `rgba(56, 189, 248, ${0.12 + revealBoost * 0.3})`;
-            context.lineWidth = 0.6;
-            context.stroke();
-          }
+        if (nearestIndex !== -1 && nearestDistance < maxLinkDistance * 1.55) {
+          const b = particles[nearestIndex];
+          context.beginPath();
+          context.moveTo(a.x, a.y);
+          context.lineTo(b.x, b.y);
+          context.strokeStyle = 'rgba(16, 185, 129, 0.12)';
+          context.lineWidth = 0.2;
+          context.stroke();
         }
       }
 
-      if (pointer.active) {
-        context.beginPath();
-        context.arc(pointer.x, pointer.y, 72, 0, Math.PI * 2);
-        context.strokeStyle = 'rgba(56, 189, 248, 0.24)';
-        context.lineWidth = 1.2;
-        context.stroke();
+      for (const particle of particles) {
+        const pointerDistance = Math.hypot(particle.x - pointer.x, particle.y - pointer.y);
+        const revealBoost = pointer.active ? Math.max(0, 1 - pointerDistance / pointerRadius) : 0;
+        const radius = particle.size + revealBoost * 0.9;
 
         context.beginPath();
-        context.arc(pointer.x, pointer.y, 116, 0, Math.PI * 2);
-        context.strokeStyle = 'rgba(59, 130, 246, 0.12)';
-        context.lineWidth = 0.9;
-        context.stroke();
+        context.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
+        context.fillStyle = `rgba(74, 222, 128, ${0.46 + revealBoost * 0.35})`;
+        context.fill();
+
+        if (revealBoost > 0.22) {
+          context.beginPath();
+          context.arc(particle.x, particle.y, radius + 2 + revealBoost * 2.2, 0, Math.PI * 2);
+          context.strokeStyle = `rgba(34, 211, 238, ${0.1 + revealBoost * 0.22})`;
+          context.lineWidth = 0.45;
+          context.stroke();
+        }
       }
 
       rafId = window.requestAnimationFrame(drawFrame);

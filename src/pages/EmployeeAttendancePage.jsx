@@ -33,6 +33,27 @@ const EmployeeAttendancePage = () => {
         const d = String(date.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     };
+
+    const normalizeDateYmd = (raw) => {
+        if (!raw) return null;
+
+        if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+            return formatLocalYmd(raw);
+        }
+
+        const text = String(raw).trim();
+        const directMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (directMatch) {
+            return directMatch[1];
+        }
+
+        const parsed = new Date(text);
+        if (!Number.isNaN(parsed.getTime())) {
+            return formatLocalYmd(parsed);
+        }
+
+        return null;
+    };
     const getTodayYmd = () => formatLocalYmd(new Date());
     const shiftDate = (dateStr, deltaDays) => {
         const d = new Date(`${dateStr}T00:00:00`);
@@ -40,9 +61,21 @@ const EmployeeAttendancePage = () => {
         return formatLocalYmd(d);
     };
 
+    const getRecordDateYmd = (record) => {
+        const raw = record?.attendance_date_resolved || record?.attendance_date;
+        if (raw) {
+            return normalizeDateYmd(raw);
+        }
+        if (record?.check_in) {
+            return normalizeDateYmd(record.check_in);
+        }
+        return null;
+    };
+
     const [currentTime, setCurrentTime] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(getTodayYmd());
     const [isCheckingIn, setIsCheckingIn] = useState(false); // To prevent double-clicks
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [attendance, setAttendance] = useState([]);
     const [todayRecord, setTodayRecord] = useState(null);
     const [todayRecords, setTodayRecords] = useState([]);
@@ -55,26 +88,24 @@ const EmployeeAttendancePage = () => {
         width: window.innerWidth,
         height: window.innerHeight
     });
+    const activeSessionForSelectedDate = todayRecords.find((rec) => !rec.check_out) || null;
 
-    // Determine if today is restricted
     const selectedDateObj = new Date(`${selectedDate}T00:00:00`);
     const isWeekend = selectedDateObj.getDay() === 0 || selectedDateObj.getDay() === 6;
-
-    // Check if selected day matches any holiday
-    const selectedHoliday = holidays.find(h => formatLocalYmd(new Date(h.date)) === selectedDate);
-
-    // Check if selected day falls within any approved leave
-    const selectedLeave = leaves.find(l => 
-        l.status === 'Approved' && 
-        selectedDate >= formatLocalYmd(new Date(l.start_date)) && 
-        selectedDate <= formatLocalYmd(new Date(l.end_date))
+    const selectedHoliday = holidays.find(h => normalizeDateYmd(h.date) === selectedDate);
+    const selectedLeave = leaves.find(l =>
+        l.status === 'Approved' &&
+        selectedDate >= normalizeDateYmd(l.start_date) &&
+        selectedDate <= normalizeDateYmd(l.end_date)
     );
-
-    const isRestrictedDay = isWeekend || selectedHoliday || selectedLeave;
-    const restrictReason = selectedHoliday ? selectedHoliday.name : 
-                          selectedLeave ? 'On Leave' : 
-                          (isWeekend ? 'Weekend' : '');
-
+    const isCheckInBlocked = Boolean(isWeekend || selectedHoliday || selectedLeave);
+    const checkInBlockReason = selectedLeave
+        ? 'On Approved Leave'
+        : selectedHoliday
+            ? `Holiday: ${selectedHoliday.name}`
+            : isWeekend
+                ? 'Weekend'
+                : '';
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
@@ -96,8 +127,8 @@ const EmployeeAttendancePage = () => {
             }
         });
 
-        if (todayRecord && !todayRecord.check_out) {
-            const checkInTime = new Date(todayRecord.check_in).getTime();
+        if (activeSessionForSelectedDate) {
+            const checkInTime = new Date(activeSessionForSelectedDate.check_in).getTime();
             
             // Cap the duration calculation to the end of the selected date 
             // so we don't show >24 hours if a session stays open for days.
@@ -119,7 +150,7 @@ const EmployeeAttendancePage = () => {
         } else {
             setActiveDuration(cumulativeSeconds);
         }
-    }, [currentTime, todayRecord, todayRecords, selectedDate]);
+    }, [currentTime, todayRecords, selectedDate, activeSessionForSelectedDate]);
 
     useEffect(() => {
         const onResize = () => {
@@ -134,16 +165,6 @@ const EmployeeAttendancePage = () => {
         try {
             const data = await api.get('/attendance/my');
             setAttendance(data);
-
-            // Get all records for today
-            const foundToday = data.filter(rec => formatLocalYmd(new Date(rec.check_in)) === selectedDate);
-            setTodayRecords(foundToday);
-
-            // Find an active session (not checked out) or the most recent one
-            const activeSession = foundToday.find(rec => !rec.check_out);
-            const mostRecentSession = foundToday.length > 0 ? foundToday[0] : null;
-
-            setTodayRecord(activeSession || mostRecentSession || null);
         } catch (err) {
             console.error('Failed to fetch attendance', err);
         }
@@ -173,8 +194,25 @@ const EmployeeAttendancePage = () => {
         }
     };
 
+    useEffect(() => {
+        const recordsForSelectedDate = attendance.filter((rec) => getRecordDateYmd(rec) === selectedDate);
+        setTodayRecords(recordsForSelectedDate);
+
+        const activeSession = recordsForSelectedDate.find((rec) => !rec.check_out);
+        const mostRecentSession = recordsForSelectedDate.length > 0 ? recordsForSelectedDate[0] : null;
+        setTodayRecord(activeSession || mostRecentSession || null);
+    }, [attendance, selectedDate]);
+
     const handleCheckIn = async () => {
         if (isCheckingIn) return;
+        if (activeSessionForSelectedDate) {
+            await fetchAttendance();
+            return;
+        }
+        if (isCheckInBlocked) {
+            alert(`Check-in is disabled for this date (${checkInBlockReason}).`);
+            return;
+        }
         try {
             setIsCheckingIn(true);
             setLoading(true);
@@ -230,8 +268,13 @@ const EmployeeAttendancePage = () => {
             }
 
             await api.post('/attendance/check-in', { location: locationString, attendance_date: selectedDate });
-            fetchAttendance();
+            await fetchAttendance();
         } catch (err) {
+            const message = (err?.message || '').toLowerCase();
+            if (message.includes('active check-in session for this date')) {
+                await fetchAttendance();
+                return;
+            }
             alert(err.message);
         } finally {
             setLoading(false);
@@ -240,11 +283,20 @@ const EmployeeAttendancePage = () => {
     };
 
     const handleCheckOut = async () => {
+        if (isCheckingOut) return;
         try {
-            await api.post('/attendance/check-out', { attendance_date: selectedDate });
-            fetchAttendance();
+            setIsCheckingOut(true);
+            await api.post('/attendance/check-out', { attendance_date: displayedAttendanceDate });
+            await fetchAttendance();
         } catch (err) {
+            // If a duplicate/late click happens after successful checkout, treat it as a no-op.
+            if ((err.message || '').toLowerCase().includes('no active check-in found')) {
+                await fetchAttendance();
+                return;
+            }
             alert(err.message);
+        } finally {
+            setIsCheckingOut(false);
         }
     };
 
@@ -273,17 +325,35 @@ const EmployeeAttendancePage = () => {
         for (const record of attendance) {
             if (!presentStatuses.has(record.status)) continue;
 
-            const checkInDate = new Date(record.check_in);
-            if (
-                checkInDate.getFullYear() === calendarYear &&
-                checkInDate.getMonth() === calendarMonth
-            ) {
-                uniqueDays.add(formatLocalYmd(checkInDate));
+            const dateYmd = getRecordDateYmd(record);
+            if (dateYmd && dateYmd.startsWith(`${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}`)) {
+                uniqueDays.add(dateYmd);
             }
         }
 
         return uniqueDays.size;
     };
+
+    const displayedAttendanceDate = selectedDate;
+    const primaryRecord = activeSessionForSelectedDate || todayRecord;
+    const effectiveStatus = selectedLeave
+        ? 'On Leave'
+        : selectedHoliday
+            ? 'Holiday'
+            : isWeekend
+                ? 'Weekend'
+                : (primaryRecord?.status || '--');
+    const shouldMaskAttendanceTimes = Boolean(selectedLeave || selectedHoliday || isWeekend);
+    const displayedCheckInTime = shouldMaskAttendanceTimes
+        ? '--:--'
+        : (primaryRecord?.check_in
+            ? new Date(primaryRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '--:--');
+    const displayedCheckOutTime = shouldMaskAttendanceTimes
+        ? '--:--'
+        : (primaryRecord?.check_out
+            ? new Date(primaryRecord.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '--:--');
 
     const formatDuration = (totalSeconds) => {
         const sign = totalSeconds < 0 ? '-' : '';
@@ -304,9 +374,16 @@ const EmployeeAttendancePage = () => {
     const isVeryShortViewport = viewport.height <= 760;
 
     const getStatusColor = (dateString) => {
-        const record = attendance.find(rec => formatLocalYmd(new Date(rec.check_in)) === dateString);
-        if (record) {
-            switch (record.status) {
+        const leaveRecord = leaves.find(l => 
+            l.status === 'Approved' && 
+            dateString >= normalizeDateYmd(l.start_date) && 
+            dateString <= normalizeDateYmd(l.end_date)
+        );
+        if (leaveRecord) return 'var(--status-rejected-text)';
+
+        const recordByDate = attendance.find(rec => getRecordDateYmd(rec) === dateString);
+        if (recordByDate) {
+            switch (recordByDate.status) {
                 case 'Present': return 'var(--status-approved-text)';
                 case 'Late': return 'var(--status-pending-text)';
                 case 'On Leave': return 'var(--status-rejected-text)';
@@ -314,13 +391,6 @@ const EmployeeAttendancePage = () => {
                 default: return 'var(--status-approved-text)';
             }
         }
-        
-        const leaveRecord = leaves.find(l => 
-            l.status === 'Approved' && 
-            dateString >= l.start_date.slice(0,10) && 
-            dateString <= l.end_date.slice(0,10)
-        );
-        if (leaveRecord) return 'var(--status-rejected-text)';
 
         return 'var(--input-bg)';
     };
@@ -347,7 +417,6 @@ const EmployeeAttendancePage = () => {
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         style={{ width: '165px', padding: '8px 10px', fontSize: '13px' }}
-                        max={new Date().toISOString().split('T')[0]}
                     />
                     <button
                         className="btn-secondary"
@@ -373,11 +442,11 @@ const EmployeeAttendancePage = () => {
                         {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </div>
                     <p style={{ color: 'var(--text-muted)', marginBottom: isShortViewport ? '10px' : '14px', fontSize: '14px' }}>
-                        {currentTime.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        {new Date(`${displayedAttendanceDate}T00:00:00`).toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
 
-                    {(!todayRecord || todayRecord.check_out) ? (
-                        (isRestrictedDay || selectedDate > getTodayYmd()) ? (
+                    {!activeSessionForSelectedDate ? (
+                        isCheckInBlocked ? (
                             <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -391,7 +460,7 @@ const EmployeeAttendancePage = () => {
                                 fontWeight: '600',
                                 cursor: 'not-allowed'
                             }}>
-                                <Calendar size={20} /> {selectedDate > getTodayYmd() ? 'Future Date' : restrictReason}
+                                <Calendar size={20} /> {checkInBlockReason}
                             </div>
                         ) : (
                             <button
@@ -433,44 +502,44 @@ const EmployeeAttendancePage = () => {
                             </div>
                             <button
                                 onClick={handleCheckOut}
-                                disabled={loading}
+                                disabled={loading || isCheckingOut}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
                                     padding: '11px 20px',
-                                    background: loading ? 'var(--text-muted)' : '#EF4444',
+                                    background: (loading || isCheckingOut) ? 'var(--text-muted)' : '#EF4444',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '50px',
                                     fontSize: '16px',
                                     fontWeight: '600',
-                                    cursor: loading ? 'not-allowed' : 'pointer',
-                                    boxShadow: loading ? 'none' : '0 4px 14px rgba(239, 68, 68, 0.4)',
+                                    cursor: (loading || isCheckingOut) ? 'not-allowed' : 'pointer',
+                                    boxShadow: (loading || isCheckingOut) ? 'none' : '0 4px 14px rgba(239, 68, 68, 0.4)',
                                     transition: 'transform 0.2s'
                                 }}
-                                onMouseOver={(e) => !loading && (e.currentTarget.style.transform = 'scale(1.05)')}
-                                onMouseOut={(e) => !loading && (e.currentTarget.style.transform = 'scale(1)')}
+                                onMouseOver={(e) => !(loading || isCheckingOut) && (e.currentTarget.style.transform = 'scale(1.05)')}
+                                onMouseOut={(e) => !(loading || isCheckingOut) && (e.currentTarget.style.transform = 'scale(1)')}
                             >
-                                <Square fill="white" size={20} /> Check-Out
+                                <Square fill="white" size={20} /> {isCheckingOut ? 'Checking out...' : 'Check-Out'}
                             </button>
                         </div>
                     )}
 
-                    {todayRecord && (
+                    {primaryRecord && (
                         <div style={{ marginTop: isShortViewport ? '10px' : '14px', display: 'flex', gap: isShortViewport ? '10px' : '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
                             <div>
                                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CHECK-IN</p>
-                                <p style={{ fontWeight: '600', fontSize: '14px' }}>{new Date(todayRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                <p style={{ fontWeight: '600', fontSize: '14px' }}>{displayedCheckInTime}</p>
                             </div>
                             <div>
                                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CHECK-OUT</p>
-                                <p style={{ fontWeight: '600', fontSize: '14px' }}>{todayRecord.check_out ? new Date(todayRecord.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+                                <p style={{ fontWeight: '600', fontSize: '14px' }}>{displayedCheckOutTime}</p>
                             </div>
                             <div>
                                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>STATUS</p>
-                                <span className={`attendance-status-badge ${(todayRecord.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                                    {todayRecord.status}
+                                <span className={`attendance-status-badge ${effectiveStatus.toLowerCase().replace(/\s+/g, '-')}`}>
+                                    {effectiveStatus}
                                 </span>
                             </div>
                         </div>
@@ -482,7 +551,7 @@ const EmployeeAttendancePage = () => {
                     <div className="card" style={{ background: 'var(--card-bg)', borderLeft: '4px solid #F59E0B' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Work Time ({selectedDate === getTodayYmd() ? 'Today' : selectedDate})</p>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Work Time ({displayedAttendanceDate === getTodayYmd() ? 'Today' : displayedAttendanceDate})</p>
                                 <h3 style={{ fontSize: '18px', marginTop: '2px', color: 'var(--text-main)' }}>
                                     {todayRecords.some(r => !r.check_out) ? formatDuration(activeDuration).split(':').slice(0, 2).join(':') + 'h' : calculateTotalTodayHours()}
                                 </h3>

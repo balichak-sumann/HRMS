@@ -94,6 +94,7 @@ model assets {
 model attendance {
   id           String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
   employee_id  String?    @db.Char(36)
+  attendance_date DateTime  @db.Date
   check_in     DateTime
   check_out    DateTime?
   status       String?    @db.Text
@@ -102,6 +103,7 @@ model attendance {
   location     String?    @db.Text
   employees    employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@index([attendance_date], map: "attendance_attendance_date_idx")
   @@index([employee_id], map: "attendance_employee_id_fkey")
 }
 
@@ -159,6 +161,16 @@ model complaints {
 
   @@index([employee_id], map: "complaints_employee_id_fkey")
   @@index([reviewed_by], map: "complaints_reviewed_by_fkey")
+}
+
+model contact_submissions {
+  id         String   @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  name       String   @db.VarChar(120)
+  email      String   @db.VarChar(190)
+  company    String   @db.VarChar(190)
+  created_at DateTime @default(now())
+
+  @@index([created_at(sort: Desc)], map: "idx_contact_submissions_created_at")
 }
 
 model daily_reports {
@@ -1141,6 +1153,7 @@ model surveys {
   target_department_id String?            @db.Char(36)
   is_anonymous         Boolean            @default(false)
   deadline             DateTime?          @db.Date
+  survey_type          String?            @db.Text
   status               String             @default("draft") @db.Text
   created_at           DateTime?          @default(now())
   survey_questions     survey_questions[]

@@ -1,8 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 .landing-root {
-  --ink-900: #0f172a;
-  --ink-700: #475569;
+  --ink-900: #e6f5ff;
+  --ink-700: #9cb4ca;
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(148, 163, 184, 0.2);
   --panel-shadow: 0 22px 50px rgba(15, 23, 42, 0.08);
@@ -12,16 +12,16 @@
 
   position: relative;
   min-height: 100vh;
-  padding: 10px clamp(16px, 3vw, 42px) 42px;
+  padding: 10px 0 42px;
   display: grid;
   grid-template-rows: auto auto auto auto;
   gap: 12px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 10% 12%, rgba(96, 165, 250, 0.08), transparent 22%),
-    radial-gradient(circle at 88% 10%, rgba(37, 99, 235, 0.06), transparent 20%),
-    radial-gradient(circle at 52% 100%, rgba(14, 165, 233, 0.05), transparent 24%),
-    linear-gradient(180deg, #ffffff 0%, #f8fbff 52%, #eef4fb 100%);
+    radial-gradient(circle at 12% 14%, rgba(16, 185, 129, 0.18), transparent 26%),
+    radial-gradient(circle at 86% 6%, rgba(6, 182, 212, 0.18), transparent 24%),
+    radial-gradient(circle at 50% 80%, rgba(59, 130, 246, 0.12), transparent 30%),
+    linear-gradient(180deg, #111827 0%, #0f172a 55%, #111827 100%);
   font-family: 'Space Grotesk', sans-serif;
   color: var(--ink-900);
 }
@@ -33,9 +33,9 @@
   height: 100%;
   z-index: 1;
   pointer-events: none;
-  opacity: 0.9;
-  mix-blend-mode: screen;
-  filter: saturate(1.18) contrast(1.08);
+  opacity: 1;
+  mix-blend-mode: normal;
+  filter: saturate(1.2) contrast(1.08);
 }
 
 .landing-root::before {
@@ -43,10 +43,20 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(20, 184, 166, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14, 116, 144, 0.08) 1px, transparent 1px);
   background-size: 88px 88px;
-  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.35), transparent 78%);
+  opacity: 0.36;
+  pointer-events: none;
+}
+
+.landing-root::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(17, 24, 39, 0) 30%, rgba(17, 24, 39, 0.48) 100%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.28) 0%, rgba(17, 24, 39, 0.06) 46%, rgba(17, 24, 39, 0.16) 100%);
   pointer-events: none;
 }
 
@@ -102,7 +112,7 @@
   align-items: center;
   justify-content: space-between;
   animation: rise 0.6s ease-out;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
 }
 
 .brand-wrap {
@@ -312,7 +322,7 @@
   gap: 20px;
   align-items: center;
   animation: rise 0.7s ease-out;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.18);
 }
 
 .hero-copy-wrap {
@@ -321,7 +331,7 @@
 
 .eyebrow {
   margin: 0;
-  color: #2563eb;
+  color: #34d399;
   font-size: 0.82rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -334,7 +344,7 @@
   font-family: 'Fraunces', serif;
   font-size: clamp(2.05rem, 5vw, 4.1rem);
   line-height: 1.02;
-  color: #0f172a;
+  color: #ecfeff;
 }
 
 .hero-copy {
@@ -353,8 +363,10 @@
   place-items: center;
   padding: 20px;
   border-radius: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94));
+  background: transparent;
   border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
   overflow: hidden;
 }
 
@@ -375,20 +387,23 @@
 .hero-ring {
   position: absolute;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
+  border: 1.5px solid rgba(52, 211, 153, 0.24);
+  box-shadow: 0 0 22px rgba(34, 197, 94, 0.14), inset 0 0 18px rgba(6, 182, 212, 0.08);
   pointer-events: none;
 }
 
 .ring-a {
   width: 290px;
   height: 290px;
+  border-color: rgba(52, 211, 153, 0.22);
   animation: spinRing 18s linear infinite;
 }
 
 .ring-b {
   width: 220px;
   height: 220px;
-  border-color: rgba(14, 165, 233, 0.1);
+  border-color: rgba(34, 211, 238, 0.2);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.12), inset 0 0 14px rgba(34, 211, 238, 0.05);
   animation: spinRingReverse 16s linear infinite;
 }
 
@@ -396,19 +411,19 @@
   position: absolute;
   display: grid;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(3, 10, 16, 0.18);
+  border: 1px solid rgba(34, 197, 94, 0.06);
   border-radius: 14px;
   padding: 8px 10px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
 }
 
 .visual-label {
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #1d4ed8;
+  color: #60a5fa;
   font-weight: 700;
 }
 
@@ -423,7 +438,7 @@
 .visual-bars span {
   width: 8px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #93c5fd, #2563eb);
+  background: linear-gradient(180deg, #4ade80, #0f766e);
   animation: barRise 2.5s ease-in-out infinite;
 }
 
@@ -436,7 +451,7 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: linear-gradient(140deg, #60a5fa, #2563eb);
+  background: linear-gradient(140deg, #4ade80, #22c55e);
   animation: pulseDot 2.4s ease-in-out infinite;
 }
 
@@ -459,9 +474,12 @@
 .hero-logo {
   position: relative;
   z-index: 1;
-  width: min(100%, 420px);
+  width: min(100%, 470px);
   height: auto;
-  filter: drop-shadow(0 24px 38px rgba(0, 0, 0, 0.45));
+  filter:
+    brightness(1.12)
+    contrast(1.08)
+    drop-shadow(0 24px 38px rgba(0, 0, 0, 0.38));
   animation: float 7s ease-in-out infinite;
 }
 
@@ -867,10 +885,14 @@
 
 .reviews {
   z-index: 2;
-  padding: 8px clamp(16px, 3vw, 42px) 8px;
+  padding: 8px 0 8px;
   border-top: 1px solid rgba(148, 163, 184, 0.16);
   display: grid;
   gap: 14px;
+}
+
+.reviews-head {
+  padding: 0 clamp(16px, 3vw, 42px);
 }
 
 .reviews-head p {
@@ -894,6 +916,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  padding: 0 clamp(16px, 3vw, 42px);
 }
 
 .review-card {
@@ -952,10 +975,14 @@
 
 .partners-footer {
   z-index: 2;
-  padding: 10px clamp(16px, 3vw, 42px) 14px;
+  padding: 10px 0 14px;
   border-top: 1px solid rgba(148, 163, 184, 0.16);
   display: grid;
   gap: 10px;
+}
+
+.partners-head {
+  padding: 0 clamp(16px, 3vw, 42px);
 }
 
 .company-footer {
@@ -1006,6 +1033,7 @@
 .partners-marquee {
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  padding: 0 clamp(16px, 3vw, 42px);
 }
 
 .partners-track {

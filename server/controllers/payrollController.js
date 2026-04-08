@@ -116,8 +116,8 @@ const getAttendanceSummary = async (employeeId, month, year) => {
 
     // 2. Fetch Attendance Records
     const attendanceRes = await pool.query(
-        `SELECT DATE(check_in) as work_day, MAX(CASE WHEN status = 'Half-Day' THEN 0.5 WHEN status IN ('Present', 'Late') THEN 1 ELSE 0 END) as credit
-         FROM attendance WHERE employee_id = $1 AND DATE(check_in) BETWEEN $2::date AND $3::date GROUP BY DATE(check_in)`,
+        `SELECT attendance_date as work_day, MAX(CASE WHEN status = 'Half-Day' THEN 0.5 WHEN status IN ('Present', 'Late') THEN 1 ELSE 0 END) as credit
+         FROM attendance WHERE employee_id = $1 AND attendance_date BETWEEN $2::date AND $3::date GROUP BY attendance_date`,
         [employeeId, startDate, endDate]
     );
     const attendanceMap = {};
@@ -126,33 +126,7 @@ const getAttendanceSummary = async (employeeId, month, year) => {
         attendanceMap[d] = Number(r.credit);
     });
 
-    // 3. Fetch Approved Leaves
-    const leavesRes = await pool.query(
-        `SELECT start_date, end_date, days FROM leaves 
-         WHERE employee_id = $1 AND status = 'Approved' 
-         AND ((start_date BETWEEN $2::date AND $3::date) OR (end_date BETWEEN $2::date AND $3::date) 
-         OR (start_date <= $2::date AND end_date >= $3::date))`,
-        [employeeId, startDate, endDate]
-    );
-    const leaveDaysMap = {};
-    leavesRes.rows.forEach(l => {
-        let curr = new Date(l.start_date);
-        const end = new Date(l.end_date);
-        // If it's a multi-day leave, we need to spread the 'days' count or assume 1 per day if days >= duration
-        // For simplicity, we'll mark the dates. 
-        // Note: some systems have complex half-day leave logic.
-        while (curr <= end) {
-            const dStr = curr.toISOString().slice(0, 10);
-            if (dStr >= startDate && dStr <= endDate) {
-                // We default to 1 day credit for approved leave unless it's a single day with < 1 day weight
-                const weight = (l.start_date.getTime() === l.end_date.getTime() && l.days < 1) ? Number(l.days) : 1;
-                leaveDaysMap[dStr] = Math.max(leaveDaysMap[dStr] || 0, weight);
-            }
-            curr.setDate(curr.getDate() + 1);
-        }
-    });
-
-    // 4. Fetch Holidays
+    // 3. Fetch Holidays
     const holidaysRes = await pool.query(
         "SELECT date FROM holidays WHERE date BETWEEN $1::date AND $2::date",
         [startDate, endDate]
@@ -163,7 +137,7 @@ const getAttendanceSummary = async (employeeId, month, year) => {
         holidaysMap[d] = 1;
     });
 
-    // 5. Calculate Final Paid Days
+    // 4. Calculate Final Paid Days
     let paidDays = 0;
     for (let i = 1; i <= processedDays; i++) {
         const dateObj = new Date(Date.UTC(yearNumber, monthNumber - 1, i));
@@ -174,14 +148,13 @@ const getAttendanceSummary = async (employeeId, month, year) => {
 
         const isWeekend = dateObj.getUTCDay() === 0 || dateObj.getUTCDay() === 6;
         const attendanceCredit = attendanceMap[dateStr] || 0;
-        const leaveCredit = leaveDaysMap[dateStr] || 0;
         const holidayCredit = holidaysMap[dateStr] || 0;
         const weekendCredit = isWeekend ? 1 : 0;
 
-        // Priority Logic for a single day:
-        // A day is paid if it's a Weekend, Holiday, Approved Leave, or Present.
+        // Approved leave is treated as unpaid by default (salary cut).
+        // A day is paid if it's a Weekend, Holiday, or Present.
         // We take the MAX credit to avoid double counting (e.g. working on a holiday).
-        const dayCredit = Math.max(attendanceCredit, leaveCredit, holidayCredit, weekendCredit);
+        const dayCredit = Math.max(attendanceCredit, holidayCredit, weekendCredit);
         paidDays += dayCredit;
     }
 
