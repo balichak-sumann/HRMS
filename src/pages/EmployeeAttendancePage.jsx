@@ -42,14 +42,19 @@ const EmployeeAttendancePage = () => {
         }
 
         const text = String(raw).trim();
-        const directMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (directMatch) {
-            return directMatch[1];
+        const isoDateOnlyMatch = text.match(/^(\d{4}-\d{2}-\d{2})$/);
+        if (isoDateOnlyMatch) {
+            return isoDateOnlyMatch[1];
         }
 
         const parsed = new Date(text);
         if (!Number.isNaN(parsed.getTime())) {
             return formatLocalYmd(parsed);
+        }
+
+        const directMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (directMatch) {
+            return directMatch[1];
         }
 
         return null;
