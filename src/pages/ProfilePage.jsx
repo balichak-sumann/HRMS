@@ -249,12 +249,10 @@ const ProfilePage = () => {
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                     key={displayPhoto} // Force refresh image
                                 />
-                                    disabled={!isAdminUser || saving}
+                            ) : (
                                 <span>{headerName.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase()}</span>
                             )}
-                                    {isAdminUser
-                                        ? 'As admin, you can update this email.'
-                                        : 'Only admin can change email.'}
+                        </div>
                         <div style={{ position: 'absolute', bottom: '5px', right: '5px' }}>
                             <button 
                                 onClick={() => setShowPhotoOptions(!showPhotoOptions)}
@@ -378,10 +376,12 @@ const ProfilePage = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="Enter your email"
-                                    disabled
+                                    disabled={!isAdminUser || saving}
                                 />
                                 <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '6px' }}>
-                                    Email cannot be changed once the account is created.
+                                    {isAdminUser
+                                        ? 'As admin, you can update this email.'
+                                        : 'Only admin can change email.'}
                                 </p>
                             </div>
                         </div>
