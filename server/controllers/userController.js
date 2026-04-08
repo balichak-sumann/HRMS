@@ -128,6 +128,7 @@ const updateProfile = async (req, res) => {
     const panRegex = /^[A-Z]{5}\d{4}[A-Z]$/;
     const bankAccountRegex = /^\d{9,18}$/;
     const emergencyContactRegex = /^\d{10}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (typeof name === 'string' && name.trim() && !nameValidationRegex.test(name.trim())) {
         return res.status(400).json({
@@ -182,15 +183,46 @@ const updateProfile = async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        const userResult = await client.query('SELECT email, role FROM profiles WHERE id = $1', [req.user.id]);
+        const userResult = await client.query('SELECT email, role, employee_uuid FROM profiles WHERE id = $1', [req.user.id]);
         const currentEmail = userResult.rows[0].email;
         const currentRole = String(userResult.rows[0].role || '').toLowerCase();
+        const profileEmployeeUuid = userResult.rows[0].employee_uuid || null;
         const incomingEmail = String(email || '').trim().toLowerCase();
         const normalizedCurrentEmail = String(currentEmail || '').trim().toLowerCase();
+        const actorRole = String(req.user?.role || '').toLowerCase();
+        let effectiveEmail = currentEmail;
 
         if (incomingEmail && incomingEmail !== normalizedCurrentEmail) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Email cannot be changed once the account is created.' });
+            if (actorRole !== 'admin') {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Only admin can change email.' });
+            }
+
+            if (!emailRegex.test(incomingEmail)) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Please provide a valid work email address.' });
+            }
+
+            const duplicateEmailCheck = await client.query(
+                `SELECT 1
+                 FROM profiles
+                 WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+                   AND id <> $2
+                 UNION
+                 SELECT 1
+                 FROM employees
+                 WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+                   AND ($3::uuid IS NULL OR id <> $3::uuid)
+                 LIMIT 1`,
+                [incomingEmail, req.user.id, profileEmployeeUuid]
+            );
+
+            if (duplicateEmailCheck.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Email already exists in the system' });
+            }
+
+            effectiveEmail = incomingEmail;
         }
 
         if (normalizedRole && normalizedRole !== currentRole) {
@@ -211,20 +243,30 @@ const updateProfile = async (req, res) => {
             profileUpdateQuery += `, role = $${pIdx++}`;
             profileParams.push(normalizedRole);
         }
+        if (effectiveEmail !== currentEmail) {
+            profileUpdateQuery += `, email = $${pIdx++}`;
+            profileParams.push(effectiveEmail);
+        }
         profileUpdateQuery += ' WHERE id = $1';
         await client.query(profileUpdateQuery, profileParams);
 
         const empCheck = await client.query(
             `SELECT id
              FROM employees
-             WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+             WHERE ($2::uuid IS NOT NULL AND id = $2::uuid)
+                OR LOWER(TRIM(email)) = LOWER(TRIM($1))
              LIMIT 1`,
-            [currentEmail]
+            [currentEmail, profileEmployeeUuid]
         );
         if (empCheck.rows.length > 0) {
             let empUpdateQuery = 'UPDATE employees SET updated_at = NOW()';
-            let empParams = [currentEmail];
-            let eIdx = 2;
+            let empParams = [currentEmail, profileEmployeeUuid];
+            let eIdx = 3;
+
+            if (effectiveEmail !== currentEmail) {
+                empUpdateQuery += `, email = $${eIdx++}`;
+                empParams.push(effectiveEmail);
+            }
 
             if (name) {
                 empUpdateQuery += `, full_name = $${eIdx++}`;
@@ -259,7 +301,7 @@ const updateProfile = async (req, res) => {
                 empParams.push(profilePhoto);
             }
 
-            empUpdateQuery += ' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))';
+            empUpdateQuery += ' WHERE ($2::uuid IS NOT NULL AND id = $2::uuid) OR LOWER(TRIM(email)) = LOWER(TRIM($1))';
             await client.query(empUpdateQuery, empParams);
         } else {
             const derivedName = (typeof name === 'string' && name.trim())
@@ -271,7 +313,7 @@ const updateProfile = async (req, res) => {
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
                 [
                     derivedName,
-                    currentEmail,
+                    effectiveEmail,
                     mapProfileRoleToEmployeeRole(currentRole),
                     'General',
                     'Active',
@@ -288,6 +330,15 @@ const updateProfile = async (req, res) => {
         res.json({ message: 'Profile updated successfully', profilePhoto });
     } catch (err) {
         await client.query('ROLLBACK');
+        if (
+            err?.code === '23505' &&
+            (
+                String(err?.constraint || '').toLowerCase().includes('email') ||
+                String(err?.detail || '').toLowerCase().includes('email')
+            )
+        ) {
+            return res.status(400).json({ error: 'Email already exists in the system' });
+        }
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
     } finally {

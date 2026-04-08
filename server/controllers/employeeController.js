@@ -592,6 +592,8 @@ const updateEmployee = async (req, res) => {
         const currentEmployeeEmail = existingEmployeeResult.rows[0].email;
         const requestedEmail = String(email || '').trim().toLowerCase();
         const normalizedCurrentEmployeeEmail = String(currentEmployeeEmail || '').trim().toLowerCase();
+        const actorRole = String(req.user?.role || '').toLowerCase();
+        let effectiveEmployeeEmail = currentEmployeeEmail;
 
         if (requestedEmail && !emailRegex.test(requestedEmail)) {
             return res.status(400).json({ error: 'Please provide a valid work email address.' });
@@ -608,7 +610,29 @@ const updateEmployee = async (req, res) => {
         }
 
         if (requestedEmail && requestedEmail !== normalizedCurrentEmployeeEmail) {
-            return res.status(400).json({ error: 'Email cannot be changed once the account is created.' });
+            if (actorRole !== 'admin') {
+                return res.status(403).json({ error: 'Only admin can change employee email.' });
+            }
+
+            const duplicateEmailCheck = await pool.query(
+                `SELECT 1
+                 FROM profiles
+                 WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+                   AND LOWER(TRIM(email)) <> LOWER(TRIM($2))
+                 UNION
+                 SELECT 1
+                 FROM employees
+                 WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+                   AND LOWER(TRIM(email)) <> LOWER(TRIM($2))
+                 LIMIT 1`,
+                [requestedEmail, normalizedCurrentEmployeeEmail]
+            );
+
+            if (duplicateEmailCheck.rows.length > 0) {
+                return res.status(400).json({ error: 'Email already exists in the system' });
+            }
+
+            effectiveEmployeeEmail = requestedEmail;
         }
 
         if (normalizedEmployeeCode) {
@@ -640,7 +664,7 @@ const updateEmployee = async (req, res) => {
                     OR email = $2
                     OR email = $3
                  LIMIT 1`,
-                [req.params.id, currentEmployeeEmail, email || currentEmployeeEmail]
+                [req.params.id, currentEmployeeEmail, effectiveEmployeeEmail]
             );
 
             if (linkedProfile.rows.length === 0) {
@@ -685,7 +709,7 @@ const updateEmployee = async (req, res) => {
                 experience_years = $19, aadhaar_card = $20, dob = $21,
                 updated_at = NOW()`;
         let params = [
-            normalizedFullName, currentEmployeeEmail, normalizedJobRole, departmentNameValue, departmentIdValue, nextManagerId,
+            normalizedFullName, effectiveEmployeeEmail, normalizedJobRole, departmentNameValue, departmentIdValue, nextManagerId,
             normalizedPhone, joining_date, normalizedSalary,
             normalizedEmployeeCode || null, normalizedDesignation || normalizedJobRole || null, location || null,
             normalizedPan || null, normalizedBankAccount || null, bank_name || null,
@@ -718,18 +742,30 @@ const updateEmployee = async (req, res) => {
 
         await pool.query(
             `UPDATE profiles
-             SET employee_uuid = $1,
+             SET email = $4,
+                 employee_uuid = $1,
                  employee_id = CASE
                      WHEN $2 IS NOT NULL THEN $2
                      ELSE employee_id
                  END,
                  updated_at = NOW()
-             WHERE email = $3`,
-            [req.params.id, normalizedEmployeeCode || null, currentEmployeeEmail]
+             WHERE employee_uuid = $1
+                OR LOWER(TRIM(email)) = LOWER(TRIM($3))
+                OR LOWER(TRIM(email)) = LOWER(TRIM($4))`,
+            [req.params.id, normalizedEmployeeCode || null, currentEmployeeEmail, effectiveEmployeeEmail]
         );
 
         res.json(result.rows[0]);
     } catch (err) {
+        if (
+            err?.code === '23505' &&
+            (
+                String(err?.constraint || '').toLowerCase().includes('email') ||
+                String(err?.detail || '').toLowerCase().includes('email')
+            )
+        ) {
+            return res.status(400).json({ error: 'Email already exists in the system' });
+        }
         if (
             err?.code === '23505' &&
             (

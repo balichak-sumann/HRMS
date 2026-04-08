@@ -30,6 +30,7 @@ const ProfilePage = () => {
     const nameValidationRegex = /^[A-Za-z][A-Za-z\s.'-]*$/;
     const allowedRoles = ['admin', 'hr', 'employee'];
     const canEditOwnRole = false;
+    const isAdminUser = String(authProfile?.role || '').toLowerCase() === 'admin';
     const todayDate = new Date().toISOString().split('T')[0];
     const roleHelperText = role === 'admin'
         ? 'Admin role cannot be changed.'
@@ -248,10 +249,12 @@ const ProfilePage = () => {
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                     key={displayPhoto} // Force refresh image
                                 />
-                            ) : (
+                                    disabled={!isAdminUser || saving}
                                 <span>{headerName.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase()}</span>
                             )}
-                        </div>
+                                    {isAdminUser
+                                        ? 'As admin, you can update this email.'
+                                        : 'Only admin can change email.'}
                         <div style={{ position: 'absolute', bottom: '5px', right: '5px' }}>
                             <button 
                                 onClick={() => setShowPhotoOptions(!showPhotoOptions)}
