@@ -13,6 +13,17 @@ const MAX_FAILED_ATTEMPTS = 5;
 const LOGIN_OTP_EXPIRY_MINUTES = 10;
 const TEST_LOGIN_OTP_OVERRIDE = '123456';
 
+const toBooleanFlag = (value, fallback = false) => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+
+    const normalized = String(value).trim().toLowerCase();
+    if (['1', 'true', 't', 'yes', 'y'].includes(normalized)) return true;
+    if (['0', 'false', 'f', 'no', 'n', ''].includes(normalized)) return false;
+    return fallback;
+};
+
 const maskEmail = (email) => {
     const normalized = String(email || '').trim().toLowerCase();
     const [local, domain] = normalized.split('@');
@@ -130,6 +141,8 @@ const login = async (req, res) => {
         const normalizedRequestedRole = typeof requestedRole === 'string'
             ? requestedRole.trim().toLowerCase()
             : null;
+        const isFirstLogin = toBooleanFlag(user.is_first_login, false);
+        user.is_first_login = isFirstLogin;
 
         if (String(user.status || '').toLowerCase() === 'inactive') {
             return res.status(403).json({
@@ -137,7 +150,9 @@ const login = async (req, res) => {
             });
         }
 
-        if (String(user.status || '').toLowerCase() === 'pending_activation') {
+        const normalizedStatus = String(user.status || '').toLowerCase();
+
+        if (normalizedStatus === 'pending_activation' && !isFirstLogin) {
             return res.status(403).json({
                 error: 'Account is pending activation. Please complete password setup from your welcome/reset email.'
             });
@@ -333,8 +348,21 @@ const verifyLoginOtp = async (req, res) => {
 
         const user = result.rows[0];
 
-        if (String(user.status || '').toLowerCase() !== 'active') {
+        const normalizedStatus = String(user.status || '').toLowerCase();
+        const isFirstLogin = toBooleanFlag(user.is_first_login, false);
+        user.is_first_login = isFirstLogin;
+        const isAllowedPendingFirstLogin = normalizedStatus === 'pending_activation' && isFirstLogin;
+
+        if (normalizedStatus !== 'active' && !isAllowedPendingFirstLogin) {
             return res.status(403).json({ error: 'Account is not active. Please contact admin.' });
+        }
+
+        if (isAllowedPendingFirstLogin) {
+            await pool.query(
+                "UPDATE profiles SET status = 'active', updated_at = NOW() WHERE id = $1",
+                [user.id]
+            );
+            user.status = 'active';
         }
 
         if (decoded.requested_role) {
@@ -376,7 +404,7 @@ const verifyLoginOtp = async (req, res) => {
                 full_name: user.full_name,
                 employee_id: syncedProfileEmployee.employeeCode,
                 employee_uuid,
-                is_first_login: user.is_first_login ?? true,
+                is_first_login: isFirstLogin,
                 status: user.status,
             }
         });
@@ -676,7 +704,15 @@ const getMe = async (req, res) => {
                                   OR (p.employee_id IS NOT NULL AND p.employee_id::text = e.id::text)
             WHERE p.id = $1
         `, [req.user.id]);
-        res.json(result.rows[0]);
+        const profile = result.rows[0];
+        if (!profile) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            ...profile,
+            is_first_login: toBooleanFlag(profile.is_first_login, false),
+        });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });

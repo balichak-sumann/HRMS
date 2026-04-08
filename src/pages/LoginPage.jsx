@@ -17,17 +17,32 @@ const LoginPage = () => {
     const navigate = useNavigate();
     const { login, verifyLoginOtp, user, profile } = useAuth();
 
+    const navigateAfterLogin = (loggedInUser) => {
+        if (loggedInUser?.is_first_login) {
+            if (loggedInUser.role === 'admin') {
+                navigate('/admin/settings');
+            } else if (loggedInUser.role === 'hr') {
+                navigate('/hr/settings');
+            } else {
+                navigate('/employee/settings');
+            }
+            return;
+        }
+
+        if (loggedInUser.role === 'admin') {
+            navigate('/admin/dashboard');
+        } else if (loggedInUser.role === 'hr') {
+            navigate('/hr/dashboard');
+        } else {
+            navigate('/employee/dashboard');
+        }
+    };
+
     React.useEffect(() => {
         if (user && profile) {
-            if (profile.role === 'admin') {
-                navigate('/admin/dashboard');
-            } else if (profile.role === 'hr') {
-                navigate('/hr/dashboard');
-            } else {
-                navigate('/employee/dashboard');
-            }
+            navigateAfterLogin(profile);
         }
-    }, [user, profile, navigate]);
+    }, [user, profile]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -58,13 +73,7 @@ const LoginPage = () => {
                     return;
                 }
 
-                if (data.user.role === 'admin') {
-                    navigate('/admin/dashboard');
-                } else if (data.user.role === 'hr') {
-                    navigate('/hr/dashboard');
-                } else {
-                    navigate('/employee/dashboard');
-                }
+                navigateAfterLogin(data.user);
                 return;
             }
 
@@ -75,13 +84,7 @@ const LoginPage = () => {
                 allowedRoles: expectedRole,
             });
 
-            if (data.user.role === 'admin') {
-                navigate('/admin/dashboard');
-            } else if (data.user.role === 'hr') {
-                navigate('/hr/dashboard');
-            } else {
-                navigate('/employee/dashboard');
-            }
+            navigateAfterLogin(data.user);
         } catch (err) {
             setError(err.message || 'An unexpected error occurred.');
         } finally {
@@ -229,75 +232,77 @@ const LoginPage = () => {
                         </div>
                     </div>
 
-                    {!otpStep && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Password</label>
-                            <button
-                                type="button"
-                                onClick={() => navigate('/forgot-password')}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--primary)',
-                                    fontSize: '13px',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    padding: '0'
-                                }}
-                            >
-                                Forgot Password?
-                            </button>
-                        </div>
-                        <div style={{ position: 'relative' }}>
-                            <Lock size={18} style={{
-                                position: 'absolute',
-                                left: '12px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                color: 'var(--text-muted)'
-                            }} />
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                style={{
-                                    width: '100%',
-                                    paddingLeft: '40px',
-                                    paddingRight: '44px',
-                                    paddingTop: '10px',
-                                    paddingBottom: '10px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border)',
-                                    outline: 'none',
-                                    fontSize: '14px'
-                                }}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword((prev) => !prev)}
-                                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                title={showPassword ? 'Hide password' : 'Show password'}
-                                style={{
+                    {!otpStep && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Password</label>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/forgot-password')}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--primary)',
+                                        fontSize: '13px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        padding: '0'
+                                    }}
+                                >
+                                    Forgot Password?
+                                </button>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <Lock size={18} style={{
                                     position: 'absolute',
-                                    right: '10px',
+                                    left: '12px',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
-                                    border: 'none',
-                                    background: 'transparent',
-                                    color: 'var(--text-muted)',
-                                    cursor: 'pointer',
-                                    padding: '2px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
+                                    color: 'var(--text-muted)'
+                                }} />
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        paddingLeft: '40px',
+                                        paddingRight: '44px',
+                                        paddingTop: '10px',
+                                        paddingBottom: '10px',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--border)',
+                                        outline: 'none',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    title={showPassword ? 'Hide password' : 'Show password'}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        padding: '2px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
-                    </div>}
+                    )}
 
                     {otpStep && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 import toast from 'react-hot-toast';
 
 const SettingsPage = () => {
-    const { profile } = useAuth();
+    const { profile, setProfile } = useAuth();
     const [loading, setLoading] = useState(false);
 
     // Notification State
@@ -63,11 +63,12 @@ const SettingsPage = () => {
         setPasswordLoading(true);
         try {
             await api.post('/auth/change-password', {
-                current_password: passwords.current,
+                current_password: profile?.is_first_login ? undefined : passwords.current,
                 new_password: passwords.new
             });
             toast.success('Password changed successfully!');
             setPasswords({ current: '', new: '', confirm: '' });
+            setProfile((prev) => (prev ? { ...prev, is_first_login: false } : prev));
         } catch (error) {
             toast.error(error.message || 'Failed to change password');
         } finally {
@@ -126,18 +127,32 @@ const SettingsPage = () => {
                     </div>
 
                     <form onSubmit={handlePasswordChange} style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'grid', gap: '20px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Current Password</label>
-                                <input
-                                    type="password"
-                                    className="input-field"
-                                    required
-                                    value={passwords.current}
-                                    onChange={(e) => setPasswords(p => ({ ...p, current: e.target.value }))}
-                                    style={{ width: '100%' }}
-                                />
+                        {profile?.is_first_login ? (
+                            <div style={{
+                                padding: '12px',
+                                borderRadius: '8px',
+                                background: '#FEF3C7',
+                                color: '#92400E',
+                                fontSize: '13px',
+                                fontWeight: 600
+                            }}>
+                                First-time login detected. Please set a new password to continue using the portal.
                             </div>
+                        ) : null}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                            {!profile?.is_first_login ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Current Password</label>
+                                    <input
+                                        type="password"
+                                        className="input-field"
+                                        required
+                                        value={passwords.current}
+                                        onChange={(e) => setPasswords(p => ({ ...p, current: e.target.value }))}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+                            ) : null}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>New Password</label>
                                 <input

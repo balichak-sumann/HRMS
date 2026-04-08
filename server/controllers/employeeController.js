@@ -422,7 +422,7 @@ const createEmployee = async (req, res) => {
 
         const profileResult = await client.query(
             'INSERT INTO profiles (email, password_hash, role, employee_id, employee_uuid, is_first_login, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email',
-            [normalizedEmail, hash, profileRole, normalizedEmployeeCode || null, newEmployee.rows[0].id, true, 'pending_activation']
+            [normalizedEmail, hash, profileRole, normalizedEmployeeCode || null, newEmployee.rows[0].id, true, 'active']
         );
         const profile = profileResult.rows[0];
 

@@ -93,7 +93,7 @@ const EmployeeAttendancePage = () => {
         width: window.innerWidth,
         height: window.innerHeight
     });
-    const activeSessionForSelectedDate = todayRecords.find((rec) => !rec.check_out) || null;
+    const activeSessionForSelectedDate = todayRecords.find((rec) => Boolean(rec.check_in) && !rec.check_out) || null;
 
     const selectedDateObj = new Date(`${selectedDate}T00:00:00`);
     const isWeekend = selectedDateObj.getDay() === 0 || selectedDateObj.getDay() === 6;

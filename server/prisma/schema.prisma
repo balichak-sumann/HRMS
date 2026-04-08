@@ -95,7 +95,7 @@ model attendance {
   id           String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
   employee_id  String?    @db.Char(36)
   attendance_date DateTime  @db.Date
-  check_in     DateTime
+  check_in     DateTime?
   check_out    DateTime?
   status       String?    @db.Text
   created_at   DateTime?  @default(now())

@@ -59,7 +59,7 @@ CREATE TABLE `assets` (
 CREATE TABLE `attendance` (
     `id` CHAR(36) NOT NULL DEFAULT (UUID()),
     `employee_id` CHAR(36),
-    `check_in` DATETIME(3) NOT NULL,
+    `check_in` DATETIME(3),
     `check_out` DATETIME(3),
     `status` TEXT,
     `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP,

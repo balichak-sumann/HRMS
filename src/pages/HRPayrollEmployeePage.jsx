@@ -13,13 +13,20 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const HRPayrollEmployeePage = () => {
     const { employeeId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const isHr = location.pathname.startsWith('/hr');
-    const basePath = isHr ? '/hr' : '/admin';
+    const { profile } = useAuth();
+    const role = String(profile?.role || '').toLowerCase();
+    const isHr = role ? role === 'hr' : location.pathname.startsWith('/hr');
+    const basePath = role === 'admin'
+        ? '/admin'
+        : role === 'hr'
+            ? '/hr'
+            : (location.pathname.startsWith('/hr') ? '/hr' : '/admin');
 
     const [selectedEmp, setSelectedEmp] = useState(null);
     const [loading, setLoading] = useState(false);

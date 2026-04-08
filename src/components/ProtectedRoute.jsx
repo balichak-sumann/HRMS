@@ -1,9 +1,10 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
     const { user, profile, loading } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return (
@@ -36,6 +37,19 @@ const ProtectedRoute = ({ children, requiredRole }) => {
                 ? '/hr/dashboard'
                 : '/employee/dashboard';
         return <Navigate to={target} replace />;
+    }
+
+    // First-time users must set a new password before accessing other modules.
+    if (profile?.is_first_login) {
+        const settingsPath = profile?.role === 'admin'
+            ? '/admin/settings'
+            : profile?.role === 'hr'
+                ? '/hr/settings'
+                : '/employee/settings';
+
+        if (location.pathname !== settingsPath) {
+            return <Navigate to={settingsPath} replace />;
+        }
     }
 
     return children;

@@ -24,7 +24,10 @@ const AdminManagementPage = () => {
     const [listLoading, setListLoading] = useState(true);
     const [departments, setDepartments] = useState([]);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const fullNameRegex = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+    const phoneRegex = /^\d+$/;
     const [hrRoleOptions, setHrRoleOptions] = useState([]);
+    const [formErrors, setFormErrors] = useState({ full_name: '', email: '', phone: '' });
 
     const isAdmin = profile?.role === 'admin';
 
@@ -65,14 +68,49 @@ const AdminManagementPage = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+
+        if (name === 'full_name') {
+            const sanitized = value.replace(/[^A-Za-z\s]/g, '');
+            setFormErrors((prev) => ({ ...prev, full_name: '' }));
+            setForm((prev) => ({ ...prev, [name]: sanitized }));
+            return;
+        }
+
+        if (name === 'email') {
+            setFormErrors((prev) => ({ ...prev, email: '' }));
+            setForm((prev) => ({ ...prev, [name]: value }));
+            return;
+        }
+
+        if (name === 'phone') {
+            const sanitized = value.replace(/\D/g, '');
+            setFormErrors((prev) => ({ ...prev, phone: '' }));
+            setForm((prev) => ({ ...prev, [name]: sanitized }));
+            return;
+        }
+
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleCreateHr = async (e) => {
         e.preventDefault();
+        const normalizedName = String(form.full_name || '').trim().replace(/\s+/g, ' ');
+        const normalizedPhone = String(form.phone || '').trim();
         const normalizedEmail = String(form.email || '').trim().toLowerCase();
+
+        const nextErrors = { full_name: '', email: '', phone: '' };
+        if (!fullNameRegex.test(normalizedName)) {
+            nextErrors.full_name = 'Full Name can contain only letters and spaces.';
+        }
         if (!emailRegex.test(normalizedEmail)) {
-            toast.error('Please enter a valid work email address.');
+            nextErrors.email = 'Please enter a valid work email address.';
+        }
+        if (!phoneRegex.test(normalizedPhone)) {
+            nextErrors.phone = 'Phone must contain only digits (0-9).';
+        }
+        if (nextErrors.full_name || nextErrors.email || nextErrors.phone) {
+            setFormErrors(nextErrors);
+            toast.error('Please fix the validation errors before submitting.');
             return;
         }
 
@@ -80,11 +118,11 @@ const AdminManagementPage = () => {
 
         try {
             const payload = new FormData();
-            payload.append('full_name', form.full_name);
+            payload.append('full_name', normalizedName);
             payload.append('email', normalizedEmail);
             payload.append('account_role', 'hr');
             payload.append('role', form.role || 'HR Manager');
-            payload.append('phone', form.phone);
+            payload.append('phone', normalizedPhone);
             payload.append('joining_date', form.joining_date);
             payload.append('salary', form.salary);
             payload.append('location', form.location || '');
@@ -120,15 +158,58 @@ const AdminManagementPage = () => {
                 <div className="card" style={{ padding: '24px' }}>
                     <h3 style={{ marginBottom: '16px', fontSize: 'var(--font-xl)', color: 'var(--text-main)' }}>Create HR Account</h3>
                     <form onSubmit={handleCreateHr} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <input name="full_name" className="input-field" placeholder="Full Name" value={form.full_name} onChange={handleChange} required />
-                        <input name="email" type="email" className="input-field" placeholder="Work Email" value={form.email} onChange={handleChange} required />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <input
+                                name="full_name"
+                                className="input-field"
+                                placeholder="Full Name"
+                                value={form.full_name}
+                                onChange={handleChange}
+                                required
+                                pattern="[A-Za-z ]+"
+                                title="Full Name can contain only letters and spaces"
+                            />
+                            {formErrors.full_name ? <span style={{ color: '#b91c1c', fontSize: '12px' }}>{formErrors.full_name}</span> : null}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Work Email</label>
+                            <input
+                                name="email"
+                                type="email"
+                                className="input-field"
+                                placeholder="Work Email"
+                                value={form.email}
+                                onChange={handleChange}
+                                required
+                                inputMode="email"
+                                autoComplete="email"
+                                title="Enter a valid email address"
+                            />
+                            {formErrors.email ? <span style={{ color: '#b91c1c', fontSize: '12px' }}>{formErrors.email}</span> : null}
+                        </div>
                         <select name="role" className="input-field" value={form.role} onChange={handleChange} required>
                             {hrRoleOptions.map((option) => (
                                 <option key={option} value={option}>{option}</option>
                             ))}
                         </select>
-                        <input name="phone" className="input-field" placeholder="Phone" value={form.phone} onChange={handleChange} required />
-                        <input name="joining_date" type="date" className="input-field" value={form.joining_date} onChange={handleChange} required />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <input
+                                name="phone"
+                                className="input-field"
+                                placeholder="Phone"
+                                value={form.phone}
+                                onChange={handleChange}
+                                required
+                                inputMode="numeric"
+                                pattern="[0-9]+"
+                                title="Phone must contain only digits (0-9)"
+                            />
+                            {formErrors.phone ? <span style={{ color: '#b91c1c', fontSize: '12px' }}>{formErrors.phone}</span> : null}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Joining Date</label>
+                            <input name="joining_date" type="date" className="input-field" value={form.joining_date} onChange={handleChange} required />
+                        </div>
                         <input name="salary" type="number" className="input-field" placeholder="Annual Salary" value={form.salary} onChange={handleChange} required />
                         <select name="department_id" className="input-field" value={form.department_id} onChange={handleChange}>
                             <option value="">Department (Optional)</option>

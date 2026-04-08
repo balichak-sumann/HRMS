@@ -534,10 +534,11 @@ const createAttendance = async (req, res) => {
             return res.status(400).json({ error: 'Attendance record already exists for this employee on this date' });
         }
 
-        // Create attendance record with status only (no check-in/out times)
+        // Create attendance record with status only (no check-in/out times).
+        // This avoids auto-triggering employee check-in when HR/Admin marks status manually.
         const result = await pool.query(
             "INSERT INTO attendance (employee_id, attendance_date, check_in, status) VALUES ($1, $2::date, $3, $4) RETURNING *",
-            [employee_id, date, new Date(), status]
+            [employee_id, date, null, status]
         );
 
         res.json(result.rows[0]);

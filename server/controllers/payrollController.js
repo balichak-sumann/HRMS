@@ -72,6 +72,39 @@ const toNumber = (value, defaultValue = 0) => {
 
 const round2 = (value) => Number((Math.round(value * 100) / 100).toFixed(2));
 
+const formatLocalYmd = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+const normalizeDateYmd = (raw) => {
+    if (!raw) return null;
+
+    if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+        return formatLocalYmd(raw);
+    }
+
+    const text = String(raw).trim();
+    const isoDateOnlyMatch = text.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (isoDateOnlyMatch) {
+        return isoDateOnlyMatch[1];
+    }
+
+    const parsed = new Date(text);
+    if (!Number.isNaN(parsed.getTime())) {
+        return formatLocalYmd(parsed);
+    }
+
+    const directMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (directMatch) {
+        return directMatch[1];
+    }
+
+    return null;
+};
+
 const parseMonthNumber = (month) => {
     if (month == null) return null;
     const numeric = Number(month);
@@ -112,7 +145,7 @@ const getAttendanceSummary = async (employeeId, month, year) => {
 
     // 1. Fetch Employee Joining Date
     const empRes = await pool.query('SELECT joining_date FROM employees WHERE id = $1', [employeeId]);
-    const joiningDate = empRes.rows[0]?.joining_date ? new Date(empRes.rows[0].joining_date) : null;
+    const joiningDateYmd = normalizeDateYmd(empRes.rows[0]?.joining_date);
 
     // 2. Fetch Attendance Records
     const attendanceRes = await pool.query(
@@ -122,7 +155,8 @@ const getAttendanceSummary = async (employeeId, month, year) => {
     );
     const attendanceMap = {};
     attendanceRes.rows.forEach(r => {
-        const d = new Date(r.work_day).toISOString().slice(0, 10);
+        const d = normalizeDateYmd(r.work_day);
+        if (!d) return;
         attendanceMap[d] = Number(r.credit);
     });
 
@@ -133,7 +167,8 @@ const getAttendanceSummary = async (employeeId, month, year) => {
     );
     const holidaysMap = {};
     holidaysRes.rows.forEach(h => {
-        const d = new Date(h.date).toISOString().slice(0, 10);
+        const d = normalizeDateYmd(h.date);
+        if (!d) return;
         holidaysMap[d] = 1;
     });
 
@@ -144,7 +179,7 @@ const getAttendanceSummary = async (employeeId, month, year) => {
         const dateStr = dateObj.toISOString().slice(0, 10);
 
         // Skip if before joining date
-        if (joiningDate && dateObj < joiningDate) continue;
+        if (joiningDateYmd && dateStr < joiningDateYmd) continue;
 
         const isWeekend = dateObj.getUTCDay() === 0 || dateObj.getUTCDay() === 6;
         const attendanceCredit = attendanceMap[dateStr] || 0;
