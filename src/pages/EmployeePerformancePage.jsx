@@ -5,8 +5,6 @@ import { Loader2, PlusCircle, Save } from 'lucide-react';
 const EmployeePerformancePage = () => {
     const [overview, setOverview] = useState(null);
     const [loading, setLoading] = useState(true);
-
-    const [goalForm, setGoalForm] = useState({ title: '', description: '', target: '' });
     const [selfItems, setSelfItems] = useState([]);
     const [selfComment, setSelfComment] = useState('');
 
@@ -34,22 +32,6 @@ const EmployeePerformancePage = () => {
     useEffect(() => {
         fetchOverview();
     }, []);
-
-    const addGoal = async (e) => {
-        e.preventDefault();
-        if (!overview?.current_cycle?.id) return;
-        try {
-            await api.post('/performance/goals', {
-                cycle_id: overview.current_cycle.id,
-                ...goalForm
-            });
-            setGoalForm({ title: '', description: '', target: '' });
-            await fetchOverview();
-        } catch (error) {
-            console.error('Failed to add goal', error);
-            alert('Failed to add goal');
-        }
-    };
 
     const updateProgress = async (goalId, progress) => {
         try {
@@ -147,12 +129,9 @@ const EmployeePerformancePage = () => {
 
             <div className="card" style={{ padding: '20px', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>My Goals</h3>
-                <form onSubmit={addGoal} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '10px', marginBottom: '12px' }}>
-                    <input className="input-field" placeholder="Goal title" value={goalForm.title} onChange={(e) => setGoalForm({ ...goalForm, title: e.target.value })} required />
-                    <input className="input-field" placeholder="Description" value={goalForm.description} onChange={(e) => setGoalForm({ ...goalForm, description: e.target.value })} />
-                    <input className="input-field" placeholder="Target" value={goalForm.target} onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })} required />
-                    <button type="submit" className="btn-primary" style={{ borderRadius: '8px' }}><PlusCircle size={16} /> Add</button>
-                </form>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '12px', fontSize: '13px' }}>
+                    Goals are assigned by HR/Admin for this cycle. You can update progress and submit self-appraisal.
+                </p>
 
                 {(overview.goals || []).length === 0 ? (
                     <p style={{ color: 'var(--text-muted)' }}>No goals added yet.</p>

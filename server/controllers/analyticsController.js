@@ -12,14 +12,14 @@ const getTodayCelebrationsData = async () => {
             e.role,
             e.department,
             e.avatar_url,
-            'birthday'::text AS celebration_type,
-            EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.dob::date))::int AS years_count,
+                        'birthday' AS celebration_type,
+                        TIMESTAMPDIFF(YEAR, e.dob, CURDATE()) AS years_count,
             TO_CHAR(e.dob, 'Mon DD') AS date_label
         FROM employees e
         WHERE e.status = 'Active'
           AND e.dob IS NOT NULL
-          AND EXTRACT(MONTH FROM e.dob) = EXTRACT(MONTH FROM CURRENT_DATE)
-          AND EXTRACT(DAY FROM e.dob) = EXTRACT(DAY FROM CURRENT_DATE)
+                    AND MONTH(e.dob) = MONTH(CURDATE())
+                    AND DAY(e.dob) = DAY(CURDATE())
 
         UNION ALL
 
@@ -29,15 +29,15 @@ const getTodayCelebrationsData = async () => {
             e.role,
             e.department,
             e.avatar_url,
-            'work_anniversary'::text AS celebration_type,
-            EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.joining_date::date))::int AS years_count,
+                        'work_anniversary' AS celebration_type,
+                        TIMESTAMPDIFF(YEAR, e.joining_date, CURDATE()) AS years_count,
             TO_CHAR(e.joining_date, 'Mon DD') AS date_label
         FROM employees e
         WHERE e.status = 'Active'
           AND e.joining_date IS NOT NULL
-          AND EXTRACT(MONTH FROM e.joining_date) = EXTRACT(MONTH FROM CURRENT_DATE)
-          AND EXTRACT(DAY FROM e.joining_date) = EXTRACT(DAY FROM CURRENT_DATE)
-          AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.joining_date::date)) >= 1
+                    AND MONTH(e.joining_date) = MONTH(CURDATE())
+                    AND DAY(e.joining_date) = DAY(CURDATE())
+                    AND TIMESTAMPDIFF(YEAR, e.joining_date, CURDATE()) >= 1
 
         ORDER BY celebration_type, full_name
     `);
@@ -59,7 +59,7 @@ const getAnalytics = async (req, res) => {
         );
 
         const newEmployees = await pool.query(
-            'SELECT COUNT(*) FROM employees WHERE joining_date >= NOW() - INTERVAL \'30 days\''
+            'SELECT COUNT(*) FROM employees WHERE joining_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
         );
 
         const upcomingBirthdays = await pool.query(`
@@ -67,14 +67,14 @@ const getAnalytics = async (req, res) => {
             FROM employees 
             WHERE status = 'Active' AND dob IS NOT NULL 
             AND (
-                (EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM dob) > EXTRACT(DAY FROM CURRENT_DATE))
+                (MONTH(dob) = MONTH(CURDATE()) AND DAY(dob) > DAY(CURDATE()))
                 OR
-                (EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month'))
+                (MONTH(dob) = MONTH(DATE_ADD(CURDATE(), INTERVAL 1 MONTH)))
             )
             ORDER BY 
-                (EXTRACT(MONTH FROM dob) < EXTRACT(MONTH FROM CURRENT_DATE))::int,
-                EXTRACT(MONTH FROM dob), 
-                EXTRACT(DAY FROM dob)
+                (MONTH(dob) < MONTH(CURDATE())),
+                MONTH(dob), 
+                DAY(dob)
             LIMIT 5
         `);
 

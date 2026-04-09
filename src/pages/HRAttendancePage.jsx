@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Filter, Download, Users, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { api } from '../lib/api';
+import { getIstTodayYmd, getIstCurrentMonth } from '../lib/istDate';
 
 const HRAttendancePage = () => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
     const [departments, setDepartments] = useState([]);
     const [filters, setFilters] = useState({
-        date: new Date().toISOString().split('T')[0],
-        month: new Date().toISOString().slice(0, 7),
+        date: getIstTodayYmd(),
+        month: getIstCurrentMonth(),
         department: ''
     });
     const [updatingId, setUpdatingId] = useState(null);
@@ -129,7 +130,7 @@ const HRAttendancePage = () => {
             ];
 
             const rows = monthlyRows.map(r => [
-                r.employee_id,
+                r.employee_display_id || r.employee_id,
                 r.full_name,
                 r.department || 'Unassigned',
                 filters.month,
@@ -178,7 +179,7 @@ const HRAttendancePage = () => {
                         className="input-field"
                         value={filters.month}
                         onChange={e => setFilters({ ...filters, month: e.target.value })}
-                        max={new Date().toISOString().slice(0, 7)}
+                        max={getIstCurrentMonth()}
                         style={{ minWidth: '170px' }}
                     />
                     <button
@@ -243,7 +244,7 @@ const HRAttendancePage = () => {
                             value={filters.date}
                             onChange={e => setFilters({ ...filters, date: e.target.value })}
                             style={{ width: '100%' }}
-                            max={new Date().toISOString().split('T')[0]}
+                            max={getIstTodayYmd()}
                         />
                     </div>
                     <div style={{ flex: '1', minWidth: '240px', maxWidth: '320px' }}>

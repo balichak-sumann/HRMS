@@ -21,7 +21,7 @@ const getAuditLogs = async (req, res) => {
             params.push(category);
         }
         if (user && user.trim() !== '') {
-            query += ` AND (full_name ILIKE $${pIndex} OR user_email ILIKE $${pIndex})`;
+            query += ` AND (LOWER(full_name) LIKE LOWER($${pIndex}) OR LOWER(user_email) LIKE LOWER($${pIndex}))`;
             pIndex++;
             params.push(`%${user}%`);
         }

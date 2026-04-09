@@ -16,7 +16,8 @@ router.get('/dashboard', authorize(['hr']), performanceController.getHRDashboard
 router.get('/my-overview', performanceController.getMyOverview);
 
 router.get('/goals', performanceController.getGoals);
-router.post('/goals', authorize(['employee']), performanceController.createGoal);
+router.post('/goals', authorize(['hr', 'admin', 'Super Admin']), performanceController.createGoal);
+router.patch('/goals/:id', authorize(['hr', 'admin', 'Super Admin']), performanceController.updateGoal);
 router.patch('/goals/:id/progress', authorize(['employee']), performanceController.updateGoalProgress);
 
 router.post('/self-appraisal', authorize(['employee', 'hr']), performanceController.submitSelfAppraisal);

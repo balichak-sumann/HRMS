@@ -130,15 +130,18 @@ const getCycles = async (req, res) => {
 };
 
 const createGoal = async (req, res) => {
-    const { cycle_id, title, description, target } = req.body;
+    const { cycle_id, employee_id, title, description, target } = req.body;
 
-    if (!cycle_id || !title || !target) {
-        return res.status(400).json({ error: 'cycle_id, title and target are required' });
+    if (!cycle_id || !employee_id || !title || !target) {
+        return res.status(400).json({ error: 'cycle_id, employee_id, title and target are required' });
     }
 
     try {
-        const employee = await resolveEmployee(req);
-        if (!employee) return res.status(404).json({ error: 'Employee not found' });
+        const employee = await pool.query(
+            'SELECT id FROM employees WHERE id = $1 LIMIT 1',
+            [employee_id]
+        );
+        if (employee.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
 
         const cycle = await pool.query('SELECT id, status FROM appraisal_cycles WHERE id = $1', [cycle_id]);
         if (cycle.rows.length === 0) return res.status(404).json({ error: 'Cycle not found' });
@@ -146,16 +149,51 @@ const createGoal = async (req, res) => {
             return res.status(400).json({ error: 'Goals can only be created in active cycles' });
         }
 
+        await pool.query(
+            `INSERT INTO appraisal_participants (cycle_id, employee_id)
+             VALUES ($1, $2)
+             ON CONFLICT DO NOTHING`,
+            [cycle_id, employee_id]
+        );
+
         const result = await pool.query(
             `INSERT INTO goals (cycle_id, employee_id, title, description, target, progress)
              VALUES ($1, $2, $3, $4, $5, 0)
              RETURNING *`,
-            [cycle_id, employee.id, title, description || null, target]
+            [cycle_id, employee_id, title, description || null, target]
         );
 
         res.json(result.rows[0]);
     } catch (err) {
         console.error('createGoal error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+const updateGoal = async (req, res) => {
+    const { id } = req.params;
+    const { title, description, target } = req.body;
+
+    if (!title || !target) {
+        return res.status(400).json({ error: 'title and target are required' });
+    }
+
+    try {
+        const result = await pool.query(
+            `UPDATE goals
+             SET title = $1, description = $2, target = $3, updated_at = NOW()
+             WHERE id = $4
+             RETURNING *`,
+            [title, description || null, target, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Goal not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('updateGoal error:', err.message);
         res.status(500).json({ error: 'Server error' });
     }
 };
@@ -301,16 +339,33 @@ const submitManagerAppraisal = async (req, res) => {
 
         await client.query('BEGIN');
 
-        const upsert = await client.query(
-            `INSERT INTO manager_appraisals (cycle_id, employee_id, manager_id, feedback, submitted_at)
-             VALUES ($1, $2, $3, $4, NOW())
-             ON CONFLICT (cycle_id, employee_id, manager_id)
-             DO UPDATE SET feedback = EXCLUDED.feedback, submitted_at = NOW()
-             RETURNING *`,
-            [cycle_id, employee_id, manager.id, feedback || null]
+        const existing = await client.query(
+            `SELECT id
+             FROM manager_appraisals
+             WHERE cycle_id = $1 AND employee_id = $2 AND manager_id = $3
+             LIMIT 1`,
+            [cycle_id, employee_id, manager.id]
         );
 
-        const managerId = upsert.rows[0].id;
+        let managerId;
+        if (existing.rows.length > 0) {
+            managerId = existing.rows[0].id;
+            await client.query(
+                `UPDATE manager_appraisals
+                 SET feedback = $1, submitted_at = NOW()
+                 WHERE id = $2`,
+                [feedback || null, managerId]
+            );
+        } else {
+            const inserted = await client.query(
+                `INSERT INTO manager_appraisals (cycle_id, employee_id, manager_id, feedback, submitted_at)
+                 VALUES ($1, $2, $3, $4, NOW())
+                 RETURNING id`,
+                [cycle_id, employee_id, manager.id, feedback || null]
+            );
+            managerId = inserted.rows[0].id;
+        }
+
         await client.query('DELETE FROM manager_appraisal_items WHERE manager_appraisal_id = $1', [managerId]);
 
         for (const item of items) {
@@ -647,6 +702,7 @@ module.exports = {
     updateCycleStatus,
     getCycles,
     createGoal,
+    updateGoal,
     updateGoalProgress,
     getGoals,
     submitSelfAppraisal,

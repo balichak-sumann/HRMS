@@ -92,6 +92,10 @@ const createSurvey = async (req, res) => {
         return res.status(400).json({ error: 'target_department_id is required for department surveys' });
     }
 
+    if (survey_type !== undefined && survey_type !== null && typeof survey_type !== 'string') {
+        return res.status(400).json({ error: 'survey_type must be a string when provided' });
+    }
+
     for (const question of questions) {
         const error = validateQuestion(question);
         if (error) return res.status(400).json({ error });
@@ -171,8 +175,9 @@ const createSurvey = async (req, res) => {
         res.status(201).json({ ...survey, questions: createdQuestions });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('createSurvey error:', err.message);
-        res.status(500).json({ error: 'Server error' });
+        console.error('createSurvey error:', err.message, err.stack);
+        const message = err.message || 'Server error';
+        res.status(500).json({ error: message });
     } finally {
         client.release();
     }

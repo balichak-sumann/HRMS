@@ -7,11 +7,11 @@ const surveyController = require('../controllers/surveyController');
 router.use(auth);
 router.use(auditLogger('Employee Surveys'));
 
-router.post('/', authorize(['hr']), surveyController.createSurvey);
-router.patch('/:id/publish', authorize(['hr']), surveyController.publishSurvey);
+router.post('/', authorize(['hr', 'admin', 'Super Admin']), surveyController.createSurvey);
+router.patch('/:id/publish', authorize(['hr', 'admin', 'Super Admin']), surveyController.publishSurvey);
 router.get('/', surveyController.getSurveys);
 router.get('/:id', surveyController.getSurveyById);
 router.post('/:id/respond', authorize(['employee']), surveyController.respondToSurvey);
-router.get('/:id/results', authorize(['hr']), surveyController.getSurveyResults);
+router.get('/:id/results', authorize(['hr', 'admin', 'Super Admin']), surveyController.getSurveyResults);
 
 module.exports = router;

@@ -313,16 +313,19 @@ const HROffboardingPage = () => {
                                 onChange={(e) => setStartForm((prev) => ({ ...prev, last_working_date: e.target.value }))}
                                 required
                             />
-                            <select
-                                className="input-field"
-                                value={startForm.reason}
-                                onChange={(e) => setStartForm((prev) => ({ ...prev, reason: e.target.value }))}
-                                required
-                            >
-                                {reasonOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Reason</label>
+                                <select
+                                    className="input-field"
+                                    value={startForm.reason}
+                                    onChange={(e) => setStartForm((prev) => ({ ...prev, reason: e.target.value }))}
+                                    required
+                                >
+                                    {reasonOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <textarea

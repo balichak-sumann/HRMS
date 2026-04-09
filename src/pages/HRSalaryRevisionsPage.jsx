@@ -179,7 +179,10 @@ const HRSalaryRevisionsPage = () => {
                 <div className="card" style={{ padding: '14px' }}>
                     <p style={{ fontWeight: 700, marginBottom: '6px' }}>Initiate Revision</p>
                     <form onSubmit={initiateRevision} style={{ display: 'grid', gap: '8px' }}>
-                        <input className="input-field" type="date" required value={newRevision.effective_date} onChange={(e) => setNewRevision((prev) => ({ ...prev, effective_date: e.target.value }))} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Effective Date</label>
+                                <input className="input-field" type="date" required value={newRevision.effective_date} onChange={(e) => setNewRevision((prev) => ({ ...prev, effective_date: e.target.value }))} />
+                            </div>
                         <input className="input-field" type="number" min="0" step="0.01" placeholder="Basic" required value={newRevision.basic_salary} onChange={(e) => setNewRevision((prev) => ({ ...prev, basic_salary: e.target.value }))} />
                         <input className="input-field" type="number" min="0" step="0.01" placeholder="HRA" required value={newRevision.hra} onChange={(e) => setNewRevision((prev) => ({ ...prev, hra: e.target.value }))} />
                         <input className="input-field" type="number" min="0" step="0.01" placeholder="Allowances" required value={newRevision.allowances} onChange={(e) => setNewRevision((prev) => ({ ...prev, allowances: e.target.value }))} />

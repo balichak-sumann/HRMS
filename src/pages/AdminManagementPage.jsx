@@ -207,8 +207,20 @@ const AdminManagementPage = () => {
                             {formErrors.phone ? <span style={{ color: '#b91c1c', fontSize: '12px' }}>{formErrors.phone}</span> : null}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Joining Date</label>
-                            <input name="joining_date" type="date" className="input-field" value={form.joining_date} onChange={handleChange} required />
+                            <label htmlFor="hr-joining-date" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Date of Joining (DOJ)</label>
+                            <input
+                                id="hr-joining-date"
+                                name="joining_date"
+                                type="date"
+                                className="input-field"
+                                value={form.joining_date}
+                                onChange={handleChange}
+                                required
+                                aria-describedby="hr-joining-date-help"
+                            />
+                            <span id="hr-joining-date-help" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                Select the employee's joining date for the HR account.
+                            </span>
                         </div>
                         <input name="salary" type="number" className="input-field" placeholder="Annual Salary" value={form.salary} onChange={handleChange} required />
                         <select name="department_id" className="input-field" value={form.department_id} onChange={handleChange}>

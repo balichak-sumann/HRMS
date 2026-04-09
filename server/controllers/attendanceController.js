@@ -4,11 +4,47 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+const IST_TIME_ZONE = 'Asia/Kolkata';
+const IST_OFFSET_MINUTES = 330;
+
+const getIstParts = (date = new Date()) => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: IST_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const valueByType = {};
+    for (const part of parts) {
+        if (part.type !== 'literal') {
+            valueByType[part.type] = part.value;
+        }
+    }
+
+    return {
+        year: Number(valueByType.year),
+        month: Number(valueByType.month),
+        day: Number(valueByType.day),
+        hour: Number(valueByType.hour),
+        minute: Number(valueByType.minute),
+        second: Number(valueByType.second),
+    };
+};
+
+const buildUtcDateFromIst = (dateStr, hour = 0, minute = 0, second = 0) => {
+    const [year, month, day] = String(dateStr).split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, hour, minute, second) - IST_OFFSET_MINUTES * 60 * 1000);
+};
+
 const formatLocalYmd = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    const { year, month, day } = getIstParts(date);
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 
 const normalizeDateYmd = (raw) => {
@@ -73,16 +109,7 @@ const isWeekendDate = (dateStr) => {
     const day = new Date(`${dateStr}T00:00:00`).getDay();
     return day === 0 || day === 6;
 };
-
-const buildTimestampForDate = (dateStr) => {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    return new Date(`${dateStr}T${hh}:${mm}:${ss}`);
-};
-
-const endOfAttendanceDay = (dateStr) => new Date(`${dateStr}T23:59:59`);
+const endOfAttendanceDay = (dateStr) => buildUtcDateFromIst(dateStr, 23, 59, 59);
 
 const resolveAttendanceDate = (row) => {
     const raw = row?.attendance_date || row?.check_in;
@@ -200,7 +227,8 @@ const checkIn = async (req, res) => {
         }
 
         const checkInAt = new Date();
-        const checkInTime = checkInAt.getHours() * 60 + checkInAt.getMinutes();
+        const istNow = getIstParts(checkInAt);
+        const checkInTime = istNow.hour * 60 + istNow.minute;
         const status = checkInTime > LATE_AFTER_MINUTES ? 'Late' : 'Present';
 
         // Always create a new record for multiple check-ins
@@ -247,7 +275,8 @@ const checkOut = async (req, res) => {
         }
 
         const record = result.rows[0];
-        const checkOutTime = checkOutAt.getHours() * 60 + checkOutAt.getMinutes();
+        const istNow = getIstParts(checkOutAt);
+        const checkOutTime = istNow.hour * 60 + istNow.minute;
 
         if (checkOutTime < EARLY_BEFORE_MINUTES) {
             await pool.query(
@@ -381,6 +410,7 @@ const getMonthlyAttendanceExport = async (req, res) => {
         let query = `
             SELECT
                 e.id AS employee_id,
+                COALESCE(NULLIF(TRIM(COALESCE(e.employee_id, '')), ''), 'NA') AS employee_display_id,
                 e.full_name,
                 e.department,
                 COALESCE(SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END), 0) AS present_days,
@@ -390,7 +420,7 @@ const getMonthlyAttendanceExport = async (req, res) => {
                 COALESCE(SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END), 0) AS absent_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Half-Day' THEN 1 ELSE 0 END), 0) AS half_day_count,
                 COALESCE(COUNT(a.att_date), 0) AS recorded_days,
-                COALESCE(ROUND(SUM(a.total_hours)::numeric, 2), 0) AS total_hours
+                COALESCE(ROUND(SUM(a.total_hours), 2), 0) AS total_hours
             FROM employees e
             LEFT JOIN (
                 SELECT employee_id,
@@ -399,12 +429,12 @@ const getMonthlyAttendanceExport = async (req, res) => {
                        SUM(
                            CASE
                                WHEN check_in IS NOT NULL AND check_out IS NOT NULL
-                               THEN GREATEST(0, EXTRACT(EPOCH FROM (check_out - check_in)) / 3600)
+                               THEN GREATEST(0, TIMESTAMPDIFF(SECOND, check_in, check_out) / 3600)
                                ELSE 0
                            END
                        ) AS total_hours
                 FROM attendance
-                WHERE COALESCE(attendance_date, DATE(check_in)) BETWEEN $1::date AND $2::date
+                WHERE COALESCE(attendance_date, DATE(check_in)) BETWEEN DATE($1) AND DATE($2)
                 GROUP BY employee_id, COALESCE(attendance_date, DATE(check_in))
             ) a ON a.employee_id = e.id
             WHERE 1=1
@@ -423,7 +453,7 @@ const getMonthlyAttendanceExport = async (req, res) => {
         }
 
         query += `
-            GROUP BY e.id, e.full_name, e.department
+            GROUP BY e.id, e.employee_id, e.full_name, e.department
             ORDER BY e.full_name ASC
         `;
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Play, Square, Calendar, CheckCircle, AlertCircle, Timer, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
+import { getIstTodayYmd } from '../lib/istDate';
 
 const buildPreciseLocationLabel = (addr = {}, latitude, longitude) => {
     const locality = addr.suburb || addr.neighbourhood || addr.city_district || addr.residential || addr.hamlet || addr.quarter;
@@ -28,10 +29,13 @@ const buildPreciseLocationLabel = (addr = {}, latitude, longitude) => {
 
 const EmployeeAttendancePage = () => {
     const formatLocalYmd = (date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        });
+        return formatter.format(date);
     };
 
     const normalizeDateYmd = (raw) => {
@@ -59,7 +63,7 @@ const EmployeeAttendancePage = () => {
 
         return null;
     };
-    const getTodayYmd = () => formatLocalYmd(new Date());
+    const getTodayYmd = () => getIstTodayYmd();
     const shiftDate = (dateStr, deltaDays) => {
         const d = new Date(`${dateStr}T00:00:00`);
         d.setDate(d.getDate() + deltaDays);

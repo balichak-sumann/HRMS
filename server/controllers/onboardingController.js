@@ -8,7 +8,7 @@ const getOnboardingTaskColumns = async (client) => {
     const cols = await client.query(
         `SELECT column_name
          FROM information_schema.columns
-         WHERE table_schema = 'public'
+         WHERE table_schema = DATABASE()
            AND table_name = 'onboarding_case_tasks'`
     );
     return new Set(cols.rows.map((r) => r.column_name));

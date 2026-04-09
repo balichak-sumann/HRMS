@@ -121,14 +121,25 @@ const getCaseByIdInternal = async (client, caseId) => {
 
 const startOffboarding = async (req, res) => {
     const { employee_id, last_working_date, reason, reason_details } = req.body;
-    const allowedReasons = ['resignation', 'termination', 'contract_end'];
+    const reasonAliases = {
+        resignation: 'resignation',
+        termination: 'termination',
+        contract_end: 'contract_end',
+        'Career Readjustment': 'Career Readjustment',
+        'Health Issues': 'Health Issues',
+        'Continuing Education': 'Continuing Education',
+        Relocation: 'Relocation',
+        'Better Opportunity': 'Better Opportunity',
+        'Personal Reasons': 'Personal Reasons'
+    };
+    const normalizedReason = reasonAliases[String(reason || '').trim()];
 
     if (!employee_id || !last_working_date || !reason) {
         return res.status(400).json({ error: 'employee_id, last_working_date, and reason are required' });
     }
 
-    if (!allowedReasons.includes(reason)) {
-        return res.status(400).json({ error: 'reason must be resignation, termination, or contract_end' });
+    if (!normalizedReason) {
+        return res.status(400).json({ error: 'reason must match one of the available offboarding reasons' });
     }
 
     const client = await pool.connect();
@@ -175,7 +186,7 @@ const startOffboarding = async (req, res) => {
                 updated_at
             ) VALUES ($1, $2, $3, $4, 'in_progress', $5, NOW())
             RETURNING *`,
-            [employee_id, last_working_date, reason, reason_details || null, actor?.id || null]
+            [employee_id, last_working_date, normalizedReason, reason_details || null, actor?.id || null]
         );
 
         const caseId = created.rows[0].id;

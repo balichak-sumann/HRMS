@@ -14,6 +14,10 @@ router.get('/:id', auth, projectController.getProjectById);
 // --- Tasks ---
 router.post('/:id/tasks', auth, projectController.createTask);
 
+// --- Team Management ---
+router.post('/:id/members', auth, authorize(['hr', 'admin']), projectController.addProjectMember);
+router.delete('/:id/members/:employeeId', auth, authorize(['hr', 'admin']), projectController.removeProjectMember);
+
 // --- Daily Reports ---
 router.post('/:id/reports', auth, projectController.createReport);
 router.get('/:id/reports', auth, projectController.getProjectReports);

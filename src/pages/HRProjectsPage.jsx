@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Briefcase, Plus, Calendar, User,
     CheckCircle2, Clock, MoreVertical,
     Layout, ListTodo, FileText, ChevronRight,
-    Users, Target, AlertCircle, X
+    Users, Target, AlertCircle, X, Edit, Trash2, Lock, Unlock
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -21,6 +21,9 @@ const HRProjectsPage = () => {
         deadline: '',
         team: []
     });
+    const [selectedMemberEmployee, setSelectedMemberEmployee] = useState(null);
+    const [activeMenuProject, setActiveMenuProject] = useState(null);
+    const menuRef = useRef(null);
 
     useEffect(() => {
         fetchProjects();
@@ -98,6 +101,100 @@ const HRProjectsPage = () => {
         }
     };
 
+    const handleAddMember = async () => {
+        if (!selectedMemberEmployee || !selectedProject?.id) return;
+        try {
+            await api.post(`/projects/${selectedProject.id}/members`, { employee_id: selectedMemberEmployee });
+            setSelectedMemberEmployee(null);
+            fetchProjectDetail(selectedProject.id);
+        } catch (err) {
+            alert(err?.response?.data?.error || 'Failed to add member');
+        }
+    };
+
+    const handleRemoveMember = async (employeeId) => {
+        if (!selectedProject?.id) return;
+        const ok = window.confirm('Remove this member from the project?');
+        if (!ok) return;
+        try {
+            await api.delete(`/projects/${selectedProject.id}/members/${employeeId}`);
+            fetchProjectDetail(selectedProject.id);
+        } catch (err) {
+            alert(err?.response?.data?.error || 'Failed to remove member');
+        }
+    };
+
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                setActiveMenuProject(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleMenuClick = (e, projectId) => {
+        e.stopPropagation();
+        setActiveMenuProject(activeMenuProject === projectId ? null : projectId);
+    };
+
+    const handleMenuEditProject = (e, project) => {
+        e.stopPropagation();
+        setSelectedProject(project);
+        setActiveMenuProject(null);
+        fetchProjectDetail(project.id);
+    };
+
+    const handleMenuDeleteProject = async (e, projectId) => {
+        e.stopPropagation();
+        const ok = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
+        if (!ok) return;
+        try {
+            await api.delete(`/projects/${projectId}`);
+            setActiveMenuProject(null);
+            setSelectedProject(null);
+            setProjectDetail(null);
+            fetchProjects();
+            alert('Project deleted successfully');
+        } catch (err) {
+            console.error(err);
+            alert(err?.response?.data?.error || 'Failed to delete project');
+        }
+    };
+
+    const handleMenuCloseProject = async (e, projectId) => {
+        e.stopPropagation();
+        const ok = window.confirm('Close this project? Team members will not be able to submit reports.');
+        if (!ok) return;
+        try {
+            const updated = await api.patch(`/projects/${projectId}/close`, {});
+            setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+            setActiveMenuProject(null);
+            alert('Project closed');
+        } catch (err) {
+            console.error(err);
+            alert(err?.response?.data?.error || 'Failed to close project');
+        }
+    };
+
+    const handleMenuReopenProject = async (e, projectId) => {
+        e.stopPropagation();
+        const ok = window.confirm('Reopen this project? Team members will be able to submit reports again.');
+        if (!ok) return;
+        try {
+            const updated = await api.patch(`/projects/${projectId}/reopen`, {});
+            setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+            setActiveMenuProject(null);
+            alert('Project reopened');
+        } catch (err) {
+            console.error(err);
+            alert(err?.response?.data?.error || 'Failed to reopen project');
+        }
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'Active': return '#3B82F6';
@@ -170,7 +267,107 @@ const HRProjectsPage = () => {
                             }}>
                                 {project.status}
                             </span>
-                            <MoreVertical size={18} color="var(--text-muted)" />
+                            <div style={{ position: 'relative' }} ref={activeMenuProject === project.id ? menuRef : null}>
+                                <button
+                                    onClick={(e) => handleMenuClick(e, project.id)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Project menu"
+                                >
+                                    <MoreVertical size={18} color="var(--text-muted)" />
+                                </button>
+                                {activeMenuProject === project.id && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '24px',
+                                        right: 0,
+                                        background: 'var(--card-bg)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '8px',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                        zIndex: 1000,
+                                        minWidth: '200px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <button
+                                            onClick={(e) => handleMenuEditProject(e, project)}
+                                            style={{
+                                                width: '100%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '10px 14px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontSize: '13px',
+                                                color: 'var(--text-main)',
+                                                textAlign: 'left',
+                                                transition: 'background 0.15s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--input-bg)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                        >
+                                            <Edit size={16} /> View/Edit Details
+                                        </button>
+                                        <button
+                                            onClick={(e) => project.status === 'Active' ? handleMenuCloseProject(e, project.id) : handleMenuReopenProject(e, project.id)}
+                                            style={{
+                                                width: '100%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '10px 14px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontSize: '13px',
+                                                color: 'var(--text-main)',
+                                                textAlign: 'left',
+                                                transition: 'background 0.15s',
+                                                borderTop: '1px solid var(--border)'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--input-bg)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                        >
+                                            {project.status === 'Active' ? (
+                                                <><Lock size={16} /> Close Project</>
+                                            ) : (
+                                                <><Unlock size={16} /> Reopen Project</>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleMenuDeleteProject(e, project.id)}
+                                            style={{
+                                                width: '100%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '10px 14px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontSize: '13px',
+                                                color: '#DC2626',
+                                                textAlign: 'left',
+                                                transition: 'background 0.15s',
+                                                borderTop: '1px solid var(--border)'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = '#FEE2E2'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                        >
+                                            <Trash2 size={16} /> Delete Project
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{project.name}</h3>
@@ -251,18 +448,31 @@ const HRProjectsPage = () => {
 
                     <section style={{ marginBottom: '40px' }}>
                         <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Users size={18} color="var(--primary)" /> Team Members
+                            <Users size={18} color="var(--primary)" /> Team Members ({projectDetail.members?.length || 0})
                         </h3>
+                        <div style={{ marginBottom: '16px', display: 'grid', gap: '8px', gridTemplateColumns: '1fr auto' }}>
+                            <select value={selectedMemberEmployee || ''} onChange={(e) => setSelectedMemberEmployee(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
+                                <option value="">Select employee to add...</option>
+                                {employees.map((emp) => {
+                                    const isAlreadyMember = (projectDetail.members || []).some(m => m.id === emp.id);
+                                    return !isAlreadyMember ? <option key={emp.id} value={emp.id}>{emp.full_name}</option> : null;
+                                })}
+                            </select>
+                            <button onClick={handleAddMember} disabled={!selectedMemberEmployee} style={{ padding: '8px 14px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: selectedMemberEmployee ? 'pointer' : 'not-allowed', opacity: selectedMemberEmployee ? 1 : 0.6 }}>Add</button>
+                        </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                             {projectDetail.members.map((m, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-                                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
-                                        {m.full_name[0]}
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
+                                            {m.full_name[0]}
+                                        </div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <p style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{m.full_name}</p>
+                                            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{m.role || 'Member'}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{m.full_name}</p>
-                                        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{m.role || 'Member'}</p>
-                                    </div>
+                                    <button onClick={() => handleRemoveMember(m.id)} style={{ padding: '4px 8px', background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Remove</button>
                                 </div>
                             ))}
                         </div>

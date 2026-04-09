@@ -22,6 +22,11 @@ const HRPerformancePage = () => {
     const [reviewRatings, setReviewRatings] = useState([]); // [{ goal_id, rating, comment }]
     const [submittingReview, setSubmittingReview] = useState(false);
     const [goalsLoading, setGoalsLoading] = useState(false);
+    const [goalModal, setGoalModal] = useState(null); // { employee_id, cycle_id, full_name }
+    const [goalForm, setGoalForm] = useState({ title: '', description: '', target: '' });
+    const [submittingGoal, setSubmittingGoal] = useState(false);
+    const [goalList, setGoalList] = useState([]);
+    const [editingGoalId, setEditingGoalId] = useState(null);
 
     // Add Employee States
     const [addEmployeeModal, setAddEmployeeModal] = useState(null); // cycle_id
@@ -125,6 +130,72 @@ const HRPerformancePage = () => {
             alert('Failed to add employee to cycle');
         } finally {
             setAddingEmployee(false);
+        }
+    };
+
+    const openGoalModal = (employeeId, fullName, cycleId, cycleStatus) => {
+        setGoalModal({ employee_id: employeeId, full_name: fullName, cycle_id: cycleId, cycle_status: cycleStatus });
+        setGoalForm({ title: '', description: '', target: '' });
+        setEditingGoalId(null);
+        setGoalList([]);
+        loadEmployeeGoals(employeeId, cycleId);
+    };
+
+    const loadEmployeeGoals = async (employeeId, cycleId) => {
+        try {
+            const goals = await api.get(`/performance/goals?employee_id=${employeeId}&cycle_id=${cycleId}`);
+            setGoalList(goals || []);
+        } catch (error) {
+            console.error('Failed to load assigned goals', error);
+            alert(error?.response?.data?.error || 'Failed to load assigned goals');
+        }
+    };
+
+    const startEditGoal = (goal) => {
+        setEditingGoalId(goal.id);
+        setGoalForm({
+            title: goal.title || '',
+            description: goal.description || '',
+            target: goal.target || ''
+        });
+    };
+
+    const resetGoalEditor = () => {
+        setEditingGoalId(null);
+        setGoalForm({ title: '', description: '', target: '' });
+    };
+
+    const submitAssignedGoal = async (e) => {
+        e.preventDefault();
+        if (!goalModal) return;
+
+        try {
+            setSubmittingGoal(true);
+            if (editingGoalId) {
+                await api.patch(`/performance/goals/${editingGoalId}`, {
+                    title: goalForm.title,
+                    description: goalForm.description,
+                    target: goalForm.target
+                });
+            } else {
+                await api.post('/performance/goals', {
+                    cycle_id: goalModal.cycle_id,
+                    employee_id: goalModal.employee_id,
+                    title: goalForm.title,
+                    description: goalForm.description,
+                    target: goalForm.target
+                });
+            }
+            setGoalForm({ title: '', description: '', target: '' });
+            setEditingGoalId(null);
+            await loadEmployeeGoals(goalModal.employee_id, goalModal.cycle_id);
+            await fetchData();
+            alert(editingGoalId ? 'Goal updated successfully' : 'Goal assigned successfully');
+        } catch (error) {
+            console.error('Assign goal failed', error);
+            alert(error?.response?.data?.error || 'Failed to save goal');
+        } finally {
+            setSubmittingGoal(false);
         }
     };
 
@@ -246,7 +317,17 @@ const HRPerformancePage = () => {
                                             ) : employees.map((emp) => (
                                                 <tr key={emp.employee_id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                                                     <td style={{ padding: '8px 6px', fontWeight: '600' }}>{emp.full_name}</td>
-                                                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{emp.goals_count}</td>
+                                                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                            <span>{emp.goals_count}</span>
+                                                            <button
+                                                                onClick={() => openGoalModal(emp.employee_id, emp.full_name, cycle.id, cycle.status)}
+                                                                style={{ padding: '4px 8px', fontSize: '11px', background: '#EEF2FF', color: '#3730A3', border: '1px solid #C7D2FE', borderRadius: '4px', cursor: 'pointer' }}
+                                                            >
+                                                                Goals
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                     <td style={{ padding: '8px 6px', textAlign: 'center', color: emp.self_submitted ? '#16A34A' : '#DC2626' }}>{emp.self_submitted ? 'Done' : 'Pending'}</td>
                                                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
                                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -352,6 +433,12 @@ const HRPerformancePage = () => {
                                         </div>
                                     )}
 
+                                    {reviewGoals.length === 0 && (
+                                        <div style={{ padding: '14px', borderRadius: '10px', background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', fontSize: '13px' }}>
+                                            No goals assigned for this employee in this cycle. You can still submit overall feedback, or use + Goal from the cycle table to assign goals first.
+                                        </div>
+                                    )}
+
                                     <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                                         <button 
                                             className="btn-primary" 
@@ -376,6 +463,85 @@ const HRPerformancePage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Assign Goal Modal */}
+            {goalModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+                    <div className="card" style={{ width: '100%', maxWidth: '560px', padding: '0', borderRadius: '16px' }}>
+                        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Assign Goal</h2>
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Assigning to {goalModal.full_name}</p>
+                            </div>
+                            <button onClick={() => setGoalModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+                        </div>
+
+                        <form onSubmit={submitAssignedGoal} style={{ padding: '20px', display: 'grid', gap: '12px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>Assigned Goals</label>
+                                {goalModal?.cycle_status !== 'active' && (
+                                    <div style={{ marginBottom: '10px', padding: '10px', borderRadius: '10px', background: '#FEF3C7', border: '1px solid #FCD34D', color: '#92400E', fontSize: '13px' }}>
+                                        This cycle is not active, so goals are view-only.
+                                    </div>
+                                )}
+                                <div style={{ display: 'grid', gap: '10px', marginBottom: '8px' }}>
+                                    {goalList.length === 0 ? (
+                                        <div style={{ padding: '12px', borderRadius: '10px', background: '#F8FAFC', border: '1px dashed #CBD5E1', color: 'var(--text-muted)', fontSize: '13px' }}>
+                                            No goals assigned yet for this employee in this cycle.
+                                        </div>
+                                    ) : goalList.map((goal) => (
+                                        <div key={goal.id} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', background: editingGoalId === goal.id ? '#EEF2FF' : 'white' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <p style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '14px' }}>{goal.title}</p>
+                                                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{goal.description || goal.target}</p>
+                                                    <p style={{ fontSize: '11px', color: '#64748B', marginTop: '6px' }}>Progress: {goal.progress ?? 0}%</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startEditGoal(goal)}
+                                                    disabled={goalModal?.cycle_status !== 'active'}
+                                                    style={{ padding: '4px 8px', fontSize: '11px', background: '#DBEAFE', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer' }}
+                                                >
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {editingGoalId && goalModal?.cycle_status === 'active' && (
+                                    <button type="button" className="btn-secondary" onClick={resetGoalEditor} style={{ height: '36px', borderRadius: '8px', fontSize: '12px' }}>
+                                        Create New Goal Instead
+                                    </button>
+                                )}
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>GOAL TITLE</label>
+                                <input className="input-field" value={goalForm.title} onChange={(e) => setGoalForm((prev) => ({ ...prev, title: e.target.value }))} required placeholder="e.g. Improve API response time" disabled={goalModal?.cycle_status !== 'active'} />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>DESCRIPTION</label>
+                                <input className="input-field" value={goalForm.description} onChange={(e) => setGoalForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="Optional details" disabled={goalModal?.cycle_status !== 'active'} />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>TARGET</label>
+                                <input className="input-field" value={goalForm.target} onChange={(e) => setGoalForm((prev) => ({ ...prev, target: e.target.value }))} required placeholder="e.g. P95 under 200ms" disabled={goalModal?.cycle_status !== 'active'} />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                <button type="submit" className="btn-primary" disabled={submittingGoal || goalModal?.cycle_status !== 'active'} style={{ flex: 1, borderRadius: '8px', height: '42px' }}>
+                                    {submittingGoal ? <Loader2 className="animate-spin" size={16} /> : (editingGoalId ? 'Save Goal Changes' : 'Assign Goal')}
+                                </button>
+                                <button type="button" className="btn-secondary" onClick={() => setGoalModal(null)} disabled={submittingGoal} style={{ flex: 1, borderRadius: '8px', height: '42px' }}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Add Employee Modal */}
             {addEmployeeModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>

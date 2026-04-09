@@ -271,7 +271,7 @@ const HRShiftManagementPage = () => {
                         <button className="btn-secondary" onClick={() => setWeekStart(toYmd(addDays(new Date(`${weekStart}T00:00:00`), -7)))}>Prev Week</button>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Calendar size={14} />
-                            <input className="input-field" type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} style={{ width: '160px' }} />
+                                <input className="input-field" type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} style={{ width: '160px' }} aria-label="Select week start date" title="Select the start date for the week" />
                         </div>
                         <button className="btn-secondary" onClick={() => setWeekStart(toYmd(addDays(new Date(`${weekStart}T00:00:00`), 7)))}>Next Week</button>
 

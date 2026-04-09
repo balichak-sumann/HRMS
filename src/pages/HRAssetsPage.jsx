@@ -202,7 +202,10 @@ const HRAssetsPage = () => {
 
                         <input className="input-field" placeholder="Serial number" value={assetForm.serial_number} onChange={(e) => setAssetForm((prev) => ({ ...prev, serial_number: e.target.value }))} required />
 
-                        <input className="input-field" type="date" value={assetForm.purchase_date} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchase_date: e.target.value }))} max={new Date().toISOString().split('T')[0]} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Purchase Date</label>
+                                <input className="input-field" type="date" value={assetForm.purchase_date} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchase_date: e.target.value }))} max={new Date().toISOString().split('T')[0]} />
+                            </div>
 
                         <input className="input-field" type="number" min="0" step="0.01" placeholder="Value (Rs)" value={assetForm.value} onChange={(e) => setAssetForm((prev) => ({ ...prev, value: e.target.value }))} />
 
@@ -260,6 +263,7 @@ const HRAssetsPage = () => {
                                         <td style={{ padding: '8px' }}>
                                             {asset.status === 'assigned' && asset.active_assignment_id ? (
                                                 <div style={{ display: 'grid', gap: '6px' }}>
+                                                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Return Date</label>
                                                     <input
                                                         className="input-field"
                                                         type="date"
@@ -320,6 +324,7 @@ const HRAssetsPage = () => {
                                                             <option key={employee.id} value={employee.id}>{employee.full_name}</option>
                                                         ))}
                                                     </select>
+                                                        <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>Assignment Date</label>
                                                     <input
                                                         className="input-field"
                                                         type="date"
