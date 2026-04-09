@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Play, Square, Calendar, CheckCircle, AlertCircle, Timer } from 'lucide-react';
+import { Clock, Play, Square, Calendar, CheckCircle, AlertCircle, Timer, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 
 const buildPreciseLocationLabel = (addr = {}, latitude, longitude) => {
@@ -81,6 +81,7 @@ const EmployeeAttendancePage = () => {
     const [selectedDate, setSelectedDate] = useState(getTodayYmd());
     const [isCheckingIn, setIsCheckingIn] = useState(false); // To prevent double-clicks
     const [isCheckingOut, setIsCheckingOut] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [attendance, setAttendance] = useState([]);
     const [todayRecord, setTodayRecord] = useState(null);
     const [todayRecords, setTodayRecords] = useState([]);
@@ -116,7 +117,20 @@ const EmployeeAttendancePage = () => {
             setCurrentTime(new Date());
         }, 1000);
         fetchAttendance();
-        return () => clearInterval(timer);
+
+        // Poll attendance data every 10 seconds (real-time updates for admin/HR changes)
+        // Only poll when viewing today's date to reduce unnecessary API calls
+        const pollInterval = setInterval(() => {
+            const todayYmd = getTodayYmd();
+            if (selectedDate === todayYmd) {
+                fetchAttendance();
+            }
+        }, 10000); // Poll every 10 seconds
+
+        return () => {
+            clearInterval(timer);
+            clearInterval(pollInterval);
+        };
     }, [selectedDate]);
 
     // Deterministic Active Duration Calculation completely decoupled from isolated states
@@ -196,6 +210,16 @@ const EmployeeAttendancePage = () => {
             console.error('Failed to fetch leaves', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleManualRefresh = async () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        try {
+            await fetchAttendance();
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
@@ -436,6 +460,29 @@ const EmployeeAttendancePage = () => {
                         style={{ padding: '7px 12px', fontSize: '13px' }}
                     >
                         Today
+                    </button>
+                    <button
+                        className="btn-secondary"
+                        onClick={handleManualRefresh}
+                        disabled={isRefreshing || loading}
+                        style={{ 
+                            padding: '7px 12px', 
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            opacity: isRefreshing || loading ? 0.6 : 1,
+                            cursor: isRefreshing || loading ? 'not-allowed' : 'pointer'
+                        }}
+                        title="Refresh attendance data"
+                    >
+                        <RefreshCw 
+                            size={16} 
+                            style={{ 
+                                animation: isRefreshing ? 'spin 1s linear infinite' : 'none'
+                            }} 
+                        />
+                        Refresh
                     </button>
                 </div>
             </header>
