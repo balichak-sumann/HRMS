@@ -49,21 +49,15 @@ const HRPayrollEmployeePage = () => {
         return fallback;
     };
 
-    const getBreakupRatios = (settings = {}) => {
+    const getBreakupConfig = (settings = {}) => {
         const basicRatio = toRatio(settings.basic_ratio, 0.4);
-        const hraRatio = toRatio(settings.hra_ratio, 0.2);
-        const conveyanceRatio = toRatio(settings.conveyance_amount, 0.2);
-        const configuredSum = basicRatio + hraRatio + conveyanceRatio;
-
-        if (configuredSum > 1) {
-            return { basicRatio: 0.4, hraRatio: 0.2, conveyanceRatio: 0.2, specialRatio: 0.2 };
-        }
+        const hraOnBasicRatio = toRatio(settings.hra_ratio, 0.4);
+        const conveyanceFixed = Math.max(0, Number(settings.conveyance_amount) || 0);
 
         return {
             basicRatio,
-            hraRatio,
-            conveyanceRatio,
-            specialRatio: Math.max(0, 1 - configuredSum),
+            hraOnBasicRatio,
+            conveyanceFixed,
         };
     };
     const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -167,10 +161,17 @@ const HRPayrollEmployeePage = () => {
 
                 setPayslip((prev) => {
                     const base = prev || buildInitialPayslip(selectedEmp);
+                    const existingLeaveDays = Math.max(0, Number(base.leave_encashment_days) || 0);
+                    const processedDays = Number(metrics.processed_days) || 0;
+                    const attendancePaidDays = Number(metrics.paid_days) || 0;
+                    const autoPaidDays = processedDays > 0
+                        ? Math.min(processedDays, Math.ceil(attendancePaidDays + existingLeaveDays))
+                        : Math.ceil(attendancePaidDays + existingLeaveDays);
                     const next = {
                         ...base,
-                        processed_days: metrics.processed_days,
-                        paid_days: metrics.paid_days,
+                        processed_days: processedDays,
+                        base_attendance_paid_days: attendancePaidDays,
+                        paid_days: autoPaidDays,
                     };
                     return recalculatePayslip(next);
                 });
@@ -193,7 +194,7 @@ const HRPayrollEmployeePage = () => {
         const employeePfDef = Number(settings.fixed_pf_deduction) || 1800;
         const employerPfDef = employeePfDef;
         const insDef = Number(settings.fixed_insurance_deduction) || 450;
-        const { basicRatio, hraRatio, conveyanceRatio, specialRatio } = getBreakupRatios(settings);
+        const { basicRatio, hraOnBasicRatio, conveyanceFixed } = getBreakupConfig(settings);
         const ptaxAmount = Number(settings.fixed_ptax_deduction) || 200;
 
         // Breakup base = full Monthly CTC (deductions are applied separately)
@@ -201,9 +202,14 @@ const HRPayrollEmployeePage = () => {
         
         // Components based on dynamic logic
         const basic = annualSalary > 0 ? Math.round(gross * basicRatio) : 0;
-        const hra = annualSalary > 0 ? Math.round(gross * hraRatio) : 0;
-        const conveyance = annualSalary > 0 ? Math.round(gross * conveyanceRatio) : 0;
-        const specialAllowance = annualSalary > 0 ? Math.max(0, Math.round(gross * specialRatio)) : 0;
+        const hra = annualSalary > 0 ? Math.round(basic * hraOnBasicRatio) : 0;
+        const remainingAfterBasicAndHra = Math.max(0, gross - basic - hra);
+        const conveyance = annualSalary > 0
+            ? Math.min(Math.round(conveyanceFixed), remainingAfterBasicAndHra)
+            : 0;
+        const specialAllowance = annualSalary > 0
+            ? Math.max(0, Math.round(gross - basic - hra - conveyance))
+            : 0;
 
         const ptax = annualSalary > 0 ? ptaxAmount : 0; // Dynamic P Tax
         const otherDeduction = 0;
@@ -220,6 +226,8 @@ const HRPayrollEmployeePage = () => {
             location: employee.location || '',
             processed_days: 31,
             paid_days: 31,
+            base_attendance_paid_days: 31,
+            leave_encashment_days: 0,
             pan_no: employee.pan || '',
             bank_account: employee.bank_account || '',
             bank_name: employee.bank_name || '',
@@ -345,18 +353,79 @@ const HRPayrollEmployeePage = () => {
             };
 
             if (editableToBaseFieldMap[field]) {
-                const factor = getProrationFactor(prev);
+                const processedDays = Number(prev.processed_days) || 0;
+                const leaveEncashmentDays = Math.max(0, Number(prev.leave_encashment_days) || 0);
                 const baseField = editableToBaseFieldMap[field];
-                const recalculatedBase = factor > 0 ? Math.round(normalized / factor) : normalized;
+
+                const nextPayables = {
+                    basic_salary: field === 'basic_salary' ? normalized : Number(prev.basic_salary) || 0,
+                    hra: field === 'hra' ? normalized : Number(prev.hra) || 0,
+                    conveyance: field === 'conveyance' ? normalized : Number(prev.conveyance) || 0,
+                    specialAllowance: field === 'specialAllowance' ? normalized : Number(prev.specialAllowance) || 0,
+                };
+
+                const baseTotal =
+                    (Number(prev.base_basic_salary) || 0) +
+                    (Number(prev.base_hra) || 0) +
+                    (Number(prev.base_conveyance) || 0) +
+                    (Number(prev.base_special_allowance) || 0);
+                const payableTotal =
+                    nextPayables.basic_salary +
+                    nextPayables.hra +
+                    nextPayables.conveyance +
+                    nextPayables.specialAllowance;
+
+                const inferredFactor = baseTotal > 0
+                    ? Math.max(0, payableTotal / baseTotal)
+                    : getProrationFactor(prev);
+
+                const inferredPaidDays = processedDays > 0
+                    ? Math.min(processedDays, inferredFactor * processedDays)
+                    : Number(prev.paid_days) || 0;
+
+                // Business rule: if inferred paid days are decimal, always round up.
+                const autoPaidDays = inferredPaidDays > 0
+                    ? Math.min(processedDays, Math.ceil(inferredPaidDays + leaveEncashmentDays))
+                    : Math.min(processedDays, Math.ceil(leaveEncashmentDays));
+                const effectiveFactor = processedDays > 0 ? autoPaidDays / processedDays : inferredFactor;
+                const recalculatedBase = effectiveFactor > 0 ? Math.round(normalized / effectiveFactor) : normalized;
                 const currentOverrides = prev.manualProratedOverrides || {};
-                const updatedOverrides = factor === 0
+                const updatedOverrides = effectiveFactor === 0
                     ? { ...currentOverrides, [field]: normalized }
                     : currentOverrides;
                 const next = {
                     ...prev,
                     [field]: normalized,
                     [baseField]: recalculatedBase,
+                    paid_days: autoPaidDays,
                     manualProratedOverrides: updatedOverrides,
+                };
+                return recalculatePayslip(next);
+            }
+
+            if (field === 'leave_encashment_days') {
+                const processedDays = Number(prev.processed_days) || 0;
+                const attendancePaidDays = Number(prev.base_attendance_paid_days ?? prev.paid_days) || 0;
+                const leaveDays = Math.max(0, Math.ceil(normalized));
+                const maxExtraDays = Math.max(0, Math.floor(processedDays - attendancePaidDays));
+                const effectiveLeaveDays = Math.min(leaveDays, maxExtraDays);
+                const updatedPaidDays = processedDays > 0
+                    ? Math.min(processedDays, Math.ceil(attendancePaidDays + effectiveLeaveDays))
+                    : Math.ceil(attendancePaidDays + effectiveLeaveDays);
+
+                const baseSalaryEarnings =
+                    (Number(prev.base_basic_salary) || 0) +
+                    (Number(prev.base_hra) || 0) +
+                    (Number(prev.base_conveyance) || 0) +
+                    (Number(prev.base_special_allowance) || 0);
+                const perDayRate = processedDays > 0 ? baseSalaryEarnings / processedDays : 0;
+                const leaveEncashmentAmount = round2(perDayRate * effectiveLeaveDays);
+
+                const next = {
+                    ...prev,
+                    leave_encashment_days: effectiveLeaveDays,
+                    leave_encashment: leaveEncashmentAmount,
+                    paid_days: updatedPaidDays,
                 };
                 return recalculatePayslip(next);
             }
@@ -435,6 +504,8 @@ const HRPayrollEmployeePage = () => {
                 esi_employer: payslip.esi_employer,
                 ptax: payslip.ptax,
                 tds: payslip.tds,
+                leave_encashment_days: payslip.leave_encashment_days,
+                leave_encashment: payslip.leave_encashment,
                 other_deduction: payslip.otherDeduction,
                 gross_salary: payslip.gross_salary,
                 deductions: payslip.deductions,
@@ -559,6 +630,16 @@ const HRPayrollEmployeePage = () => {
                                         <input type="number" value={payslip.specialAllowance} onChange={(e) => updateNumericField('specialAllowance', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
                                     </div>
                                 </div>
+                                <div className="pay-row pay-row-editable">
+                                    <span>Leave Encashment Days</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
+                                        <input type="number" min="0" step="1" value={payslip.leave_encashment_days || 0} onChange={(e) => updateNumericField('leave_encashment_days', e.target.value)} style={{ width: '100%', textAlign: 'right' }} className="input-field" />
+                                    </div>
+                                </div>
+                                <div className="pay-row">
+                                    <span>Leave Encashment Amount</span>
+                                    <span>₹{payslip.leave_encashment || 0}</span>
+                                </div>
                                 <div className="pay-row total"><span>Gross Total (Payable)</span> <span>₹{payslip.gross_salary}</span></div>
                             </div>
                             <div>
@@ -630,20 +711,13 @@ const HRPayrollEmployeePage = () => {
                                         max={payslip.processed_days || 0}
                                         step="0.5"
                                         value={payslip.paid_days || 0}
+                                        onFocus={(e) => e.target.select()}
                                         onChange={(e) => {
                                             if (isHr) return;
                                             updateNumericField('paid_days', e.target.value);
                                         }}
                                         readOnly={isHr}
                                     />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>PF Employer Contribution</label>
-                                    <input className="input-field" type="number" value={payslip.pf_employer || 0} readOnly />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ESI Employer Contribution</label>
-                                    <input className="input-field" type="number" value={payslip.esi_employer || 0} readOnly />
                                 </div>
                             </div>
                         </div>

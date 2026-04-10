@@ -84,9 +84,20 @@ const HRPerformancePage = () => {
         try {
             setReviewModal({ employee_id: employeeId, full_name: fullName, cycle_id: cycleId });
             setGoalsLoading(true);
+            setReviewFeedback('');
+            setReviewRatings([]);
             const goals = await api.get(`/performance/goals?employee_id=${employeeId}&cycle_id=${cycleId}`);
+            const existingAppraisal = await api.get(`/performance/manager-appraisal?employee_id=${employeeId}&cycle_id=${cycleId}`);
+
             setReviewGoals(goals || []);
-            setReviewRatings((goals || []).map(g => ({ goal_id: g.id, rating: 5, comment: '' })));
+            setReviewFeedback(existingAppraisal?.feedback || '');
+
+            const existingByGoal = new Map((existingAppraisal?.items || []).map((item) => [item.goal_id, item]));
+            setReviewRatings((goals || []).map((g) => ({
+                goal_id: g.id,
+                rating: Number(existingByGoal.get(g.id)?.rating || 5),
+                comment: existingByGoal.get(g.id)?.comment || ''
+            })));
         } catch (error) {
             console.error('Failed to fetch goals', error);
             alert('Failed to load employee goals');

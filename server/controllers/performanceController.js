@@ -388,6 +388,53 @@ const submitManagerAppraisal = async (req, res) => {
     }
 };
 
+const getManagerAppraisal = async (req, res) => {
+    const { cycle_id, employee_id } = req.query;
+
+    if (!cycle_id || !employee_id) {
+        return res.status(400).json({ error: 'cycle_id and employee_id are required' });
+    }
+
+    try {
+        const manager = await resolveEmployee(req);
+        if (!manager) return res.status(404).json({ error: 'Manager not found' });
+
+        const allowed = ['hr', 'admin', 'Super Admin'].includes(req.user.role)
+            ? true
+            : await isManagerOf(manager.id, employee_id);
+        if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+
+        const appraisalRes = await pool.query(
+            `SELECT id, cycle_id, employee_id, manager_id, feedback, submitted_at
+             FROM manager_appraisals
+             WHERE cycle_id = $1 AND employee_id = $2 AND manager_id = $3
+             LIMIT 1`,
+            [cycle_id, employee_id, manager.id]
+        );
+
+        if (appraisalRes.rows.length === 0) {
+            return res.json({ feedback: '', items: [] });
+        }
+
+        const appraisal = appraisalRes.rows[0];
+        const itemsRes = await pool.query(
+            `SELECT goal_id, rating, comment
+             FROM manager_appraisal_items
+             WHERE manager_appraisal_id = $1
+             ORDER BY created_at ASC`,
+            [appraisal.id]
+        );
+
+        res.json({
+            ...appraisal,
+            items: itemsRes.rows,
+        });
+    } catch (err) {
+        console.error('getManagerAppraisal error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
 const respondToAppraisal = async (req, res) => {
     const { appraisal_id, comment } = req.body;
 
@@ -706,6 +753,7 @@ module.exports = {
     updateGoalProgress,
     getGoals,
     submitSelfAppraisal,
+    getManagerAppraisal,
     submitManagerAppraisal,
     submitPeerFeedback,
     getPeerFeedback,

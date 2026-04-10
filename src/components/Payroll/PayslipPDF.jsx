@@ -283,6 +283,7 @@ const PayslipPDF = ({ payslip, employee }) => {
     const conveyance = Number(payslip.conveyance) || 0;
     const specialAllowance = Number(payslip.specialAllowance ?? payslip.special_allowance) || 0;
     const leaveEncashment = Number(payslip.leave_encashment) || 0;
+    const leaveEncashmentDays = Number(payslip.leave_encashment_days ?? payslip.manual_leave_encashment_days) || 0;
     const grossPay = Number(payslip.gross_salary) || (basic + hra + conveyance + specialAllowance + leaveEncashment);
 
     const fixedEmployeePf = Number(payslip.fixed_employee_pf ?? payslip.fixed_deductions?.employee_pf) || 0;
@@ -304,7 +305,7 @@ const PayslipPDF = ({ payslip, employee }) => {
         { label: 'HRA', amount: hra },
         { label: 'Conveyance', amount: conveyance },
         { label: 'Special Allowance', amount: specialAllowance },
-        { label: 'Leave Encashment', amount: leaveEncashment },
+        ...(leaveEncashmentDays > 0 ? [{ label: 'Leave Encashment', amount: leaveEncashment }] : []),
     ];
 
     const deductionRows = [

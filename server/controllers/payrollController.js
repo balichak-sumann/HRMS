@@ -347,6 +347,8 @@ const createPayroll = async (req, res) => {
         employee_id, month, year, basic_salary, hra,
         conveyance, special_allowance, allowances, ptax, other_deduction,
         paid_days,
+        leave_encashment_days,
+        leave_encashment,
         gross_salary
     } = req.body;
     const client = await pool.connect();
@@ -372,6 +374,23 @@ const createPayroll = async (req, res) => {
             }
 
             effectivePaidDays = round2(Math.min(parsedPaidDays, attendance.processedDays));
+        }
+
+        let manualEncashmentDays = 0;
+        if (leave_encashment_days !== undefined && leave_encashment_days !== null && leave_encashment_days !== '') {
+            const parsedLeaveDays = Number(leave_encashment_days);
+            if (!Number.isFinite(parsedLeaveDays) || parsedLeaveDays < 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'leave_encashment_days must be a non-negative number.' });
+            }
+            manualEncashmentDays = Math.ceil(parsedLeaveDays);
+        }
+
+        if (manualEncashmentDays > 0) {
+            effectivePaidDays = Math.min(
+                attendance.processedDays,
+                Math.ceil(effectivePaidDays + manualEncashmentDays)
+            );
         }
 
         const prorationFactor = attendance.processedDays > 0
@@ -472,9 +491,17 @@ const createPayroll = async (req, res) => {
         );
 
         const leaveEncashmentIds = approvedEncashmentRes.rows.map((row) => row.id);
-        const leaveEncashment = round2(
+        const approvedLeaveEncashment = round2(
             approvedEncashmentRes.rows.reduce((sum, row) => sum + toNumber(row.encashment_amount), 0)
         );
+        const perDayGross = attendance.processedDays > 0 ? baseGross / attendance.processedDays : 0;
+        const hasManualEncashmentAmount = leave_encashment !== undefined && leave_encashment !== null && leave_encashment !== '';
+        const manualLeaveEncashment = round2(
+            hasManualEncashmentAmount
+                ? toNumber(leave_encashment)
+                : (perDayGross * manualEncashmentDays)
+        );
+        const leaveEncashmentTotal = round2(approvedLeaveEncashment + manualLeaveEncashment);
 
         const totalDeductions = round2(
             totalFixedDeductions
@@ -483,7 +510,7 @@ const createPayroll = async (req, res) => {
             + proratedOtherDeduction
             + statutoryBreakup.tds
         );
-        const totalGross = round2(proratedGross + reimbursements + leaveEncashment);
+        const totalGross = round2(proratedGross + reimbursements + leaveEncashmentTotal);
         const netSalary = round2(totalGross - totalDeductions);
 
         const result = await client.query(
@@ -512,7 +539,7 @@ const createPayroll = async (req, res) => {
                 proratedPtax,
                 statutoryBreakup.tds,
                 reimbursements,
-                leaveEncashment,
+                leaveEncashmentTotal,
                 totalGross,
                 totalDeductions,
                 netSalary,
@@ -564,6 +591,8 @@ const createPayroll = async (req, res) => {
             other_deduction: proratedOtherDeduction,
             reimbursement_claim_count: reimbursementClaimIds.length,
             leave_encashment_request_count: leaveEncashmentIds.length,
+            manual_leave_encashment_days: manualEncashmentDays,
+            manual_leave_encashment_amount: manualLeaveEncashment,
             attendance_summary: {
                 period_start: attendance.startDate,
                 period_end: attendance.endDate,

@@ -21,6 +21,7 @@ router.patch('/goals/:id', authorize(['hr', 'admin', 'Super Admin']), performanc
 router.patch('/goals/:id/progress', authorize(['employee']), performanceController.updateGoalProgress);
 
 router.post('/self-appraisal', authorize(['employee', 'hr']), performanceController.submitSelfAppraisal);
+router.get('/manager-appraisal', authorize(['employee', 'hr', 'admin', 'Super Admin']), performanceController.getManagerAppraisal);
 router.post('/manager-appraisal', authorize(['employee', 'hr']), performanceController.submitManagerAppraisal);
 router.post('/respond', authorize(['employee', 'hr']), performanceController.respondToAppraisal);
 
