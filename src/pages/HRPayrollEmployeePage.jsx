@@ -62,6 +62,44 @@ const HRPayrollEmployeePage = () => {
     };
     const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
+    const normalizeSavedPayrollRow = (row, fallbackEmployee) => {
+        if (!row) return null;
+
+        const normalized = {
+            ...row,
+            month: row.month || month,
+            year: Number(row.year || year),
+            basic_salary: Number(row.basic_salary ?? 0),
+            hra: Number(row.hra ?? 0),
+            conveyance: Number(row.conveyance ?? 0),
+            specialAllowance: Number(row.special_allowance ?? row.specialAllowance ?? 0),
+            allowances: Number(row.allowances ?? 0),
+            reimbursements: Number(row.reimbursements ?? 0),
+            leave_encashment: Number(row.leave_encashment ?? 0),
+            leave_encashment_days: Number(row.leave_encashment_days ?? row.manual_leave_encashment_days ?? 0),
+            gross_salary: Number(row.gross_salary ?? 0),
+            deductions: Number(row.deductions ?? 0),
+            net_salary: Number(row.net_salary ?? 0),
+            tds: Number(row.tds ?? 0),
+            ptax: Number(row.ptax ?? 0),
+            pf_employee: Number(row.pf_employee ?? row.pf ?? 0),
+            pf_employer: Number(row.pf_employer ?? 0),
+            esi_employee: Number(row.esi_employee ?? 0),
+            esi_employer: Number(row.esi_employer ?? 0),
+            bank_account: row.bank_account ?? fallbackEmployee?.bank_account ?? '',
+            bank_name: row.bank_name ?? fallbackEmployee?.bank_name ?? '',
+            pan_no: row.pan_no ?? fallbackEmployee?.pan ?? '',
+            emp_code: row.emp_code ?? fallbackEmployee?.employee_id ?? fallbackEmployee?.id ?? '',
+            designation: row.designation ?? fallbackEmployee?.role ?? '',
+            department: row.department ?? fallbackEmployee?.department ?? '',
+            location: row.location ?? fallbackEmployee?.location ?? '',
+            processed_days: Number(row.processed_days ?? 31),
+            paid_days: Number(row.paid_days ?? 31),
+        };
+
+        return normalized;
+    };
+
     const getProrationFactor = (data) => {
         const processedDays = Number(data?.processed_days) || 0;
         if (processedDays <= 0) return 1;
@@ -73,14 +111,36 @@ const HRPayrollEmployeePage = () => {
         return Math.min(Math.max(paidDays / processedDays, 0), 1);
     };
 
+    const normalizeSlabs = (slabs = []) =>
+        [...slabs].sort((a, b) => (Number(a?.income_from) || 0) - (Number(b?.income_from) || 0));
+
+    const findApplicableSlab = (income, slabs = []) => {
+        const sortedSlabs = normalizeSlabs(slabs);
+        if (sortedSlabs.length === 0) return null;
+
+        const directMatch = sortedSlabs.find((slab) => {
+            const from = Number(slab.income_from) || 0;
+            const to = slab.income_to == null || slab.income_to === ''
+                ? Number.POSITIVE_INFINITY
+                : Number(slab.income_to);
+            return income >= from && income <= to;
+        });
+        if (directMatch) return directMatch;
+
+        const lowerOrEqual = sortedSlabs.filter((slab) => income >= (Number(slab.income_from) || 0));
+        return lowerOrEqual[lowerOrEqual.length - 1] || sortedSlabs[0];
+    };
+
     const getTdsBreakdown = (annualIncome, slabs = []) => {
         const income = Math.max(0, Number(annualIncome) || 0);
+        const applicableSlab = findApplicableSlab(income, slabs);
 
         return slabs.map((slab) => {
             const from = Number(slab.income_from) || 0;
             const to = slab.income_to == null || slab.income_to === '' ? Number.POSITIVE_INFINITY : Number(slab.income_to);
             const rate = Number(slab.rate) || 0;
-            const taxable = income > from ? Math.max(0, Math.min(income, to) - from) : 0;
+            const isApplied = applicableSlab === slab;
+            const taxable = isApplied ? income : 0;
             const tax = taxable * (rate / 100);
 
             return {
@@ -89,27 +149,17 @@ const HRPayrollEmployeePage = () => {
                 rate,
                 taxable_income: round2(taxable),
                 tax_amount: round2(tax),
-                applied: taxable > 0,
+                applied: isApplied,
             };
         });
     };
 
     const computeAnnualTds = (annualIncome, slabs = []) => {
         const income = Math.max(0, Number(annualIncome) || 0);
-        let total = 0;
-
-        for (const slab of slabs) {
-            const from = Number(slab.income_from) || 0;
-            const to = slab.income_to == null ? Number.POSITIVE_INFINITY : Number(slab.income_to);
-            const rate = Number(slab.rate) || 0;
-
-            if (income <= from) continue;
-
-            const taxable = Math.max(0, Math.min(income, to) - from);
-            total += taxable * (rate / 100);
-        }
-
-        return round2(total);
+        const slab = findApplicableSlab(income, slabs);
+        if (!slab) return 0;
+        const rate = Number(slab.rate) || 0;
+        return round2(income * (rate / 100));
     };
 
     useEffect(() => {
@@ -146,7 +196,45 @@ const HRPayrollEmployeePage = () => {
     }, [statutorySettings]);
 
     useEffect(() => {
-        setGeneratedPayrollMeta(null);
+        let active = true;
+
+        const syncExistingPayrollMeta = async () => {
+            if (!selectedEmp?.id) {
+                setGeneratedPayrollMeta(null);
+                return;
+            }
+
+            try {
+                const rows = await api.get('/payroll');
+                if (!active) return;
+
+                const existing = (rows || []).find((row) => (
+                    String(row?.employee_id) === String(selectedEmp.id)
+                    && String(row?.month || '').trim().toLowerCase() === String(month || '').trim().toLowerCase()
+                    && Number(row?.year) === Number(year)
+                ));
+
+                if (existing) {
+                    setGeneratedPayrollMeta(existing);
+                    setPayslip((prev) => normalizeSavedPayrollRow(existing, prev || selectedEmp));
+                } else {
+                    setGeneratedPayrollMeta(null);
+                    setPayslip((prev) => {
+                        if (!prev) return prev;
+                        const { id, ...rest } = prev;
+                        return rest;
+                    });
+                }
+            } catch {
+                if (active) setGeneratedPayrollMeta(null);
+            }
+        };
+
+        syncExistingPayrollMeta();
+
+        return () => {
+            active = false;
+        };
     }, [selectedEmp?.id, month, year]);
 
     useEffect(() => {
@@ -272,29 +360,35 @@ const HRPayrollEmployeePage = () => {
         const ptax = current.ptax != null && current.ptax !== '' ? Number(current.ptax) : 0;
         
         const factor = getProrationFactor(current);
-        const hasZeroFactor = factor === 0;
         const overrides = current.manualProratedOverrides || {};
+        const hasOverride = (key) => overrides[key] !== undefined && overrides[key] !== null;
+        const ctcDerivedBaseGross = baseBasic + baseHra + baseConveyance + baseSpecial;
+        const maxGrossFromCtc = round2(ctcDerivedBaseGross * factor);
 
         // Prorate all Earnings
-        const basic_salary = hasZeroFactor
-            ? Math.max(0, Number(overrides.basic_salary ?? current.basic_salary ?? 0))
+        const basic_salary = hasOverride('basic_salary')
+            ? Math.max(0, Number(overrides.basic_salary) || 0)
             : Math.round(baseBasic * factor);
-        const hra = hasZeroFactor
-            ? Math.max(0, Number(overrides.hra ?? current.hra ?? 0))
+        const hra = hasOverride('hra')
+            ? Math.max(0, Number(overrides.hra) || 0)
             : Math.round(baseHra * factor);
-        const conveyance = hasZeroFactor
-            ? Math.max(0, Number(overrides.conveyance ?? current.conveyance ?? 0))
+        const conveyance = hasOverride('conveyance')
+            ? Math.max(0, Number(overrides.conveyance) || 0)
             : Math.round(baseConveyance * factor);
-        const specialAllowance = hasZeroFactor
-            ? Math.max(0, Number(overrides.specialAllowance ?? current.specialAllowance ?? 0))
+        const requestedSpecial = hasOverride('specialAllowance')
+            ? Math.max(0, Number(overrides.specialAllowance) || 0)
             : Math.round(baseSpecial * factor);
-        const allowances = conveyance + specialAllowance;
-        const baseSalaryEarnings = basic_salary + hra + allowances;
 
         // Include reimbursements and leave encashment in gross (matches backend calculation)
         const reimbursements = round2(Number(current.reimbursements) || 0);
         const leaveEncashment = round2(Number(current.leave_encashment) || 0);
-        const gross_salary = baseSalaryEarnings + reimbursements + leaveEncashment;
+        const maxEarningsFromCtc = Math.max(0, round2(maxGrossFromCtc - reimbursements - leaveEncashment));
+        const fixedEarnings = round2(basic_salary + hra + conveyance);
+        const allowedSpecial = Math.max(0, round2(maxEarningsFromCtc - fixedEarnings));
+        const specialAllowance = Math.min(requestedSpecial, allowedSpecial);
+        const allowances = round2(conveyance + specialAllowance);
+        const baseSalaryEarnings = round2(basic_salary + hra + allowances);
+        const gross_salary = round2(Math.min(maxGrossFromCtc, baseSalaryEarnings + reimbursements + leaveEncashment));
 
         const fixedEmployeePf = Number(statutorySettings?.settings?.fixed_pf_deduction) || 0;
         const fixedEmployerPf = fixedEmployeePf;
@@ -345,60 +439,63 @@ const HRPayrollEmployeePage = () => {
             if (!prev) return prev;
             const parsed = value === '' ? 0 : Number(value);
             const normalized = Number.isNaN(parsed) ? 0 : parsed;
-            const editableToBaseFieldMap = {
-                basic_salary: 'base_basic_salary',
-                hra: 'base_hra',
-                conveyance: 'base_conveyance',
-                specialAllowance: 'base_special_allowance',
-            };
+            const editableFields = ['basic_salary', 'hra', 'conveyance', 'specialAllowance'];
 
-            if (editableToBaseFieldMap[field]) {
-                const processedDays = Number(prev.processed_days) || 0;
-                const leaveEncashmentDays = Math.max(0, Number(prev.leave_encashment_days) || 0);
-                const baseField = editableToBaseFieldMap[field];
-
-                const nextPayables = {
-                    basic_salary: field === 'basic_salary' ? normalized : Number(prev.basic_salary) || 0,
-                    hra: field === 'hra' ? normalized : Number(prev.hra) || 0,
-                    conveyance: field === 'conveyance' ? normalized : Number(prev.conveyance) || 0,
-                    specialAllowance: field === 'specialAllowance' ? normalized : Number(prev.specialAllowance) || 0,
-                };
-
-                const baseTotal =
+            if (editableFields.includes(field)) {
+                const inputValue = Math.max(0, normalized);
+                const factor = getProrationFactor(prev);
+                const ctcDerivedBaseGross =
                     (Number(prev.base_basic_salary) || 0) +
                     (Number(prev.base_hra) || 0) +
                     (Number(prev.base_conveyance) || 0) +
                     (Number(prev.base_special_allowance) || 0);
-                const payableTotal =
-                    nextPayables.basic_salary +
-                    nextPayables.hra +
-                    nextPayables.conveyance +
-                    nextPayables.specialAllowance;
+                const ctcGrossCap = round2(ctcDerivedBaseGross * factor);
+                const reimbursements = round2(Number(prev.reimbursements) || 0);
+                const leaveEncashment = round2(Number(prev.leave_encashment) || 0);
+                const maxEarningsFromCtc = Math.max(0, round2(ctcGrossCap - reimbursements - leaveEncashment));
 
-                const inferredFactor = baseTotal > 0
-                    ? Math.max(0, payableTotal / baseTotal)
-                    : getProrationFactor(prev);
+                const nextPayables = {
+                    basic_salary: Math.max(0, Number(prev.basic_salary) || 0),
+                    hra: Math.max(0, Number(prev.hra) || 0),
+                    conveyance: Math.max(0, Number(prev.conveyance) || 0),
+                    specialAllowance: Math.max(0, Number(prev.specialAllowance) || 0),
+                };
 
-                const inferredPaidDays = processedDays > 0
-                    ? Math.min(processedDays, inferredFactor * processedDays)
-                    : Number(prev.paid_days) || 0;
+                if (field === 'specialAllowance') {
+                    const fixedWithoutSpecial = round2(
+                        nextPayables.basic_salary +
+                        nextPayables.hra +
+                        nextPayables.conveyance
+                    );
+                    const maxSpecial = Math.max(0, round2(maxEarningsFromCtc - fixedWithoutSpecial));
+                    nextPayables.specialAllowance = Math.min(inputValue, maxSpecial);
+                } else {
+                    nextPayables[field] = inputValue;
+                    const fixedWithoutSpecial = round2(
+                        nextPayables.basic_salary +
+                        nextPayables.hra +
+                        nextPayables.conveyance
+                    );
+                    if (fixedWithoutSpecial > maxEarningsFromCtc) {
+                        const excess = round2(fixedWithoutSpecial - maxEarningsFromCtc);
+                        nextPayables[field] = Math.max(0, round2(nextPayables[field] - excess));
+                    }
 
-                // Business rule: if inferred paid days are decimal, always round up.
-                const autoPaidDays = inferredPaidDays > 0
-                    ? Math.min(processedDays, Math.ceil(inferredPaidDays + leaveEncashmentDays))
-                    : Math.min(processedDays, Math.ceil(leaveEncashmentDays));
-                const effectiveFactor = processedDays > 0 ? autoPaidDays / processedDays : inferredFactor;
-                const recalculatedBase = effectiveFactor > 0 ? Math.round(normalized / effectiveFactor) : normalized;
-                const currentOverrides = prev.manualProratedOverrides || {};
-                const updatedOverrides = effectiveFactor === 0
-                    ? { ...currentOverrides, [field]: normalized }
-                    : currentOverrides;
+                    const fixedAfterClamp = round2(
+                        nextPayables.basic_salary +
+                        nextPayables.hra +
+                        nextPayables.conveyance
+                    );
+                    nextPayables.specialAllowance = Math.max(0, round2(maxEarningsFromCtc - fixedAfterClamp));
+                }
+
                 const next = {
                     ...prev,
-                    [field]: normalized,
-                    [baseField]: recalculatedBase,
-                    paid_days: autoPaidDays,
-                    manualProratedOverrides: updatedOverrides,
+                    ...nextPayables,
+                    manualProratedOverrides: {
+                        ...(prev.manualProratedOverrides || {}),
+                        ...nextPayables,
+                    },
                 };
                 return recalculatePayslip(next);
             }
@@ -512,7 +609,7 @@ const HRPayrollEmployeePage = () => {
                 net_salary: payslip.net_salary
             });
             if (created?.id) {
-                setPayslip((prev) => (prev ? { ...prev, id: created.id } : prev));
+                setPayslip((prev) => normalizeSavedPayrollRow(created, prev || selectedEmp));
             }
             setGeneratedPayrollMeta(created || null);
             toast.success('Payslip generated and saved successfully!');
@@ -552,10 +649,12 @@ const HRPayrollEmployeePage = () => {
         );
     }
 
-    const previewAnnualIncome = round2((Number(payslip.gross_salary) || 0) * 12);
+    const previewAnnualIncome = round2(Math.max(0, Number(selectedEmp.salary) || 0));
     const previewBreakdown = getTdsBreakdown(previewAnnualIncome, statutorySettings?.tds_slabs || []);
     const generatedBreakdown = generatedPayrollMeta?.statutory_breakup?.tds_breakdown || [];
     const generatedAnnualTaxable = generatedPayrollMeta?.annual_taxable_income;
+    const savedPayrollId = payslip?.id || generatedPayrollMeta?.id || null;
+    const hasSavedPayslip = Boolean(savedPayrollId);
 
     return (
         <>
@@ -768,16 +867,16 @@ const HRPayrollEmployeePage = () => {
                         <button 
                             id="confirm-save-btn" 
                             onClick={generatePayslip} 
-                            disabled={generating || !!generatedPayrollMeta} 
-                            className={generatedPayrollMeta ? 'generated-success' : generating ? 'generating' : 'normal'}
+                            disabled={generating} 
+                            className={hasSavedPayslip && !generating ? 'generated-success' : generating ? 'generating' : 'normal'}
                         >
-                            {generating ? <Loader2 className="animate-spin" size={18} /> : generatedPayrollMeta ? <CheckCircle size={18} /> : <CheckCircle size={18} />}
-                            {generating ? 'Generating...' : generatedPayrollMeta ? 'Payslip Generated' : 'Confirm & Save Payslip'}
+                            {generating ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+                            {generating ? (hasSavedPayslip ? 'Saving Updates...' : 'Generating...') : hasSavedPayslip ? 'Payslip Saved (Click to Update)' : 'Confirm & Save Payslip'}
                         </button>
 
                         <button
                             onClick={async () => {
-                                if (!payslip?.id) {
+                                if (!savedPayrollId) {
                                     toast.error('Payslip must be saved first before sending email');
                                     return;
                                 }
@@ -788,8 +887,10 @@ const HRPayrollEmployeePage = () => {
                                     const fileName = `Payslip_${selectedEmp.full_name}_${payslip.month}_${payslip.year}.pdf`;
                                     formData.append('payslipPdf', blob, fileName);
                                     formData.append('pdfFileName', fileName);
+                                    formData.append('net_salary', String(payslip.net_salary ?? ''));
+                                    formData.append('gross_salary', String(payslip.gross_salary ?? ''));
 
-                                    await api.post(`/payroll/${payslip.id}/send`, formData);
+                                    await api.post(`/payroll/${savedPayrollId}/send`, formData);
                                     toast.success('Payslip sent successfully to ' + selectedEmp.email);
                                 } catch (error) {
                                     toast.error(error.message || 'Failed to send payslip email');
@@ -799,7 +900,7 @@ const HRPayrollEmployeePage = () => {
                             }}
                             className="btn-secondary"
                             style={{ flex: 1, background: '#F3F4F6', color: '#000000' }}
-                            disabled={generating || !payslip?.id}
+                            disabled={generating || !savedPayrollId}
                         >
                             {generating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />} Send Email
                         </button>
@@ -837,16 +938,29 @@ const HRPayrollEmployeePage = () => {
                 }
                 #confirm-save-btn.normal {
                     background-color: #3B82F6 !important;
-                    color: #000000 !important;
+                    color: #FFFFFF !important;
                     cursor: pointer;
+                }
+                #confirm-save-btn.normal:active {
+                    transform: translateY(1px);
+                    filter: brightness(0.95);
                 }
                 #confirm-save-btn.generating {
                     background-color: #6B7280 !important;
                     color: #FFFFFF !important;
                     cursor: not-allowed;
                 }
+                #confirm-save-btn.generated-success {
+                    background-color: #059669 !important;
+                    color: #FFFFFF !important;
+                    cursor: not-allowed;
+                }
                 #confirm-save-btn:disabled {
                     background-color: #6B7280 !important;
+                    color: #FFFFFF !important;
+                }
+                #confirm-save-btn.generated-success:disabled {
+                    background-color: #059669 !important;
                     color: #FFFFFF !important;
                 }
 

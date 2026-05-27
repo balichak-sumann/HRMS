@@ -785,6 +785,7 @@ const deleteEmployee = async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
+        const actorRole = String(req.user?.role || '').toLowerCase();
 
         await client.query('BEGIN');
 
@@ -795,6 +796,30 @@ const deleteEmployee = async (req, res) => {
         }
 
         const employee = employeeResult.rows[0];
+
+        const targetProfileRoleRes = await client.query(
+            `SELECT role
+             FROM profiles
+             WHERE employee_id = $1 OR email = $2
+             ORDER BY CASE
+                 WHEN LOWER(role) = 'admin' THEN 1
+                 WHEN LOWER(role) = 'hr' THEN 2
+                 ELSE 3
+             END
+             LIMIT 1`,
+            [employee.id, employee.email]
+        );
+        const targetRole = String(targetProfileRoleRes.rows[0]?.role || 'employee').toLowerCase();
+
+        if (actorRole === 'hr' && targetRole !== 'employee') {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ error: 'HR can deactivate only employee accounts.' });
+        }
+
+        if (actorRole === 'admin' && !['employee', 'hr'].includes(targetRole)) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ error: 'Admin can deactivate only HR and employee accounts.' });
+        }
 
         const statusResult = await client.query('SELECT status FROM employees WHERE id = $1', [id]);
         const currentStatus = (statusResult.rows[0]?.status || '').toLowerCase();

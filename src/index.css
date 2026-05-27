@@ -115,6 +115,14 @@ body {
   box-sizing: border-box;
 }
 
+/* Keep a single password visibility toggle in login form. */
+.login-password-input::-ms-reveal,
+.login-password-input::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 h1,
 h2,
 h3,

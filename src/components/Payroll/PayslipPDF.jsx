@@ -284,7 +284,10 @@ const PayslipPDF = ({ payslip, employee }) => {
     const specialAllowance = Number(payslip.specialAllowance ?? payslip.special_allowance) || 0;
     const leaveEncashment = Number(payslip.leave_encashment) || 0;
     const leaveEncashmentDays = Number(payslip.leave_encashment_days ?? payslip.manual_leave_encashment_days) || 0;
-    const grossPay = Number(payslip.gross_salary) || (basic + hra + conveyance + specialAllowance + leaveEncashment);
+    const hasStoredGrossPay = payslip.gross_salary !== undefined && payslip.gross_salary !== null && payslip.gross_salary !== '';
+    const grossPay = hasStoredGrossPay
+        ? round2(Number(payslip.gross_salary))
+        : round2(basic + hra + conveyance + specialAllowance + leaveEncashment);
 
     const fixedEmployeePf = Number(payslip.fixed_employee_pf ?? payslip.fixed_deductions?.employee_pf) || 0;
     const fixedEmployerPf = Number(payslip.fixed_employer_pf ?? payslip.fixed_deductions?.employer_pf) || 0;
@@ -292,13 +295,14 @@ const PayslipPDF = ({ payslip, employee }) => {
     const tds = Number(payslip.tds) || 0;
     const professionalTax = Number(payslip.ptax ?? payslip.professional_tax) || 0;
     const knownDeductions = round2(fixedEmployeePf + fixedEmployerPf + fixedInsurance + tds + professionalTax);
-    const persistedDeductions = Number(payslip.deductions) || 0;
+    const hasPersistedDeductions = payslip.deductions !== undefined && payslip.deductions !== null && payslip.deductions !== '';
+    const persistedDeductions = hasPersistedDeductions ? round2(Number(payslip.deductions)) : 0;
     const explicitOtherDeduction = Number(payslip.other_deduction ?? payslip.otherDeduction) || 0;
     const residualOtherDeduction = persistedDeductions > round2(knownDeductions + explicitOtherDeduction)
         ? round2(persistedDeductions - knownDeductions - explicitOtherDeduction)
         : 0;
     const otherDeduction = round2(explicitOtherDeduction + residualOtherDeduction);
-    const totalDeductions = persistedDeductions || round2(knownDeductions + otherDeduction);
+    const totalDeductions = hasPersistedDeductions ? persistedDeductions : round2(knownDeductions + otherDeduction);
 
     const earningRows = [
         { label: 'Basic', amount: basic },
@@ -320,7 +324,8 @@ const PayslipPDF = ({ payslip, employee }) => {
     const rowCount = Math.max(earningRows.length, deductionRows.length || 0);
 
     // Net Pay based strictly on the split above to ensure math is perfect
-    const netPay = round2(grossPay - totalDeductions);
+    const hasStoredNetPay = payslip.net_salary !== undefined && payslip.net_salary !== null && payslip.net_salary !== '';
+    const netPay = hasStoredNetPay ? round2(Number(payslip.net_salary)) : round2(grossPay - totalDeductions);
     const netWords = numberToWords(netPay);
 
     return (

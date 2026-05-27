@@ -49,6 +49,36 @@ app.use((req, res, next) => {
     next();
 });
 
+// Broadcast successful data mutations so open clients can refresh without hard reloads.
+app.use((req, res, next) => {
+    const mutationMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+    const isApiRequest = req.originalUrl.startsWith('/api/');
+
+    if (!isApiRequest || !mutationMethods.has(req.method)) {
+        return next();
+    }
+
+    res.on('finish', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) return;
+
+        const parts = req.originalUrl.split('?')[0].split('/').filter(Boolean);
+        const apiIndex = parts.indexOf('api');
+        const resource = apiIndex >= 0 ? parts[apiIndex + 1] || 'unknown' : 'unknown';
+
+        io.emit('data_changed', {
+            resource,
+            path: req.originalUrl,
+            method: req.method,
+            statusCode: res.statusCode,
+            actorId: req.user?.id || req.user?.employee_id || null,
+            actorRole: req.user?.role || null,
+            timestamp: new Date().toISOString(),
+        });
+    });
+
+    next();
+});
+
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));

@@ -28,10 +28,8 @@ const ensurePayrollSchemaCompatibility = async () => {
         ADD COLUMN IF NOT EXISTS fixed_ptax_deduction DECIMAL(10,2) DEFAULT 200
     `);
 
-    await pool.query(`
-        ALTER TABLE payroll
-        ADD COLUMN IF NOT EXISTS gross_salary DECIMAL(10,2) DEFAULT NULL
-    `);
+    await pool.query(`ALTER TABLE payroll ADD COLUMN IF NOT EXISTS gross_salary DECIMAL(10,2) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE payroll ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
 
     payrollSchemaEnsured = true;
 };
@@ -247,42 +245,43 @@ const getStatutorySettingsData = async () => {
 
 const computeAnnualTdsDetails = (annualIncome, slabs) => {
     const income = Math.max(0, Number(annualIncome) || 0);
-    let annualTds = 0;
-    const breakdown = [];
+    const orderedSlabs = [...(slabs || [])].sort(
+        (a, b) => (Number(a?.income_from) || 0) - (Number(b?.income_from) || 0)
+    );
+    const findApplicableSlab = () => {
+        const directMatch = orderedSlabs.find((slab) => {
+            const from = Number(slab.income_from) || 0;
+            const to = slab.income_to == null ? Number.POSITIVE_INFINITY : Number(slab.income_to);
+            return income >= from && income <= to;
+        });
+        if (directMatch) return directMatch;
+        const lowerOrEqual = orderedSlabs.filter((slab) => income >= (Number(slab.income_from) || 0));
+        return lowerOrEqual[lowerOrEqual.length - 1] || orderedSlabs[0] || null;
+    };
 
-    for (const slab of slabs) {
+    const applicableSlab = findApplicableSlab();
+    const applicableRate = applicableSlab ? (Number(applicableSlab.rate) || 0) : 0;
+    const annualTds = round2(income * (applicableRate / 100));
+    const breakdown = orderedSlabs.map((slab) => {
         const from = Number(slab.income_from) || 0;
         const to = slab.income_to == null ? Number.POSITIVE_INFINITY : Number(slab.income_to);
         const rate = Number(slab.rate) || 0;
         const hasUpperCap = Number.isFinite(to);
+        const isApplied = applicableSlab === slab;
+        const taxableIncome = isApplied ? income : 0;
 
-        if (income <= from) {
-            breakdown.push({
-                income_from: from,
-                income_to: hasUpperCap ? to : null,
-                rate,
-                taxable_income: 0,
-                tax_amount: 0,
-                applied: false,
-            });
-            continue;
-        }
-
-        const taxableInThisSlab = Math.max(0, Math.min(income, to) - from);
-        const taxInThisSlab = taxableInThisSlab * (rate / 100);
-        annualTds += taxInThisSlab;
-        breakdown.push({
+        return {
             income_from: from,
             income_to: hasUpperCap ? to : null,
             rate,
-            taxable_income: round2(taxableInThisSlab),
-            tax_amount: round2(taxInThisSlab),
-            applied: taxableInThisSlab > 0,
-        });
-    }
+            taxable_income: round2(taxableIncome),
+            tax_amount: round2(taxableIncome * (rate / 100)),
+            applied: isApplied,
+        };
+    });
 
     return {
-        annual_tds: round2(annualTds),
+        annual_tds: annualTds,
         breakdown,
     };
 };
@@ -317,22 +316,51 @@ const computeStatutoryBreakup = ({ grossSalary, settings, slabs, annualTaxableIn
 // ─── Get payroll records ─────────────────────────────────────────
 const getPayroll = async (req, res) => {
     try {
+        await ensurePayrollSchemaCompatibility();
 
-        let query = 'SELECT p.*, e.full_name FROM payroll p JOIN employees e ON p.employee_id = e.id';
+        let query = `SELECT p.*, e.full_name
+             FROM payroll p
+             JOIN employees e ON p.employee_id = e.id`;
         let params = [];
 
         if (!['hr', 'admin'].includes(req.user.role)) {
-            const emp = await pool.query('SELECT id FROM employees WHERE email = $1', [req.user.email]);
-            if (emp.rows.length > 0) {
+            const tokenEmployeeUuid = req.user?.employee_uuid || null;
+
+            if (tokenEmployeeUuid) {
                 query += ' WHERE p.employee_id = $1';
-                params.push(emp.rows[0].id);
+                params.push(tokenEmployeeUuid);
             } else {
-                return res.json([]);
+                const emp = await pool.query(
+                    `SELECT id
+                     FROM employees
+                     WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+                     ORDER BY COALESCE(updated_at, created_at) DESC, created_at DESC, id DESC
+                     LIMIT 1`,
+                    [req.user.email]
+                );
+
+                if (emp.rows.length > 0) {
+                    query += ' WHERE p.employee_id = $1';
+                    params.push(emp.rows[0].id);
+                } else {
+                    return res.json([]);
+                }
             }
         }
 
+        query += ' ORDER BY COALESCE(p.updated_at, p.created_at) DESC, p.created_at DESC, p.id DESC';
+
         const result = await pool.query(query, params);
-        res.json(result.rows);
+        const latestByPeriod = new Map();
+
+        for (const row of result.rows) {
+            const key = `${row.employee_id || ''}::${String(row.month || '').trim().toLowerCase()}::${Number(row.year) || ''}`;
+            if (!latestByPeriod.has(key)) {
+                latestByPeriod.set(key, row);
+            }
+        }
+
+        res.json([...latestByPeriod.values()]);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
@@ -420,6 +448,11 @@ const createPayroll = async (req, res) => {
               + toNumber(approvedRevision.proposed_allowances)
             : toNumber(gross_salary, requestedBasic + requestedHra + requestedAllowances);
 
+        const annualCtc = approvedRevision
+            ? Math.max(0, toNumber(approvedRevision.proposed_total_ctc))
+            : Math.max(0, toNumber(employeeRes.rows[0]?.salary));
+        const monthlyCtcGrossCap = round2(annualCtc / 12);
+
         if (!approvedRevision && (requestedBasic <= 0 || requestedHra < 0 || requestedAllowances < 0 || requestedGross <= 0)) {
             await client.query('ROLLBACK');
             return res.status(400).json({
@@ -429,10 +462,20 @@ const createPayroll = async (req, res) => {
 
         const baseBasic = requestedBasic;
         const baseHra = requestedHra;
-        const baseConveyance = requestedConveyance;
-        const baseSpecialAllowance = requestedSpecialAllowance;
-        const baseAllowances = requestedAllowances;
-        const baseGross = requestedGross;
+        const rawConveyance = requestedConveyance;
+        const rawSpecialAllowance = requestedSpecialAllowance;
+        const baseGrossCap = Math.max(0, Math.min(requestedGross, monthlyCtcGrossCap || requestedGross));
+
+        const maxAllowanceBudget = Math.max(0, round2(baseGrossCap - baseBasic - baseHra));
+        const baseConveyance = approvedRevision ? 0 : Math.min(Math.max(0, rawConveyance), maxAllowanceBudget);
+        const baseSpecialAllowance = approvedRevision
+            ? 0
+            : Math.min(Math.max(0, rawSpecialAllowance), Math.max(0, round2(maxAllowanceBudget - baseConveyance)));
+        const baseAllowances = approvedRevision
+            ? requestedAllowances
+            : round2(baseConveyance + baseSpecialAllowance);
+        const computedGross = round2(baseBasic + baseHra + baseAllowances);
+        const baseGross = Math.max(0, Math.min(baseGrossCap || computedGross, computedGross));
         const basePtax = toNumber(ptax);
         const baseOtherDeduction = toNumber(other_deduction);
 
@@ -443,13 +486,12 @@ const createPayroll = async (req, res) => {
         const proratedAllowances = round2(baseAllowances * prorationFactor);
         const proratedPtax = round2(basePtax * prorationFactor);
         const proratedOtherDeduction = round2(baseOtherDeduction);
-        const proratedGross = round2(baseGross * prorationFactor);
+        const maxProratedGrossCap = round2(monthlyCtcGrossCap * prorationFactor);
+        const proratedGross = round2(Math.min(baseGross * prorationFactor, maxProratedGrossCap || (baseGross * prorationFactor)));
 
         const financialYear = getFinancialYearFromPayrollMonth(month, year);
         const approvedDeclarationAmount = await getApprovedDeclarationAmount(employee_id, financialYear, client);
-        const annualBaseIncome = approvedRevision
-            ? Math.max(0, toNumber(approvedRevision.proposed_total_ctc))
-            : Math.max(0, baseGross * 12);
+        const annualBaseIncome = annualCtc;
         const annualTaxableIncome = Math.max(0, annualBaseIncome - approvedDeclarationAmount);
 
         const statutory = await getStatutorySettingsData();
@@ -465,30 +507,48 @@ const createPayroll = async (req, res) => {
         const fixedInsurance = round2(toNumber(statutory.settings?.fixed_insurance_deduction));
         const totalFixedDeductions = round2(fixedEmployeePf + fixedEmployerPf + fixedInsurance);
 
-        const approvedClaimsRes = await client.query(
-            `SELECT id, amount
-             FROM expense_claims
-             WHERE employee_id = $1
-               AND status = 'Approved'
-               AND reimbursed_payroll_id IS NULL
-             ORDER BY reviewed_at ASC, created_at ASC`,
-            [employee_id]
-        );
+                const existingPayrollRes = await client.query(
+                        `SELECT id
+                         FROM payroll
+                         WHERE employee_id = $1
+                             AND LOWER(TRIM(month)) = LOWER(TRIM($2))
+                             AND year = $3
+                         ORDER BY COALESCE(updated_at, created_at) DESC, created_at DESC, id DESC`,
+                        [employee_id, month, year]
+                );
+                const existingPayrollIds = existingPayrollRes.rows.map((row) => row.id);
+                const currentPayrollId = existingPayrollIds[0] || null;
+
+                const approvedClaimsRes = await client.query(
+                        `SELECT id, amount
+                         FROM expense_claims
+                         WHERE employee_id = $1
+                             AND status = 'Approved'
+                             AND (
+                                 reimbursed_payroll_id IS NULL
+                                 OR reimbursed_payroll_id IN ($2)
+                             )
+                         ORDER BY reviewed_at ASC, created_at ASC`,
+                        [employee_id, existingPayrollIds]
+                );
 
         const reimbursementClaimIds = approvedClaimsRes.rows.map((row) => row.id);
         const reimbursements = round2(
             approvedClaimsRes.rows.reduce((sum, row) => sum + toNumber(row.amount), 0)
         );
 
-        const approvedEncashmentRes = await client.query(
-            `SELECT id, encashment_amount
-             FROM leave_encashment_requests
-             WHERE employee_id = $1
-               AND status = 'Approved'
-               AND reimbursed_payroll_id IS NULL
-             ORDER BY reviewed_at ASC, created_at ASC`,
-            [employee_id]
-        );
+                const approvedEncashmentRes = await client.query(
+                        `SELECT id, encashment_amount
+                         FROM leave_encashment_requests
+                         WHERE employee_id = $1
+                             AND status = 'Approved'
+                             AND (
+                                 reimbursed_payroll_id IS NULL
+                                 OR reimbursed_payroll_id IN ($2)
+                             )
+                         ORDER BY reviewed_at ASC, created_at ASC`,
+                        [employee_id, existingPayrollIds]
+                );
 
         const leaveEncashmentIds = approvedEncashmentRes.rows.map((row) => row.id);
         const approvedLeaveEncashment = round2(
@@ -513,39 +573,80 @@ const createPayroll = async (req, res) => {
         const totalGross = round2(proratedGross + reimbursements + leaveEncashmentTotal);
         const netSalary = round2(totalGross - totalDeductions);
 
-        const result = await client.query(
-            `INSERT INTO payroll (
-                employee_id, month, year, emp_code, designation, department, location,
-                processed_days, paid_days, pan_no, bank_account, bank_name,
-                basic_salary, hra, conveyance, special_allowance, allowances,
-                pf, pf_employee, pf_employer, esi_employee, esi_employer,
-                ptax, tds, reimbursements, leave_encashment, gross_salary, deductions, net_salary, status
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7,
-                $8, $9, $10, $11, $12,
-                $13, $14, $15, $16, $17,
-                $18, $19, $20, $21, $22,
-                $23, $24, $25, $26, $27, $28, $29, $30
-            ) RETURNING *`,
-            [
-                employee_id, month, year, emp_code, designation, department, location,
-                attendance.processedDays, effectivePaidDays, pan_no, bank_account, bank_name,
-                proratedBasic, proratedHra, proratedConveyance, proratedSpecialAllowance, proratedAllowances,
-                0,
-                0,
-                0,
-                0,
-                0,
-                proratedPtax,
-                statutoryBreakup.tds,
-                reimbursements,
-                leaveEncashmentTotal,
-                totalGross,
-                totalDeductions,
-                netSalary,
-                'Generated'
-            ]
-        );
+        const payrollValues = [
+            employee_id, month, year, emp_code, designation, department, location,
+            attendance.processedDays, effectivePaidDays, pan_no, bank_account, bank_name,
+            proratedBasic, proratedHra, proratedConveyance, proratedSpecialAllowance, proratedAllowances,
+            0,
+            0,
+            0,
+            0,
+            0,
+            proratedPtax,
+            statutoryBreakup.tds,
+            reimbursements,
+            leaveEncashmentTotal,
+            totalGross,
+            totalDeductions,
+            netSalary,
+            'Generated'
+        ];
+
+        const result = existingPayrollRes.rows[0]
+            ? await client.query(
+                `UPDATE payroll
+                 SET employee_id = $1,
+                     month = $2,
+                     year = $3,
+                     emp_code = $4,
+                     designation = $5,
+                     department = $6,
+                     location = $7,
+                     processed_days = $8,
+                     paid_days = $9,
+                     pan_no = $10,
+                     bank_account = $11,
+                     bank_name = $12,
+                     basic_salary = $13,
+                     hra = $14,
+                     conveyance = $15,
+                     special_allowance = $16,
+                     allowances = $17,
+                     pf = $18,
+                     pf_employee = $19,
+                     pf_employer = $20,
+                     esi_employee = $21,
+                     esi_employer = $22,
+                     ptax = $23,
+                     tds = $24,
+                     reimbursements = $25,
+                     leave_encashment = $26,
+                     gross_salary = $27,
+                     deductions = $28,
+                     net_salary = $29,
+                     status = $30,
+                     sent_at = NULL,
+                     updated_at = NOW()
+                 WHERE id = $31
+                 RETURNING *`,
+                [...payrollValues, existingPayrollRes.rows[0].id]
+            )
+            : await client.query(
+                `INSERT INTO payroll (
+                    employee_id, month, year, emp_code, designation, department, location,
+                    processed_days, paid_days, pan_no, bank_account, bank_name,
+                    basic_salary, hra, conveyance, special_allowance, allowances,
+                    pf, pf_employee, pf_employer, esi_employee, esi_employer,
+                    ptax, tds, reimbursements, leave_encashment, gross_salary, deductions, net_salary, status, updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7,
+                    $8, $9, $10, $11, $12,
+                    $13, $14, $15, $16, $17,
+                    $18, $19, $20, $21, $22,
+                    $23, $24, $25, $26, $27, $28, $29, $30, NOW()
+                ) RETURNING *`,
+                payrollValues
+            );
 
         if (reimbursementClaimIds.length > 0) {
             await client.query(
@@ -671,8 +772,8 @@ const updateStatutorySettings = async (req, res) => {
         const parsedEsiEmployerRate = Number(esi_employer_rate);
         
         const parsedBasicRatio = toNumber(basic_ratio, 0.4);
-        const parsedHraRatio = toNumber(hra_ratio, 0.2);
-        const parsedConveyance = toNumber(conveyance_amount, 0.2);
+        const parsedHraRatio = toNumber(hra_ratio, 0.4);
+        const parsedConveyance = toNumber(conveyance_amount, 2000);
         const parsedFixedPf = toNumber(fixed_pf_deduction, 1800);
         const parsedFixedEmployerPf = parsedFixedPf;
         const parsedFixedInsurance = toNumber(fixed_insurance_deduction, 450);
@@ -683,15 +784,14 @@ const updateStatutorySettings = async (req, res) => {
             return res.status(400).json({ error: 'Invalid statutory contribution rates' });
         }
 
-        if (![parsedBasicRatio, parsedHraRatio, parsedConveyance].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
+        if (![parsedBasicRatio, parsedHraRatio].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Salary breakup percentages must be between 0% and 100%' });
+            return res.status(400).json({ error: 'Basic and HRA percentages must be between 0% and 100%' });
         }
 
-        const parsedSpecialRatio = round2(1 - (parsedBasicRatio + parsedHraRatio + parsedConveyance));
-        if (parsedSpecialRatio < 0 || Math.abs((parsedBasicRatio + parsedHraRatio + parsedConveyance + parsedSpecialRatio) - 1) > 0.01) {
+        if (!Number.isFinite(parsedConveyance) || parsedConveyance < 0) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Basic + HRA + Conveyance + Special Allowance must total 100%' });
+            return res.status(400).json({ error: 'Conveyance amount must be a non-negative fixed value' });
         }
 
         if (!settingsId) {
@@ -872,8 +972,10 @@ const getPayrollAttendanceMetrics = async (req, res) => {
 // ─── Send payslip (HR) ──────────────────────────────────────────
 const sendPayslip = async (req, res) => {
     try {
+        await ensurePayrollSchemaCompatibility();
+
         const { sendPayslipEmail } = require('../services/emailService');
-        const { pdfFileName } = req.body || {};
+        const { pdfFileName, net_salary: netSalaryText, gross_salary: grossSalaryText } = req.body || {};
 
         const pdfBuffer = req.file?.buffer || null;
 
@@ -901,9 +1003,15 @@ const sendPayslip = async (req, res) => {
         }
 
         // Calculate the actual take-home salary shown in the payslip PDF
-        const inHandSalary = round2(
-            toNumber(payroll.gross_salary) - toNumber(payroll.deductions)
-        );
+        const requestedNetSalary = toNumber(netSalaryText, NaN);
+        const requestedGrossSalary = toNumber(grossSalaryText, NaN);
+        const inHandSalary = Number.isFinite(requestedNetSalary) && requestedNetSalary >= 0
+            ? round2(requestedNetSalary)
+            : payroll.net_salary !== undefined && payroll.net_salary !== null && payroll.net_salary !== ''
+                ? round2(toNumber(payroll.net_salary))
+                : Number.isFinite(requestedGrossSalary)
+                    ? round2(requestedGrossSalary - toNumber(payroll.deductions))
+                    : round2(toNumber(payroll.gross_salary) - toNumber(payroll.deductions));
 
         // Send payslip email
         await sendPayslipEmail({

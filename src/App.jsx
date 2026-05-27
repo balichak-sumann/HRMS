@@ -144,7 +144,20 @@ function App() {
               </div>
             }
           >
-            <Routes>
+            <RoutesWithRefresh />
+          </Suspense>
+        </Router>
+      </SocketProvider>
+    </AuthProvider>
+  );
+}
+
+function RoutesWithRefresh() {
+  const { dataRefreshTick } = useSocket();
+
+  return (
+    <div key={dataRefreshTick}>
+      <Routes>
             {/* Public Route */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -168,7 +181,6 @@ function App() {
                     <Route path="offer-letters" element={<OfferLetterPage />} />
                     <Route path="payroll" element={<HRPayrollPage />} />
                     <Route path="payroll/:employeeId" element={<HRPayrollEmployeePage />} />
-                    <Route path="payroll/statutory-settings" element={<HRStatutorySettingsPage />} />
                     <Route path="payroll/statutory-compliance" element={<HRStatutoryCompliancePage />} />
                     <Route path="tax-declarations" element={<HRTaxDeclarationPage />} />
                     <Route path="form16" element={<HRForm16Page />} />
@@ -312,11 +324,8 @@ function App() {
 
             {/* Redirects */}
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-          </Suspense>
-        </Router>
-      </SocketProvider>
-    </AuthProvider>
+      </Routes>
+    </div>
   );
 }
 

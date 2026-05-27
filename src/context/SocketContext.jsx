@@ -9,6 +9,8 @@ export const SocketProvider = ({ children }) => {
     const socket = useRef(null);
     const [callConfig, setCallConfig] = useState(null);
     const [onlineUsers, setOnlineUsers] = useState(new Set());
+    const [dataRefreshTick, setDataRefreshTick] = useState(0);
+    const [lastDataChange, setLastDataChange] = useState(null);
 
     useEffect(() => {
         if (!currentUser) {
@@ -68,6 +70,12 @@ export const SocketProvider = ({ children }) => {
             window.location.href = '/login';
         });
 
+        socket.current.on('data_changed', (payload) => {
+            console.log('[Socket] Data changed:', payload);
+            setLastDataChange(payload || null);
+            setDataRefreshTick((tick) => tick + 1);
+        });
+
         return () => {
             if (socket.current) {
                 socket.current.disconnect();
@@ -80,7 +88,9 @@ export const SocketProvider = ({ children }) => {
         socket,
         callConfig,
         setCallConfig,
-        onlineUsers
+        onlineUsers,
+        dataRefreshTick,
+        lastDataChange
     };
 
     return (

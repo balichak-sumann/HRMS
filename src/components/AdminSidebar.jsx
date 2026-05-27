@@ -54,9 +54,6 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 { icon: ClipboardList, label: 'Onboarding', path: '/admin/onboarding' },
                 { icon: Briefcase, label: 'Projects', path: '/admin/projects' },
                 { icon: BarChart3, label: 'Performance', path: '/admin/performance' },
-                { icon: ClipboardList, label: 'Surveys', path: '/admin/surveys' },
-                { icon: LifeBuoy, label: 'Helpdesk', path: '/admin/helpdesk' },
-                { icon: MessageSquare, label: 'Complaints', path: '/admin/complaints' },
             ],
         },
         {
@@ -91,6 +88,9 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 { icon: Video, label: 'Meetings', path: '/admin/meetings' },
                 { icon: HardDrive, label: 'Drive', path: '/admin/drive' },
                 { icon: CalendarCheck, label: 'Calendar', path: '/admin/calendar' },
+                { icon: ClipboardList, label: 'Surveys', path: '/admin/surveys' },
+                { icon: LifeBuoy, label: 'Helpdesk', path: '/admin/helpdesk' },
+                { icon: MessageSquare, label: 'Complaints', path: '/admin/complaints' },
             ],
         },
         {

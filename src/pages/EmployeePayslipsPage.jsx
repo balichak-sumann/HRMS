@@ -18,6 +18,12 @@ const EmployeePayslipsPage = () => {
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [selectedPayslip, setSelectedPayslip] = useState(null);
 
+    const getRowSortScore = (row) => {
+        const updatedAt = row?.updated_at ? new Date(row.updated_at).getTime() : 0;
+        const createdAt = row?.created_at ? new Date(row.created_at).getTime() : 0;
+        return Math.max(updatedAt, createdAt, 0);
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -29,10 +35,22 @@ const EmployeePayslipsPage = () => {
             // Fetch payslips for the logged-in user
             const psData = await api.get('/payroll');
 
+            const latestByPeriod = new Map();
+            for (const ps of psData || []) {
+                const key = `${String(ps.employee_id || '')}::${String(ps.month || '').trim().toLowerCase()}::${Number(ps.year) || ''}`;
+                const current = latestByPeriod.get(key);
+                if (!current || getRowSortScore(ps) >= getRowSortScore(current)) {
+                    latestByPeriod.set(key, ps);
+                }
+            }
+
             // Ensure fields are properly mapped without overriding 0 values with hardcoded calculations
-            const enrichedPayslips = (psData || []).map(ps => {
+            const enrichedPayslips = [...latestByPeriod.values()].map(ps => {
                 return {
                     ...ps,
+                    gross_salary: Number(ps.gross_salary ?? 0),
+                    deductions: Number(ps.deductions ?? 0),
+                    net_salary: Number(ps.net_salary ?? 0),
                     conveyance: Number(ps.conveyance ?? 0),
                     specialAllowance: Number(ps.special_allowance ?? ps.specialAllowance ?? 0),
                     pf_employee: Number(ps.pf_employee ?? ps.pf ?? 0),
@@ -45,13 +63,13 @@ const EmployeePayslipsPage = () => {
             setPayslips(enrichedPayslips);
 
             // Employee data will be part of the payslip relation in local API
-            if (psData.length > 0) {
+            if (enrichedPayslips.length > 0) {
                 setEmployee({
-                    id: psData[0].employee_uuid || psData[0].employee_id,
-                    full_name: psData[0].full_name,
-                    department: psData[0].department,
-                    role: psData[0].role,
-                    location: psData[0].location
+                    id: enrichedPayslips[0].employee_uuid || enrichedPayslips[0].employee_id,
+                    full_name: enrichedPayslips[0].full_name,
+                    department: enrichedPayslips[0].department,
+                    role: enrichedPayslips[0].role,
+                    location: enrichedPayslips[0].location
                 });
             }
         } catch (error) {

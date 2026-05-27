@@ -261,6 +261,7 @@ const LoginPage = () => {
                                     color: 'var(--text-muted)'
                                 }} />
                                 <input
+                                    className="login-password-input"
                                     type={showPassword ? 'text' : 'password'}
                                     placeholder="••••••••"
                                     value={password}

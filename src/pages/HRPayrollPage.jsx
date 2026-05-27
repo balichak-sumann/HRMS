@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Search, Wallet, Settings, FileText } from 'lucide-react';
+import { Search, Wallet, FileText } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 const HRPayrollPage = () => {
@@ -44,9 +44,6 @@ const HRPayrollPage = () => {
                     Select an employee to open full payroll details on a dedicated page.
                 </p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                    <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={() => navigate(`${basePath}/payroll/statutory-settings`)}>
-                        <Settings size={16} /> Statutory Settings
-                    </button>
                     <button className="btn-primary" style={{ borderRadius: '8px' }} onClick={() => navigate(`${basePath}/payroll/statutory-compliance`)}>
                         <FileText size={16} /> Compliance Report
                     </button>

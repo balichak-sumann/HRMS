@@ -80,7 +80,6 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
             icon: CreditCard,
             items: [
                 { icon: CreditCard, label: 'Payroll', path: '/hr/payroll' },
-                { icon: Settings, label: 'Statutory Settings', path: '/hr/payroll/statutory-settings' },
                 { icon: FileCheck, label: 'Statutory Report', path: '/hr/payroll/statutory-compliance' },
                 { icon: FileCheck, label: 'IT Declarations', path: '/hr/tax-declarations' },
                 { icon: FileCheck, label: 'Form 16', path: '/hr/form16' },

@@ -8,10 +8,10 @@ const emptySlab = () => ({ name: '', income_from: 0, income_to: '', rate: 0 });
 
 const DEFAULT_BREAKUP_PERCENT = {
     basic: 40,
-    hra: 20,
-    conveyance: 20,
-    special: 20,
+    hra: 40,
 };
+
+const DEFAULT_CONVEYANCE_AMOUNT = 2000;
 
 const toRatio = (value, fallback = 0) => {
     const n = Number(value);
@@ -29,15 +29,13 @@ const toPercent = (value, fallback = 0) => {
 const normalizeBreakupPercent = (settings = {}) => {
     const basic = toPercent(settings.basic_ratio, DEFAULT_BREAKUP_PERCENT.basic);
     const hra = toPercent(settings.hra_ratio, DEFAULT_BREAKUP_PERCENT.hra);
-    const conveyance = toPercent(settings.conveyance_amount, DEFAULT_BREAKUP_PERCENT.conveyance);
-    const sum = basic + hra + conveyance;
+    const conveyance = Math.max(0, Number(settings.conveyance_amount));
 
-    if (sum > 100) {
-        return { ...DEFAULT_BREAKUP_PERCENT };
-    }
-
-    const special = Number((100 - sum).toFixed(2));
-    return { basic, hra, conveyance, special };
+    return {
+        basic,
+        hra,
+        conveyance: Number.isFinite(conveyance) ? conveyance : DEFAULT_CONVEYANCE_AMOUNT,
+    };
 };
 
 const formatInr = (value) => {
@@ -48,7 +46,8 @@ const formatInr = (value) => {
 
 const HRStatutorySettingsPage = () => {
     const { profile } = useAuth();
-    const isAdmin = profile?.role === 'admin';
+    const role = String(profile?.role || '').toLowerCase();
+    const canEditSalaryBreakdown = ['admin', 'super admin'].includes(role);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
@@ -57,9 +56,8 @@ const HRStatutorySettingsPage = () => {
         esi_employee_rate: '',
         esi_employer_rate: '',
         basic_percent: 40,
-        hra_percent: 20,
-        conveyance_percent: 20,
-        special_allowance_percent: 20,
+        hra_percent: 40,
+        conveyance_amount: DEFAULT_CONVEYANCE_AMOUNT,
         fixed_pf_deduction: 1800,
         fixed_insurance_deduction: 450,
         fixed_ptax_deduction: 200,
@@ -83,8 +81,7 @@ const HRStatutorySettingsPage = () => {
                 esi_employer_rate: Number(data.settings.esi_employer_rate),
                 basic_percent: breakup.basic,
                 hra_percent: breakup.hra,
-                conveyance_percent: breakup.conveyance,
-                special_allowance_percent: breakup.special,
+                conveyance_amount: breakup.conveyance,
                 fixed_pf_deduction: Number(data.settings.fixed_pf_deduction) || 1800,
                 fixed_insurance_deduction: Number(data.settings.fixed_insurance_deduction) || 450,
                 fixed_ptax_deduction: Number(data.settings.fixed_ptax_deduction) || 200,
@@ -151,17 +148,15 @@ const HRStatutorySettingsPage = () => {
 
             const basicPercent = Number(form.basic_percent) || 0;
             const hraPercent = Number(form.hra_percent) || 0;
-            const conveyancePercent = Number(form.conveyance_percent) || 0;
-            const specialPercent = Number(form.special_allowance_percent) || 0;
-            const breakupSum = Number((basicPercent + hraPercent + conveyancePercent + specialPercent).toFixed(2));
+            const conveyanceAmount = Number(form.conveyance_amount) || 0;
 
-            if ([basicPercent, hraPercent, conveyancePercent, specialPercent].some((v) => v < 0 || v > 100)) {
-                toast.error('Each salary breakup input must be between 0 and 100%.');
+            if ([basicPercent, hraPercent].some((v) => v < 0 || v > 100)) {
+                toast.error('Basic and HRA must be between 0 and 100%.');
                 return;
             }
 
-            if (Math.abs(breakupSum - 100) > 0.01) {
-                toast.error('Basic + HRA + Conveyance + Special Allowance must total exactly 100%.');
+            if (conveyanceAmount < 0) {
+                toast.error('Conveyance amount must be a non-negative fixed value.');
                 return;
             }
 
@@ -172,7 +167,7 @@ const HRStatutorySettingsPage = () => {
                 esi_employer_rate: Number(form.esi_employer_rate) || 0,
                 basic_ratio: Number((basicPercent / 100).toFixed(4)),
                 hra_ratio: Number((hraPercent / 100).toFixed(4)),
-                conveyance_amount: Number((conveyancePercent / 100).toFixed(4)),
+                conveyance_amount: conveyanceAmount,
                 fixed_pf_deduction: Number(form.fixed_pf_deduction) || 0,
                 fixed_employer_pf_deduction: Number(form.fixed_pf_deduction) || 0,
                 fixed_insurance_deduction: Number(form.fixed_insurance_deduction) || 0,
@@ -211,42 +206,29 @@ const HRStatutorySettingsPage = () => {
             <div style={{ marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Statutory Settings</h1>
                 <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Configure salary breakup percentages and fixed monthly deductions used by payroll and offer letters. TDS is managed through slabs.
+                    Configure salary breakup norms and fixed monthly deductions used by payroll and offer letters. TDS is managed through slabs.
                 </p>
             </div>
 
             <form className="card" style={{ padding: '20px', display: 'grid', gap: '16px' }} onSubmit={saveSettings}>
-                {isAdmin && (
+                {canEditSalaryBreakdown && (
                     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
                         <h3 style={{ fontSize: '17px', marginBottom: '16px' }}>Salary Breakdown Settings</h3>
                         <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                            Enter percentages only. Basic + HRA + Conveyance + Special Allowance must equal 100%.
+                            Basic is applied on gross monthly CTC, HRA is applied on Basic, Conveyance is a fixed monthly amount, and Special Allowance is computed as the remaining balance.
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                             <div>
-                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Basic Salary (%)</label>
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Basic Salary (% of gross)</label>
                                 <input className="input-field" type="number" step="0.01" min="0" max="100" value={form.basic_percent} onChange={(e) => setForm((prev) => ({ ...prev, basic_percent: e.target.value }))} placeholder="e.g. 40" />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>HRA (%)</label>
-                                <input className="input-field" type="number" step="0.01" min="0" max="100" value={form.hra_percent} onChange={(e) => setForm((prev) => ({ ...prev, hra_percent: e.target.value }))} placeholder="e.g. 20" />
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>HRA (% of Basic)</label>
+                                <input className="input-field" type="number" step="0.01" min="0" max="100" value={form.hra_percent} onChange={(e) => setForm((prev) => ({ ...prev, hra_percent: e.target.value }))} placeholder="e.g. 40" />
                             </div>
                             <div>
-                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Conveyance (%)</label>
-                                <input className="input-field" type="number" step="0.01" min="0" max="100" value={form.conveyance_percent} onChange={(e) => setForm((prev) => ({ ...prev, conveyance_percent: e.target.value }))} placeholder="e.g. 20" />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Special Allowance (%)</label>
-                                <input
-                                    className="input-field"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    value={form.special_allowance_percent}
-                                    onChange={(e) => setForm((prev) => ({ ...prev, special_allowance_percent: e.target.value }))}
-                                    placeholder="e.g. 20"
-                                />
+                                <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Conveyance (Fixed Monthly Amount)</label>
+                                <input className="input-field" type="number" min="0" value={form.conveyance_amount} onChange={(e) => setForm((prev) => ({ ...prev, conveyance_amount: e.target.value }))} placeholder="e.g. 2000" />
                             </div>
                             <div>
                                 <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Employee PF Deduction (Monthly)</label>
@@ -266,14 +248,6 @@ const HRStatutorySettingsPage = () => {
                                 <input className="input-field" type="number" value={form.fixed_ptax_deduction} onChange={(e) => setForm((prev) => ({ ...prev, fixed_ptax_deduction: e.target.value }))} />
                             </div>
                         </div>
-                        <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                            Current Total: {(
-                                (Number(form.basic_percent) || 0) +
-                                (Number(form.hra_percent) || 0) +
-                                (Number(form.conveyance_percent) || 0) +
-                                (Number(form.special_allowance_percent) || 0)
-                            ).toFixed(2)}%
-                        </p>
                     </div>
                 )}
 
