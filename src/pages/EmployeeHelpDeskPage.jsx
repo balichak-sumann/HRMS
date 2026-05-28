@@ -73,8 +73,11 @@ const EmployeeHelpDeskPage = () => {
             if (filters.status !== 'all') params.status = filters.status;
             if (filters.category !== 'all') params.category = filters.category;
 
+            const queryString = Object.keys(params).length > 0
+                ? '?' + new URLSearchParams(params).toString()
+                : '';
             const endpoint = ticketViewType === 'assigned' ? '/helpdesk/my/assigned' : '/helpdesk/my/tickets';
-            const data = await api.get(endpoint, { params });
+            const data = await api.get(`${endpoint}${queryString}`);
             
             if (ticketViewType === 'assigned') {
                 setAssignedTickets(data);

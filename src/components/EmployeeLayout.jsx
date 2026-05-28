@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import EmployeeSidebar from './EmployeeSidebar';
 import Navbar from './Navbar';
+import AnimatedPage from './AnimatedPage';
 
 const EmployeeLayout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -51,7 +52,7 @@ const EmployeeLayout = ({ children }) => {
                     maxWidth: '1400px',
                     margin: '0 auto'
                 }}>
-                    {children}
+                    <AnimatedPage>{children}</AnimatedPage>
                 </main>
             </div>
 

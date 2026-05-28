@@ -5,6 +5,12 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+const isEmailNotificationEnabled = () => {
+    const value = String(process.env.CHAT_MESSAGE_EMAIL_NOTIFICATIONS || '').toLowerCase();
+    return value === '1' || value === 'true' || value === 'yes';
+};
+
+// Ensure all profiles have a matching employee record (for chat visibility)
 const syncProfilesIntoEmployees = async () => {
     await pool.query(`
         INSERT INTO employees (full_name, email, role, department, employee_id, status)
@@ -27,11 +33,6 @@ const syncProfilesIntoEmployees = async () => {
     `);
 };
 
-const isEmailNotificationEnabled = () => {
-    const value = String(process.env.CHAT_MESSAGE_EMAIL_NOTIFICATIONS || '').toLowerCase();
-    return value === '1' || value === 'true' || value === 'yes';
-};
-
 // ─── Get contacts ────────────────────────────────────────────────
 const getContacts = async (req, res) => {
     try {
@@ -50,7 +51,7 @@ const getContacts = async (req, res) => {
             (SELECT created_at FROM messages WHERE (sender_id = $1 AND receiver_id = employees.id) OR (sender_id = employees.id AND receiver_id = $1) ORDER BY created_at DESC LIMIT 1) as last_time
             FROM employees 
             WHERE email != $2
-            ORDER BY last_time IS NULL ASC, last_time DESC, full_name ASC
+            ORDER BY last_time IS NULL, last_time DESC, full_name ASC
         `, [myUuid, req.user.email]);
 
         const onlineUsers = req.io.onlineUsers;
@@ -69,8 +70,6 @@ const getContacts = async (req, res) => {
 // ─── Get groups ──────────────────────────────────────────────────
 const getGroups = async (req, res) => {
     try {
-        await syncProfilesIntoEmployees();
-
         const result = await pool.query(`
             SELECT g.* 
             FROM chat_groups g
@@ -233,28 +232,25 @@ const sendMessage = async (req, res) => {
 
         if (!sender_id) return res.status(404).json({ error: 'Profile not found' });
 
-        await pool.query(
-            `INSERT INTO messages (sender_id, receiver_id, group_id, content, attachment_url)
-             VALUES ($1, $2, $3, $4, $5)`,
+        const result = await pool.query(
+            'INSERT INTO messages (sender_id, receiver_id, group_id, content, attachment_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
             [sender_id, receiver_id || null, group_id || null, content, attachment_url || null]
         );
 
-        const result = await pool.query(
-            `SELECT m.*, e.full_name as sender_name
-             FROM messages m
-             JOIN employees e ON m.sender_id = e.id
-             WHERE m.sender_id = $1
-               AND ((m.receiver_id = $2) OR ($2 IS NULL AND m.receiver_id IS NULL))
-               AND ((m.group_id = $3) OR ($3 IS NULL AND m.group_id IS NULL))
-             ORDER BY m.created_at DESC, m.id DESC
-             LIMIT 1`,
-            [sender_id, receiver_id || null, group_id || null]
-        );
+        const inserted = result.rows[0];
 
-        const message = result.rows[0];
+        // Get sender name
+        const senderRes = await pool.query('SELECT full_name FROM employees WHERE id = $1', [sender_id]);
+        const message = { ...inserted, sender_name: senderRes.rows[0]?.full_name || 'Unknown' };
 
         const roomId = group_id ? `group_${group_id}` : [sender_id, receiver_id].sort().join('_');
         req.io.to(roomId).emit('receive_message', message);
+
+        // Also emit directly to both users' personal rooms (ensures delivery even if room join failed)
+        if (!group_id && receiver_id) {
+            req.io.to(String(receiver_id)).emit('receive_message', message);
+            req.io.to(String(sender_id)).emit('receive_message', message);
+        }
 
         // Respond immediately after message delivery. Notification side-effects should not block chat UX.
         res.json(message);
@@ -270,14 +266,13 @@ const sendMessage = async (req, res) => {
                          FROM employees e
                          JOIN profiles p
                            ON LOWER(TRIM(p.email)) = LOWER(TRIM(e.email))
-                           OR (p.employee_id IS NOT NULL AND CAST(p.employee_id AS CHAR) = CAST(e.id AS CHAR))
+                           OR (p.employee_id IS NOT NULL AND p.employee_id::text = e.id::text)
                            OR (p.employee_id IS NOT NULL AND e.employee_id IS NOT NULL AND p.employee_id = e.employee_id)
                          WHERE e.id = $1
                          ORDER BY
                             CASE WHEN LOWER(TRIM(p.email)) = LOWER(TRIM(e.email)) THEN 0 ELSE 1 END,
-                            CASE WHEN CAST(p.employee_id AS CHAR) = CAST(e.id AS CHAR) THEN 0 ELSE 1 END,
-                            CASE WHEN p.updated_at IS NULL THEN 1 ELSE 0 END,
-                            p.updated_at DESC
+                            CASE WHEN p.employee_id::text = e.id::text THEN 0 ELSE 1 END,
+                            p.updated_at DESC NULLS LAST
                          LIMIT 1`,
                         [receiver_id]
                     );
@@ -345,6 +340,7 @@ const sendMessage = async (req, res) => {
 // ─── Clear chat history ──────────────────────────────────────────
 const clearHistory = async (req, res) => {
     const { targetId } = req.params;
+    const { type } = req.query; // 'group' or 'direct'
 
     try {
         const emp = await pool.query(`
@@ -356,14 +352,19 @@ const clearHistory = async (req, res) => {
 
         if (!myId) return res.status(404).json({ error: 'Profile not found' });
 
-        // Delete messages where sender/receiver match both directions
-        await pool.query(`
-            DELETE FROM messages 
-            WHERE 
-                (sender_id = $1 AND receiver_id = $2) 
-                OR 
-                (sender_id = $2 AND receiver_id = $1)
-        `, [myId, targetId]);
+        if (type === 'group') {
+            // For group chats, delete all messages in the group
+            await pool.query('DELETE FROM messages WHERE group_id = $1', [targetId]);
+        } else {
+            // Delete messages where sender/receiver match both directions
+            await pool.query(`
+                DELETE FROM messages 
+                WHERE 
+                    (sender_id = $1 AND receiver_id = $2) 
+                    OR 
+                    (sender_id = $2 AND receiver_id = $1)
+            `, [myId, targetId]);
+        }
 
         res.json({ message: 'Chat history cleared successfully' });
     } catch (err) {

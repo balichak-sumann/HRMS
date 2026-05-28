@@ -22,7 +22,6 @@ const lazyPage = (path) => lazy(async () => {
 });
 
 const LoginPage = lazyPage('./pages/LoginPage');
-const LandingPage = lazyPage('./pages/LandingPage');
 const ForgotPasswordPage = lazyPage('./pages/ForgotPasswordPage');
 const ResetPasswordPage = lazyPage('./pages/ResetPasswordPage');
 const HRDashboard = lazyPage('./pages/HRDashboard');
@@ -81,6 +80,7 @@ const HRSurveyResultsPage = lazyPage('./pages/HRSurveyResultsPage');
 const EmployeeSurveysPage = lazyPage('./pages/EmployeeSurveysPage');
 const EmployeeSurveyFillPage = lazyPage('./pages/EmployeeSurveyFillPage');
 const AdminManagementPage = lazyPage('./pages/AdminManagementPage');
+const LandingPage = lazyPage('./pages/LandingPage');
 
 const getRoleBasePath = (role) => {
   if (role === 'admin') return '/admin';
@@ -144,22 +144,8 @@ function App() {
               </div>
             }
           >
-            <RoutesWithRefresh />
-          </Suspense>
-        </Router>
-      </SocketProvider>
-    </AuthProvider>
-  );
-}
-
-function RoutesWithRefresh() {
-  const { dataRefreshTick } = useSocket();
-
-  return (
-    <div key={dataRefreshTick}>
-      <Routes>
+            <Routes>
             {/* Public Route */}
-            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -181,6 +167,7 @@ function RoutesWithRefresh() {
                     <Route path="offer-letters" element={<OfferLetterPage />} />
                     <Route path="payroll" element={<HRPayrollPage />} />
                     <Route path="payroll/:employeeId" element={<HRPayrollEmployeePage />} />
+                    <Route path="payroll/statutory-settings" element={<HRStatutorySettingsPage />} />
                     <Route path="payroll/statutory-compliance" element={<HRStatutoryCompliancePage />} />
                     <Route path="tax-declarations" element={<HRTaxDeclarationPage />} />
                     <Route path="form16" element={<HRForm16Page />} />
@@ -323,9 +310,13 @@ function RoutesWithRefresh() {
             } />
 
             {/* Redirects */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+          </Suspense>
+        </Router>
+      </SocketProvider>
+    </AuthProvider>
   );
 }
 

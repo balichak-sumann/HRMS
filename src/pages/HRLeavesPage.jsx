@@ -86,6 +86,7 @@ const HRLeavesPage = () => {
                             onChange={(e) => setDeptFilter(e.target.value)}
                         >
                             <option value="All">All Departments</option>
+                            <option value="Unassigned">Unassigned</option>
                             {departments.map((dep) => (
                                 <option key={dep.id || dep.name} value={dep.name}>{dep.name}</option>
                             ))}

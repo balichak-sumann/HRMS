@@ -112,9 +112,15 @@ const EmployeePerformancePage = () => {
 
     if (!overview?.current_cycle) {
         return (
-            <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No active appraisal cycle right now.
-            </div>
+            <>
+                <div style={{ marginBottom: '24px' }}>
+                    <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>Performance</h1>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Track your goals, self-appraisals, and manager reviews.</p>
+                </div>
+                <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No active appraisal cycle right now. Check back when your manager starts a new review cycle.
+                </div>
+            </>
         );
     }
 

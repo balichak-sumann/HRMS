@@ -348,6 +348,49 @@ const createEmployee = async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Valid annual salary is required' });
         }
+        if (incomingSalary > 100000000) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Salary value exceeds reasonable limit' });
+        }
+
+        // --- Date validations ---
+        if (dob) {
+            const dobDate = new Date(dob + 'T00:00:00Z');
+            if (isNaN(dobDate.getTime())) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Invalid date of birth format' });
+            }
+            const today = new Date();
+            const age = today.getFullYear() - dobDate.getFullYear();
+            if (dobDate > today) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Date of birth cannot be in the future' });
+            }
+            if (age < 18 || age > 100) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Employee must be between 18 and 100 years old' });
+            }
+        }
+
+        if (joining_date) {
+            const joinDate = new Date(joining_date + 'T00:00:00Z');
+            if (isNaN(joinDate.getTime())) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Invalid joining date format' });
+            }
+            const maxFuture = new Date();
+            maxFuture.setMonth(maxFuture.getMonth() + 6);
+            if (joinDate > maxFuture) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Joining date cannot be more than 6 months in the future' });
+            }
+            const minPast = new Date('1970-01-01');
+            if (joinDate < minPast) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Joining date is too far in the past' });
+            }
+        }
+
         const normalizedSalary = incomingSalary;
         const parsedExperience = Number(experience_years);
         const normalizedExperienceYears = Number.isFinite(parsedExperience) ? parsedExperience : null;
@@ -421,8 +464,8 @@ const createEmployee = async (req, res) => {
         const hash = await bcrypt.hash(tempPassword, salt);
 
         const profileResult = await client.query(
-            'INSERT INTO profiles (email, password_hash, role, employee_id, employee_uuid, is_first_login, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email',
-            [normalizedEmail, hash, profileRole, normalizedEmployeeCode || null, newEmployee.rows[0].id, true, 'active']
+            'INSERT INTO profiles (email, password_hash, role, employee_id, is_first_login, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email',
+            [normalizedEmail, hash, profileRole, newEmployee.rows[0].id, true, 'pending_activation']
         );
         const profile = profileResult.rows[0];
 
@@ -536,10 +579,13 @@ const updateEmployee = async (req, res) => {
     const emergencyContactRegex = /^\d{10}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
 
         const normalizedFullName = String(full_name || '').trim();
         if (!normalizedFullName) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Please enter full name' });
         }
 
@@ -585,15 +631,13 @@ const updateEmployee = async (req, res) => {
         const normalizedAccountRole = typeof account_role === 'string' ? account_role.trim().toLowerCase() : '';
         const allowedAccountRoles = new Set(['admin', 'hr', 'employee']);
 
-        const existingEmployeeResult = await pool.query('SELECT id, email FROM employees WHERE id = $1', [req.params.id]);
+        const existingEmployeeResult = await client.query('SELECT id, email FROM employees WHERE id = $1', [req.params.id]);
         if (existingEmployeeResult.rows.length === 0) {
             return res.status(404).json({ error: 'Employee not found' });
         }
         const currentEmployeeEmail = existingEmployeeResult.rows[0].email;
         const requestedEmail = String(email || '').trim().toLowerCase();
         const normalizedCurrentEmployeeEmail = String(currentEmployeeEmail || '').trim().toLowerCase();
-        const actorRole = String(req.user?.role || '').toLowerCase();
-        let effectiveEmployeeEmail = currentEmployeeEmail;
 
         if (requestedEmail && !emailRegex.test(requestedEmail)) {
             return res.status(400).json({ error: 'Please provide a valid work email address.' });
@@ -610,33 +654,11 @@ const updateEmployee = async (req, res) => {
         }
 
         if (requestedEmail && requestedEmail !== normalizedCurrentEmployeeEmail) {
-            if (actorRole !== 'admin') {
-                return res.status(403).json({ error: 'Only admin can change employee email.' });
-            }
-
-            const duplicateEmailCheck = await pool.query(
-                `SELECT 1
-                 FROM profiles
-                 WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
-                   AND LOWER(TRIM(email)) <> LOWER(TRIM($2))
-                 UNION
-                 SELECT 1
-                 FROM employees
-                 WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
-                   AND LOWER(TRIM(email)) <> LOWER(TRIM($2))
-                 LIMIT 1`,
-                [requestedEmail, normalizedCurrentEmployeeEmail]
-            );
-
-            if (duplicateEmailCheck.rows.length > 0) {
-                return res.status(400).json({ error: 'Email already exists in the system' });
-            }
-
-            effectiveEmployeeEmail = requestedEmail;
+            return res.status(400).json({ error: 'Email cannot be changed once the account is created.' });
         }
 
         if (normalizedEmployeeCode) {
-            const duplicateEmployeeCodeCheck = await pool.query(
+            const duplicateEmployeeCodeCheck = await client.query(
                 'SELECT id FROM employees WHERE employee_id = $1 AND id <> $2 LIMIT 1',
                 [normalizedEmployeeCode, req.params.id]
             );
@@ -656,15 +678,14 @@ const updateEmployee = async (req, res) => {
                 return res.status(403).json({ error: 'Only admin can change account roles' });
             }
 
-            const linkedProfile = await pool.query(
+            const linkedProfile = await client.query(
                 `SELECT id
                  FROM profiles
-                      WHERE employee_uuid = $1
-                          OR employee_id = $1
+                 WHERE employee_id = $1
                     OR email = $2
                     OR email = $3
                  LIMIT 1`,
-                [req.params.id, currentEmployeeEmail, effectiveEmployeeEmail]
+                [req.params.id, currentEmployeeEmail, email || currentEmployeeEmail]
             );
 
             if (linkedProfile.rows.length === 0) {
@@ -682,7 +703,7 @@ const updateEmployee = async (req, res) => {
         }
 
         if (nextManagerId) {
-            const managerCheck = await pool.query('SELECT id FROM employees WHERE id = $1', [nextManagerId]);
+            const managerCheck = await client.query('SELECT id FROM employees WHERE id = $1', [nextManagerId]);
             if (managerCheck.rows.length === 0) {
                 return res.status(400).json({ error: 'Reporting manager not found' });
             }
@@ -691,7 +712,7 @@ const updateEmployee = async (req, res) => {
         let departmentIdValue = null;
         let departmentNameValue = department || 'Unassigned';
         if (department_id) {
-            const dep = await pool.query('SELECT id, name FROM departments WHERE id = $1', [department_id]);
+            const dep = await client.query('SELECT id, name FROM departments WHERE id = $1', [department_id]);
             if (dep.rows.length === 0) {
                 return res.status(400).json({ error: 'Department not found' });
             }
@@ -709,7 +730,7 @@ const updateEmployee = async (req, res) => {
                 experience_years = $19, aadhaar_card = $20, dob = $21,
                 updated_at = NOW()`;
         let params = [
-            normalizedFullName, effectiveEmployeeEmail, normalizedJobRole, departmentNameValue, departmentIdValue, nextManagerId,
+            normalizedFullName, currentEmployeeEmail, normalizedJobRole, departmentNameValue, departmentIdValue, nextManagerId,
             normalizedPhone, joining_date, normalizedSalary,
             normalizedEmployeeCode || null, normalizedDesignation || normalizedJobRole || null, location || null,
             normalizedPan || null, normalizedBankAccount || null, bank_name || null,
@@ -730,42 +751,23 @@ const updateEmployee = async (req, res) => {
             params.push(req.params.id);
         }
 
-        const result = await pool.query(query + ' RETURNING *', params);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+        const result = await client.query(query + ' RETURNING *', params);
+        if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Employee not found' });
+        }
 
         if (normalizedAccountRole && targetProfileId) {
-            await pool.query(
+            await client.query(
                 'UPDATE profiles SET role = $1, updated_at = NOW() WHERE id = $2',
                 [normalizedAccountRole, targetProfileId]
             );
         }
 
-        await pool.query(
-            `UPDATE profiles
-             SET email = $4,
-                 employee_uuid = $1,
-                 employee_id = CASE
-                     WHEN $2 IS NOT NULL THEN $2
-                     ELSE employee_id
-                 END,
-                 updated_at = NOW()
-             WHERE employee_uuid = $1
-                OR LOWER(TRIM(email)) = LOWER(TRIM($3))
-                OR LOWER(TRIM(email)) = LOWER(TRIM($4))`,
-            [req.params.id, normalizedEmployeeCode || null, currentEmployeeEmail, effectiveEmployeeEmail]
-        );
-
+        await client.query('COMMIT');
         res.json(result.rows[0]);
     } catch (err) {
-        if (
-            err?.code === '23505' &&
-            (
-                String(err?.constraint || '').toLowerCase().includes('email') ||
-                String(err?.detail || '').toLowerCase().includes('email')
-            )
-        ) {
-            return res.status(400).json({ error: 'Email already exists in the system' });
-        }
+        try { await client.query('ROLLBACK'); } catch (_) {}
         if (
             err?.code === '23505' &&
             (
@@ -777,6 +779,8 @@ const updateEmployee = async (req, res) => {
         }
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
+    } finally {
+        client.release();
     }
 };
 
@@ -785,7 +789,6 @@ const deleteEmployee = async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
-        const actorRole = String(req.user?.role || '').toLowerCase();
 
         await client.query('BEGIN');
 
@@ -797,28 +800,15 @@ const deleteEmployee = async (req, res) => {
 
         const employee = employeeResult.rows[0];
 
-        const targetProfileRoleRes = await client.query(
-            `SELECT role
-             FROM profiles
-             WHERE employee_id = $1 OR email = $2
-             ORDER BY CASE
-                 WHEN LOWER(role) = 'admin' THEN 1
-                 WHEN LOWER(role) = 'hr' THEN 2
-                 ELSE 3
-             END
-             LIMIT 1`,
-            [employee.id, employee.email]
+        // Prevent HR from deactivating admin/super admin accounts
+        const profileCheck = await client.query(
+            "SELECT role FROM profiles WHERE employee_id = $1 OR email = $2 LIMIT 1",
+            [id, employee.email]
         );
-        const targetRole = String(targetProfileRoleRes.rows[0]?.role || 'employee').toLowerCase();
-
-        if (actorRole === 'hr' && targetRole !== 'employee') {
+        const targetRole = String(profileCheck.rows[0]?.role || '').toLowerCase();
+        if (targetRole === 'admin' && req.user.role !== 'admin') {
             await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'HR can deactivate only employee accounts.' });
-        }
-
-        if (actorRole === 'admin' && !['employee', 'hr'].includes(targetRole)) {
-            await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Admin can deactivate only HR and employee accounts.' });
+            return res.status(403).json({ error: 'Only admins can deactivate admin accounts' });
         }
 
         const statusResult = await client.query('SELECT status FROM employees WHERE id = $1', [id]);

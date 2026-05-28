@@ -48,7 +48,9 @@ const EmployeeOnboardingPage = () => {
         <>
             <div style={{ marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '26px', color: 'var(--text-main)', fontWeight: '700' }}>My Onboarding</h1>
-                {data?.case && <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Template: {data.case.template_name}</p>}
+                <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {data?.case ? `Template: ${data.case.template_name}` : 'Complete your onboarding tasks to get started.'}
+                </p>
             </div>
 
             {loading ? (

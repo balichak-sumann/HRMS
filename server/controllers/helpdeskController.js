@@ -586,12 +586,16 @@ const downloadAttachment = async (req, res) => {
         }
 
         const { file_path, file_name } = result.rows[0];
+        const path = require('path');
+        const absolutePath = path.isAbsolute(file_path)
+            ? file_path
+            : path.join(__dirname, '..', file_path);
 
-        if (!fs.existsSync(file_path)) {
-            return res.status(404).json({ error: 'File not found on server' });
+        if (!fs.existsSync(absolutePath)) {
+            return res.status(404).json({ error: 'File not found on server. It may have been moved or deleted.' });
         }
 
-        res.download(file_path, file_name);
+        res.download(absolutePath, file_name);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });

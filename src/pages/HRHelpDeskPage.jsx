@@ -73,8 +73,12 @@ const HRHelpDeskPage = () => {
             if (filters.priority !== 'all') params.priority = filters.priority;
             if (filters.assigned_to !== 'all') params.assigned_to = filters.assigned_to;
 
+            const queryString = Object.keys(params).length > 0
+                ? '?' + new URLSearchParams(params).toString()
+                : '';
+
             const [ticketsData, teamData, statsData] = await Promise.all([
-                api.get('/helpdesk/hr/all', { params }),
+                api.get(`/helpdesk/hr/all${queryString}`),
                 api.get('/helpdesk/hr/team-members'),
                 api.get('/helpdesk/hr/dashboard')
             ]);

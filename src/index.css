@@ -661,3 +661,1463 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     opacity: 0.9;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK MODE COMPREHENSIVE FIXES
+   Bugs: #32, #37, #39, #86, #88, #186-204
+   ═══════════════════════════════════════════════════════════════════ */
+
+[data-theme='dark'] .card,
+[data-theme='dark'] .modal-content {
+  background: var(--card-bg);
+  color: var(--text-main);
+  border-color: var(--border);
+}
+
+/* Fix: Status text visibility in dark mode (Bug #32) */
+[data-theme='dark'] .attendance-status-badge.late {
+  background: #78350f;
+  color: #fde68a;
+  border-color: #d97706;
+}
+
+[data-theme='dark'] .attendance-status-badge.present {
+  background: #064e3b;
+  color: #6ee7b7;
+  border-color: #10b981;
+}
+
+[data-theme='dark'] .attendance-status-badge.absent {
+  background: #374151;
+  color: #e5e7eb;
+  border-color: #6b7280;
+}
+
+[data-theme='dark'] .attendance-status-badge.on-leave {
+  background: #7f1d1d;
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+[data-theme='dark'] .attendance-status-badge.half-day {
+  background: #1e3a5f;
+  color: #93c5fd;
+  border-color: #3b82f6;
+}
+
+/* Fix: Button visibility in dark mode (Bug #37, #39, #186) */
+[data-theme='dark'] .btn-secondary,
+[data-theme='dark'] button[style*="background: var(--card-bg)"],
+[data-theme='dark'] button[style*="background: white"],
+[data-theme='dark'] button[style*="background: #fff"] {
+  background: var(--input-bg) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border) !important;
+}
+
+/* Fix: Cancel button visibility in dark mode (Bug #37) */
+[data-theme='dark'] button[style*="background: #F8FAFC"],
+[data-theme='dark'] button[style*="background: #f8fafc"] {
+  background: var(--input-bg) !important;
+  color: var(--text-main) !important;
+}
+
+/* Fix: Dropdown/select visibility in dark mode (Bug #195) */
+[data-theme='dark'] select option {
+  background: var(--card-bg);
+  color: var(--text-main);
+}
+
+/* Fix: Table header and row visibility in dark mode */
+[data-theme='dark'] th,
+[data-theme='dark'] thead {
+  background: var(--input-bg) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme='dark'] td {
+  color: var(--text-main);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] tr {
+  border-color: var(--border) !important;
+}
+
+/* Fix: Tooltip and hover text visibility in dark mode (Bug #193, #202, #204) */
+[data-theme='dark'] [style*="background: #F8FAFC"],
+[data-theme='dark'] [style*="background: #f8fafc"],
+[data-theme='dark'] [style*="background: white"],
+[data-theme='dark'] [style*="background: #FFFFFF"],
+[data-theme='dark'] [style*="background: #ffffff"],
+[data-theme='dark'] [style*="background: #fff"] {
+  background: var(--card-bg) !important;
+  color: var(--text-main) !important;
+}
+
+/* Fix: Text on light backgrounds in dark mode (Bug #188, #190, #196-199, #203) */
+[data-theme='dark'] [style*="color: #64748B"],
+[data-theme='dark'] [style*="color: #475569"],
+[data-theme='dark'] [style*="color: #334155"],
+[data-theme='dark'] [style*="color: #1E293B"] {
+  color: var(--text-muted) !important;
+}
+
+/* Fix: Metric cards visibility in dark mode (Bug #197) */
+[data-theme='dark'] [style*="background: linear-gradient"],
+[data-theme='dark'] .metric-card {
+  color: var(--text-main) !important;
+}
+
+/* Fix: Modal/popup text visibility in dark mode (Bug #198, #199) */
+[data-theme='dark'] [role="dialog"],
+[data-theme='dark'] .modal-overlay > div {
+  background: var(--card-bg) !important;
+  color: var(--text-main) !important;
+}
+
+/* Fix: File hover state in dark mode (Bug #202) */
+[data-theme='dark'] [style*="background: #EFF6FF"],
+[data-theme='dark'] [style*="background: #eff6ff"] {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: var(--text-main) !important;
+}
+
+/* Fix: Audit log initiator text (Bug #203) */
+[data-theme='dark'] [style*="color: #1F2937"],
+[data-theme='dark'] [style*="color: #111827"] {
+  color: var(--text-main) !important;
+}
+
+/* Fix: Download PDF button in dark mode (Bug #186) */
+[data-theme='dark'] .btn-primary,
+[data-theme='dark'] [style*="background: var(--primary)"] {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+/* Fix: Placeholder text in dark mode (Bug #189) */
+[data-theme='dark'] ::placeholder {
+  color: #6b7280 !important;
+  opacity: 1;
+}
+
+/* Fix: Chart tooltip in dark mode (Bug #193, #204) */
+[data-theme='dark'] .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme='dark'] .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-label {
+  color: var(--text-main) !important;
+}
+
+[data-theme='dark'] .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-item {
+  color: var(--text-muted) !important;
+}
+
+/* Fix: Onboarding task names in dark mode (Bug #196) */
+[data-theme='dark'] [style*="color: #1e293b"],
+[data-theme='dark'] [style*="color: #0f172a"] {
+  color: var(--text-main) !important;
+}
+
+/* Fix: "Identity Verified" text on ID card in dark mode (Bug #188) */
+[data-theme='dark'] [style*="color: #166534"] {
+  color: #6ee7b7 !important;
+}
+
+/* Fix: "Generated on" date text in payslips dark mode (Bug #190) */
+[data-theme='dark'] [style*="color: #94A3B8"],
+[data-theme='dark'] [style*="color: #94a3b8"] {
+  color: #9ca3af !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UI/UX FIXES
+   Bugs: #48, #50, #55, #59, #63, #66, #86, #87, #91, #152, #192
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Fix: Mandatory field markers (Bug #55) */
+label[style*="REQUIRED"]::after,
+.required-field::after {
+  content: ' *';
+  color: #DC2626;
+  font-weight: 700;
+}
+
+/* Fix: Notification overlap with header icons (Bug #48) */
+.notification-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 9999;
+  margin-top: 8px;
+}
+
+/* Fix: Sidebar dual selection highlight (Bug #50, #200, #201) */
+.sidebar-fixed nav button[style*="rgba(255, 255, 255, 0.15)"] + div a[style*="rgba(255, 255, 255, 0.15)"] {
+  border-left-color: #93c5fd !important;
+}
+
+/* Fix: Audit logs module column alignment (Bug #59) */
+[data-theme='dark'] table td,
+table td {
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+/* Fix: Meeting page alignment (Bug #63) */
+.meetings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* Fix: Onboarding page heading (Bug #87) */
+.page-heading {
+  font-size: var(--font-3xl);
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+/* Fix: Button click feedback (Bug #91) */
+button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* Fix: Expense form alignment (Bug #152, #187) */
+.expense-form textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Fix: Screen zoom responsiveness (Bug #192, #193) */
+@media (min-width: 1400px) {
+  .main-content {
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+}
+
+/* Fix: Calendar current date highlight (Bug #98) */
+.calendar-today {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+/* Fix: Login tab visual distinction (Bug #88) */
+[data-theme='dark'] button[style*="box-shadow"] {
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Fix: Offboarding form field alignment (Bug #191) */
+.offboarding-form textarea,
+.exit-interview-form textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  border-radius: var(--input-radius);
+}
+
+/* Fix: Employee directory search/filter spacing (Bug #86) */
+.employee-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.employee-filters > * {
+  min-width: 0;
+}
+
+/* Fix: Peer feedback dropdown (Bug #35) - ensure dropdowns show content */
+[data-theme='dark'] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239CA3AF' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  appearance: none;
+}
+
+/* Fix: Print styles for ID card (Bug #10) */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .id-card-container {
+    page-break-inside: avoid;
+    margin: 0;
+    padding: 0;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Hide URL in print */
+  @page {
+    margin: 0.5cm;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}
+
+/* Fix: Unread message indicator (Bug #156) */
+.chat-contact-item.unread {
+  background: rgba(59, 130, 246, 0.08);
+  font-weight: 600;
+}
+
+.chat-contact-item.unread::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+/* Fix: Attendance date colors (Bug #175, #176) */
+.attendance-date-late {
+  color: #f59e0b !important;
+  font-weight: 600;
+}
+
+.attendance-date-future {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADDITIONAL UI FIXES - Remaining Bugs
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Fix: Sidebar dual highlight prevention (Bug #50, #200, #201) */
+[data-theme='dark'] .sidebar-fixed nav button + div a {
+  transition: background 0.15s, border-color 0.15s;
+}
+
+/* Fix: Meeting page grid alignment (Bug #63) */
+.meeting-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Fix: Expense description field (Bug #152, #187) */
+.expense-claim-form textarea,
+.claim-form textarea {
+  width: 100% !important;
+  min-height: 80px;
+  resize: vertical;
+  border-radius: var(--input-radius) !important;
+}
+
+/* Fix: Performance specific comment placeholder (Bug #189) */
+.performance-comment-input::placeholder {
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+/* Fix: Payout formula text truncation (Bug #150) */
+.payout-formula-input {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+/* Fix: Leave breakdown chart tooltip (Bug #204) */
+.recharts-tooltip-wrapper {
+  z-index: 100 !important;
+}
+
+[data-theme='dark'] .recharts-cartesian-axis-tick-value {
+  fill: var(--text-muted) !important;
+}
+
+[data-theme='dark'] .recharts-legend-item-text {
+  color: var(--text-main) !important;
+}
+
+/* Fix: Salary revision employee pre-fill (Bug #194) */
+.salary-revision-form select:invalid {
+  color: var(--text-muted);
+}
+
+/* Fix: Chat contact unread indicator (Bug #156) */
+.chat-contact-item {
+  position: relative;
+  transition: background 0.15s;
+}
+
+.chat-contact-unread {
+  background: rgba(59, 130, 246, 0.06) !important;
+  border-left: 3px solid var(--primary);
+}
+
+.chat-contact-unread .chat-contact-name {
+  font-weight: 700 !important;
+}
+
+/* Fix: Project status badges (Bug #118) */
+.project-status-active {
+  background: #DCFCE7;
+  color: #166534;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.project-status-completed {
+  background: #DBEAFE;
+  color: #1E40AF;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.project-status-on-hold {
+  background: #FEF3C7;
+  color: #92400E;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Fix: Call modal UI - show caller name and duration (Bug #158, #162) */
+.call-modal-header {
+  text-align: center;
+  padding: 16px;
+}
+
+.call-modal-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.call-modal-duration {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fix: Emoji display in chat (Bug #157) */
+.chat-message-content {
+  font-family: 'Inter', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  word-break: break-word;
+}
+
+/* Fix: Loading/button feedback animation (Bug #91, #185) */
+@keyframes btn-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.btn-loading {
+  animation: btn-pulse 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Fix: Approve/Reject separate loading states (Bug #185) */
+.expense-action-btn {
+  min-width: 90px;
+  transition: all 0.2s;
+}
+
+.expense-action-btn:disabled {
+  opacity: 0.6;
+}
+
+/* Fix: Dark mode - form labels and section headers */
+[data-theme='dark'] label,
+[data-theme='dark'] .form-label {
+  color: var(--text-main) !important;
+}
+
+[data-theme='dark'] [style*="color: #64748b"],
+[data-theme='dark'] [style*="color: #64748B"] {
+  color: var(--text-muted) !important;
+}
+
+/* Fix: Responsive zoom handling (Bug #192) */
+@media (min-resolution: 120dpi) {
+  .main-content {
+    padding: 16px;
+  }
+  
+  .card {
+    padding: 16px;
+  }
+}
+
+/* Fix: Department filter "Unassigned" option visibility */
+select option[value="Unassigned"] {
+  font-style: italic;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 1: GLOBAL MOTION SYSTEM — Cinematic Post-Login UI
+   Makes every interaction feel premium and alive
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Smooth Page Transitions ─────────────────────────────────────── */
+.main-content {
+    animation: pageIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes pageIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Card Hover Effects (lift + glow) ────────────────────────────── */
+.card {
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+                border-color 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    border-color: var(--primary-light);
+}
+
+[data-theme='dark'] .card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(59, 130, 246, 0.08);
+}
+
+/* ─── Button Micro-interactions ───────────────────────────────────── */
+.btn-primary,
+.btn-secondary,
+button[style*="background: var(--primary)"],
+button[style*="background: linear-gradient"] {
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary:hover,
+button[style*="background: var(--primary)"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+button:active:not(:disabled) {
+    transform: translateY(0) scale(0.97) !important;
+    transition-duration: 0.1s !important;
+}
+
+/* Ripple effect on buttons */
+.btn-primary::after,
+.btn-secondary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255, 255, 255, 0.3) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+
+.btn-primary:active::after,
+.btn-secondary:active::after {
+    opacity: 1;
+    transition-duration: 0.1s;
+}
+
+/* ─── Table Row Interactions ──────────────────────────────────────── */
+table tbody tr {
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.04) !important;
+    transform: scale(1.002);
+}
+
+[data-theme='dark'] table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* ─── Input Focus Animations ──────────────────────────────────────── */
+.input-field,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+select,
+textarea {
+    transition: border-color 0.3s ease,
+                box-shadow 0.3s ease,
+                transform 0.2s ease !important;
+}
+
+.input-field:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    transform: translateY(-1px);
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ─── Sidebar Item Animations ─────────────────────────────────────── */
+.sidebar-fixed nav a,
+.sidebar-fixed nav button {
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.sidebar-fixed nav a:hover,
+.sidebar-fixed nav button:hover {
+    transform: translateX(4px);
+}
+
+/* Active sidebar indicator animation */
+.sidebar-fixed nav a[style*="border-left: 4px solid #fff"],
+.sidebar-fixed nav a[style*="border-left: 4px solid white"] {
+    animation: sidebarSlideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes sidebarSlideIn {
+    from {
+        opacity: 0.5;
+        transform: translateX(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ─── Status Badge Pulse (Pending items) ──────────────────────────── */
+.status-badge.pending {
+    animation: pendingPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pendingPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(217, 119, 6, 0);
+    }
+}
+
+/* ─── Modal Entrance ──────────────────────────────────────────────── */
+[style*="position: fixed"][style*="inset: 0"],
+[style*="position: fixed"][style*="z-index"] {
+    animation: modalIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ─── Stat Cards — Number Counter Feel ────────────────────────────── */
+.grid-cols-4 > .card,
+.dashboard-grid .card {
+    animation: statCardIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.grid-cols-4 > .card:nth-child(1) { animation-delay: 0.05s; }
+.grid-cols-4 > .card:nth-child(2) { animation-delay: 0.1s; }
+.grid-cols-4 > .card:nth-child(3) { animation-delay: 0.15s; }
+.grid-cols-4 > .card:nth-child(4) { animation-delay: 0.2s; }
+
+@keyframes statCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ─── Loading Skeleton Shimmer ────────────────────────────────────── */
+.loader,
+[class*="animate-spin"] {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton,
+[style*="Loading"] {
+    background: linear-gradient(90deg, var(--input-bg) 25%, var(--border) 50%, var(--input-bg) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 6px;
+}
+
+/* ─── Toast Notification Entrance ─────────────────────────────────── */
+[data-sonner-toaster] > *,
+[role="status"] {
+    animation: toastSlide 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes toastSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ─── Dropdown/Select Open Animation ──────────────────────────────── */
+select:focus {
+    animation: dropdownOpen 0.2s ease-out;
+}
+
+@keyframes dropdownOpen {
+    from {
+        opacity: 0.8;
+        transform: translateY(-2px) scaleY(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+    }
+}
+
+/* ─── Avatar Hover ────────────────────────────────────────────────── */
+.avatar,
+img[style*="border-radius: 50%"],
+[style*="border-radius: 50%"][style*="width: 4"] {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.avatar:hover,
+img[style*="border-radius: 50%"]:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* ─── Notification Bell Shake ─────────────────────────────────────── */
+@keyframes bellShake {
+    0%, 100% { transform: rotate(0); }
+    15% { transform: rotate(12deg); }
+    30% { transform: rotate(-10deg); }
+    45% { transform: rotate(8deg); }
+    60% { transform: rotate(-6deg); }
+    75% { transform: rotate(3deg); }
+}
+
+/* ─── Stagger Fade-in for Lists ───────────────────────────────────── */
+table tbody tr,
+.card + .card {
+    animation: listItemIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+table tbody tr:nth-child(2) { animation-delay: 0.04s; }
+table tbody tr:nth-child(3) { animation-delay: 0.06s; }
+table tbody tr:nth-child(4) { animation-delay: 0.08s; }
+table tbody tr:nth-child(5) { animation-delay: 0.1s; }
+table tbody tr:nth-child(6) { animation-delay: 0.12s; }
+table tbody tr:nth-child(7) { animation-delay: 0.14s; }
+table tbody tr:nth-child(8) { animation-delay: 0.16s; }
+table tbody tr:nth-child(9) { animation-delay: 0.18s; }
+table tbody tr:nth-child(10) { animation-delay: 0.2s; }
+
+@keyframes listItemIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Smooth Color Transitions Everywhere ─────────────────────────── */
+*:not(input):not(textarea):not(select) {
+    transition-property: color, background-color, border-color, opacity;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+}
+
+/* ─── Chart Bar Animation ─────────────────────────────────────────── */
+.recharts-bar-rectangle,
+.recharts-area-area {
+    animation: chartGrow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes chartGrow {
+    from {
+        opacity: 0;
+        transform: scaleY(0);
+        transform-origin: bottom;
+    }
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+/* ─── Floating Action Buttons ─────────────────────────────────────── */
+[style*="position: fixed"][style*="bottom"] {
+    animation: fabIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+[style*="position: fixed"][style*="bottom"]:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4);
+}
+
+@keyframes fabIn {
+    from {
+        opacity: 0;
+        transform: scale(0) rotate(-180deg);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) rotate(0);
+    }
+}
+
+/* ─── Smooth Scrollbar Appearance ─────────────────────────────────── */
+::-webkit-scrollbar-thumb {
+    transition: background-color 0.3s ease;
+}
+
+/* ─── Focus Ring Animation ────────────────────────────────────────── */
+:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+    animation: focusRing 0.3s ease;
+}
+
+@keyframes focusRing {
+    from {
+        outline-offset: 6px;
+        outline-color: transparent;
+    }
+    to {
+        outline-offset: 2px;
+        outline-color: var(--primary);
+    }
+}
+
+/* ─── Heading Entrance ────────────────────────────────────────────── */
+h1, h2 {
+    animation: headingIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes headingIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+/* ─── Glassmorphism Enhancement for Dark Mode ─────────────────────── */
+[data-theme='dark'] .card {
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .card:hover {
+    border-color: rgba(96, 165, 250, 0.2);
+}
+
+/* ─── Smooth Theme Toggle ─────────────────────────────────────────── */
+body,
+.card,
+.sidebar-fixed,
+.main-content,
+input,
+select,
+textarea,
+table {
+    transition: background-color 0.4s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 3: SIDEBAR & NAVBAR POLISH
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Sidebar gradient active indicator */
+.sidebar-fixed nav a[style*="rgba(255, 255, 255, 0.15)"] {
+    position: relative;
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(255, 255, 255, 0.15)) !important;
+}
+
+.sidebar-fixed nav a[style*="rgba(255, 255, 255, 0.15)"]::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 15%;
+    bottom: 15%;
+    width: 3px;
+    background: linear-gradient(180deg, #60a5fa, #a78bfa);
+    border-radius: 0 4px 4px 0;
+    box-shadow: 0 0 12px rgba(96, 165, 250, 0.6);
+}
+
+/* Sidebar icon hover glow */
+.sidebar-fixed nav a svg,
+.sidebar-fixed nav button svg {
+    transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.sidebar-fixed nav a:hover svg,
+.sidebar-fixed nav button:hover svg {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.5));
+}
+
+/* Navbar smooth shadow on scroll */
+[style*="position: sticky"][style*="top: 0"] {
+    transition: box-shadow 0.3s ease, background 0.3s ease !important;
+}
+
+/* Profile dropdown animation */
+[style*="position: absolute"][style*="right: 0"][style*="top: 100%"] {
+    animation: dropIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-origin: top right;
+}
+
+@keyframes dropIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Notification badge bounce on appear */
+[style*="position: absolute"][style*="background: #EF4444"][style*="border-radius: 999px"] {
+    animation: badgeBounce 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes badgeBounce {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PREMIUM INPUT & FORM STYLING — Makes forms look expensive
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Elevated Input Fields ───────────────────────────────────────── */
+.input-field,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="tel"],
+input[type="search"],
+select,
+textarea {
+    background-color: var(--input-bg) !important;
+    color: var(--text-main) !important;
+    border: 1.5px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    outline: none !important;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+    letter-spacing: 0.01em;
+}
+
+.input-field:hover,
+input:hover:not(:focus):not([type="checkbox"]):not([type="radio"]),
+select:hover:not(:focus),
+textarea:hover:not(:focus) {
+    border-color: rgba(59, 130, 246, 0.4) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(59, 130, 246, 0.1) !important;
+}
+
+.input-field:focus,
+input:focus:not([type="checkbox"]):not([type="radio"]),
+select:focus,
+textarea:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+    transform: translateY(-1px);
+}
+
+/* Dark mode inputs */
+[data-theme='dark'] .input-field,
+[data-theme='dark'] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme='dark'] select,
+[data-theme='dark'] textarea {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme='dark'] .input-field:hover,
+[data-theme='dark'] input:hover:not(:focus):not([type="checkbox"]):not([type="radio"]),
+[data-theme='dark'] select:hover:not(:focus) {
+    border-color: rgba(96, 165, 250, 0.4) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(96, 165, 250, 0.15) !important;
+}
+
+[data-theme='dark'] .input-field:focus,
+[data-theme='dark'] input:focus:not([type="checkbox"]):not([type="radio"]),
+[data-theme='dark'] select:focus,
+[data-theme='dark'] textarea:focus {
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ─── Premium Select/Dropdown ─────────────────────────────────────── */
+select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 14px center !important;
+    padding-right: 42px !important;
+    cursor: pointer;
+}
+
+[data-theme='dark'] select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+}
+
+select option {
+    padding: 12px 16px;
+    font-size: 14px;
+    background: var(--card-bg);
+    color: var(--text-main);
+}
+
+/* ─── Premium Buttons ─────────────────────────────────────────────── */
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    border: 1px solid rgba(59, 130, 246, 0.5) !important;
+    border-radius: 12px !important;
+    padding: 12px 24px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: var(--card-bg) !important;
+    border: 1.5px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 12px 24px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+    color: var(--text-main) !important;
+}
+
+.btn-secondary:hover {
+    border-color: var(--primary) !important;
+    background: var(--input-bg) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    transform: translateY(-1px);
+}
+
+/* ─── Premium Cards ───────────────────────────────────────────────── */
+.card {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme='dark'] .card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ─── Premium Table Styling ───────────────────────────────────────── */
+table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100%;
+}
+
+table thead th {
+    background: var(--input-bg) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.8px !important;
+    text-transform: uppercase !important;
+    color: var(--text-muted) !important;
+    padding: 14px 20px !important;
+    border-bottom: 1.5px solid var(--border) !important;
+}
+
+table thead th:first-child {
+    border-radius: 12px 0 0 0;
+}
+
+table thead th:last-child {
+    border-radius: 0 12px 0 0;
+}
+
+table tbody td {
+    padding: 14px 20px !important;
+    font-size: 14px !important;
+    border-bottom: 1px solid var(--border) !important;
+    vertical-align: middle;
+}
+
+table tbody tr:last-child td {
+    border-bottom: none !important;
+}
+
+table tbody tr {
+    transition: all 0.2s ease !important;
+}
+
+table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.03) !important;
+}
+
+[data-theme='dark'] table tbody tr:hover {
+    background: rgba(96, 165, 250, 0.06) !important;
+}
+
+/* ─── Premium Status Badges ───────────────────────────────────────── */
+.status-badge {
+    padding: 5px 14px !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-badge.pending,
+.status-badge.pending-activation {
+    background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
+    color: #92400e !important;
+    border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.status-badge.approved,
+.status-badge.active {
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0) !important;
+    color: #065f46 !important;
+    border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.status-badge.rejected,
+.status-badge.inactive {
+    background: linear-gradient(135deg, #fee2e2, #fecaca) !important;
+    color: #991b1b !important;
+    border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+[data-theme='dark'] .status-badge.pending {
+    background: rgba(217, 119, 6, 0.15) !important;
+    color: #fbbf24 !important;
+    border-color: rgba(217, 119, 6, 0.3);
+}
+
+[data-theme='dark'] .status-badge.approved,
+[data-theme='dark'] .status-badge.active {
+    background: rgba(5, 150, 105, 0.15) !important;
+    color: #34d399 !important;
+    border-color: rgba(5, 150, 105, 0.3);
+}
+
+[data-theme='dark'] .status-badge.rejected,
+[data-theme='dark'] .status-badge.inactive {
+    background: rgba(220, 38, 38, 0.15) !important;
+    color: #f87171 !important;
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+/* ─── Premium Toggle Switch ───────────────────────────────────────── */
+button[style*="border-radius: 999px"][style*="width: 44px"] {
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+}
+
+button[style*="border-radius: 999px"][style*="width: 44px"]:hover {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* ─── Premium Checkbox ────────────────────────────────────────────── */
+input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 5px !important;
+    border: 2px solid var(--border) !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    accent-color: var(--primary);
+}
+
+input[type="checkbox"]:checked {
+    background: var(--primary) !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+/* ─── Section Headers ─────────────────────────────────────────────── */
+h1 {
+    font-weight: 800 !important;
+    letter-spacing: -0.5px;
+    color: var(--text-main);
+}
+
+h2, h3 {
+    font-weight: 700 !important;
+    letter-spacing: -0.3px;
+}
+
+/* ─── Smooth Page Wrapper ─────────────────────────────────────────── */
+[style*="padding: 24px"],
+[style*="padding: 32px"],
+.main-content {
+    animation: contentReveal 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes contentReveal {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Elevated Navbar ─────────────────────────────────────────────── */
+[style*="height: 58px"][style*="border-bottom"] {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme='dark'] [style*="height: 58px"][style*="border-bottom"] {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ─── Pill-style filter selects ───────────────────────────────────── */
+.select-field,
+select.input-field {
+    min-width: 140px;
+}
+
+/* ─── Textarea Premium ────────────────────────────────────────────── */
+textarea {
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.6 !important;
+}
+
+/* ─── File Input ──────────────────────────────────────────────────── */
+input[type="file"] {
+    padding: 10px 14px !important;
+    border: 1.5px dashed var(--border) !important;
+    border-radius: 12px !important;
+    background: var(--input-bg) !important;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+input[type="file"]:hover {
+    border-color: var(--primary) !important;
+    background: rgba(59, 130, 246, 0.04) !important;
+}
+
+/* ─── Empty State Enhancement ─────────────────────────────────────── */
+[style*="text-align: center"][style*="color: var(--text-muted)"] {
+    padding: 48px 24px !important;
+    font-size: 15px;
+    opacity: 0.8;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DATA EDGE CASES — Prevent overflow, truncation, and layout breaks
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Long text truncation in tables */
+table td {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Allow wrapping in specific columns */
+table td:first-child,
+table td:nth-child(2) {
+    max-width: 300px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Prevent layout break from long names/emails */
+.card, .status-badge, [style*="display: flex"] {
+    min-width: 0;
+}
+
+/* Truncate long text in cards */
+.card p, .card span {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Prevent overflow in sidebar */
+.sidebar-fixed nav a span,
+.sidebar-fixed nav button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DATA EDGE CASES — Prevent overflow, truncation, and layout breaks
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Long text truncation in tables */
+table td {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Allow wrapping in specific columns */
+table td:first-child,
+table td:nth-child(2) {
+    max-width: 300px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Long names in cards */
+.card h3, .card h4, .card strong, .card p {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Status badges never wrap */
+.status-badge {
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+/* Input fields — prevent overflow */
+input, select, textarea {
+    max-width: 100% !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Sidebar text overflow */
+.sidebar-fixed nav a span,
+.sidebar-fixed nav button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Avatar initials overflow */
+.avatar, [style*="border-radius: 50%"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Empty state styling */
+.card:empty::after,
+table tbody:empty::after {
+    content: 'No data available';
+    display: block;
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-style: italic;
+}
+
+
+/* ─── Login Page Responsive ───────────────────────────────────────── */
+@media (max-width: 900px) {
+    [style*="grid-template-columns: 1fr 1fr"][style*="min-height: 100vh"] {
+        grid-template-columns: 1fr !important;
+    }
+    [style*="grid-template-columns: 1fr 1fr"][style*="min-height: 100vh"] > div:first-child {
+        display: none !important;
+    }
+}
+

@@ -68,6 +68,7 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
                 { icon: HandCoins, label: 'Leave Encashment', path: '/admin/leave-encashment' },
                 { icon: Wallet, label: 'Expense Approvals', path: '/admin/expense-approvals' },
                 { icon: Receipt, label: 'Reimbursement Summary', path: '/admin/reimbursement-summary' },
+                { icon: Mail, label: 'Offer Letters', path: '/admin/offer-letters' },
             ],
         },
         {
@@ -102,7 +103,17 @@ const AdminSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         },
     ]), []);
 
-    const isItemActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+    const isItemActive = (path) => {
+        // Exact match or child path match, but avoid false positives
+        // e.g., /admin/payroll should not match when on /admin/payroll/statutory-settings
+        if (location.pathname === path) return true;
+        // Only match child paths if the item path is not a parent of another item
+        const hasChildItems = menuGroups.some(g => 
+            g.items.some(item => item.path !== path && item.path.startsWith(path + '/'))
+        );
+        if (hasChildItems) return location.pathname === path;
+        return location.pathname.startsWith(path + '/');
+    };
 
     const isGroupActive = (group) => group.items.some((item) => isItemActive(item.path));
 

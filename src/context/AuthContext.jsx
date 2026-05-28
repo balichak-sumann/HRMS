@@ -43,13 +43,6 @@ export const AuthProvider = ({ children }) => {
             return data;
         }
 
-        const allowedRoles = Array.isArray(options.allowedRoles) ? options.allowedRoles : null;
-        if (allowedRoles && !allowedRoles.includes(data?.user?.role)) {
-            throw new Error(
-                `Unauthorized. This account is registered as ${String(data?.user?.role || '').toUpperCase()}, but you tried to login as ${String(selectedRole || '').toUpperCase()}.`
-            );
-        }
-
         localStorage.setItem('token', data.token);
         setUser(data.user);
         setProfile(data.user);
@@ -61,12 +54,6 @@ export const AuthProvider = ({ children }) => {
             otp,
             pre_auth_token: preAuthToken,
         });
-
-        if (Array.isArray(allowedRoles) && !allowedRoles.includes(data?.user?.role)) {
-            throw new Error(
-                `Unauthorized. This account is registered as ${String(data?.user?.role || '').toUpperCase()}, but you tried to login as ${String(selectedRole || '').toUpperCase()}.`
-            );
-        }
 
         localStorage.setItem('token', data.token);
         setUser(data.user);
@@ -81,7 +68,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     const value = { user, profile, loading, login, verifyLoginOtp, signOut, setProfile };
-    console.log('AuthProvider rendered with value:', value);
 
     return (
         <AuthContext.Provider value={value}>

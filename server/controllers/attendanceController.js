@@ -4,72 +4,25 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
-const IST_TIME_ZONE = 'Asia/Kolkata';
-const IST_OFFSET_MINUTES = 330;
-
-const getIstParts = (date = new Date()) => {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: IST_TIME_ZONE,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-    });
-
-    const parts = formatter.formatToParts(date);
-    const valueByType = {};
-    for (const part of parts) {
-        if (part.type !== 'literal') {
-            valueByType[part.type] = part.value;
-        }
-    }
-
-    return {
-        year: Number(valueByType.year),
-        month: Number(valueByType.month),
-        day: Number(valueByType.day),
-        hour: Number(valueByType.hour),
-        minute: Number(valueByType.minute),
-        second: Number(valueByType.second),
-    };
-};
-
-const buildUtcDateFromIst = (dateStr, hour = 0, minute = 0, second = 0) => {
-    const [year, month, day] = String(dateStr).split('-').map(Number);
-    return new Date(Date.UTC(year, month - 1, day, hour, minute, second) - IST_OFFSET_MINUTES * 60 * 1000);
-};
-
 const formatLocalYmd = (date) => {
-    const { year, month, day } = getIstParts(date);
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 };
 
 const normalizeDateYmd = (raw) => {
     if (!raw) return null;
-
     if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
         return formatLocalYmd(raw);
     }
-
     const text = String(raw).trim();
     const isoDateOnlyMatch = text.match(/^(\d{4}-\d{2}-\d{2})$/);
-    if (isoDateOnlyMatch) {
-        return isoDateOnlyMatch[1];
-    }
-
+    if (isoDateOnlyMatch) return isoDateOnlyMatch[1];
     const parsed = new Date(text);
-    if (!Number.isNaN(parsed.getTime())) {
-        return formatLocalYmd(parsed);
-    }
-
+    if (!Number.isNaN(parsed.getTime())) return formatLocalYmd(parsed);
     const directMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (directMatch) {
-        return directMatch[1];
-    }
-
+    if (directMatch) return directMatch[1];
     return null;
 };
 
@@ -106,39 +59,20 @@ const parseMonthRange = (monthValue) => {
 };
 
 const isWeekendDate = (dateStr) => {
-    const day = new Date(`${dateStr}T00:00:00`).getDay();
+    // Use UTC to avoid timezone-dependent day-of-week calculation
+    const day = new Date(dateStr + 'T00:00:00Z').getUTCDay();
     return day === 0 || day === 6;
 };
-const endOfAttendanceDay = (dateStr) => buildUtcDateFromIst(dateStr, 23, 59, 59);
 
-const resolveAttendanceDate = (row) => {
-    const raw = row?.attendance_date || row?.check_in;
-    return normalizeDateYmd(raw);
-};
-
-const autoCheckoutOverdueSessions = async (employeeId) => {
-    if (!employeeId) return;
-
-    const openRes = await pool.query(
-        "SELECT id, attendance_date, check_in FROM attendance WHERE employee_id = $1 AND check_out IS NULL",
-        [employeeId]
-    );
-
-    if (openRes.rows.length === 0) return;
-
+const buildTimestampForDate = (dateStr) => {
+    // Use IST (UTC+5:30) as the business timezone for Indian HRMS
     const now = new Date();
-    for (const row of openRes.rows) {
-        const attendanceDate = resolveAttendanceDate(row);
-        if (!attendanceDate) continue;
-
-        const autoCheckoutAt = endOfAttendanceDay(attendanceDate);
-        if (now > autoCheckoutAt) {
-            await pool.query(
-                "UPDATE attendance SET check_out = $1 WHERE id = $2 AND check_out IS NULL",
-                [autoCheckoutAt, row.id]
-            );
-        }
-    }
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + istOffset);
+    const hh = String(istNow.getUTCHours()).padStart(2, '0');
+    const mm = String(istNow.getUTCMinutes()).padStart(2, '0');
+    const ss = String(istNow.getUTCSeconds()).padStart(2, '0');
+    return new Date(`${dateStr}T${hh}:${mm}:${ss}+05:30`);
 };
 
 const parseTimeToMinutes = (timeValue) => {
@@ -148,9 +82,6 @@ const parseTimeToMinutes = (timeValue) => {
     if (!match) return null;
     return Number(match[1]) * 60 + Number(match[2]);
 };
-
-const LATE_AFTER_MINUTES = 10 * 60;
-const EARLY_BEFORE_MINUTES = 18 * 60;
 
 const getShiftForDate = async (employeeId, attendanceDate) => {
     const result = await pool.query(
@@ -183,9 +114,18 @@ const checkIn = async (req, res) => {
             return res.status(400).json({ error: 'Employee account not found. Please contact HR.' });
         }
 
-        await autoCheckoutOverdueSessions(employee_id);
-
         const attendanceDate = parseAttendanceDate(req.body?.attendance_date);
+        
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        if (attendanceDate > todayStr) {
+            return res.status(400).json({ error: 'Check-in is not allowed for future dates.' });
+        }
+
+        if (attendanceDate < todayStr) {
+            return res.status(400).json({ error: 'Check-in is only allowed for today. Past dates cannot be checked in.' });
+        }
 
         if (isWeekendDate(attendanceDate)) {
             return res.status(400).json({ error: 'Check-in is disabled on Saturday and Sunday by default.' });
@@ -213,28 +153,40 @@ const checkIn = async (req, res) => {
 
         const { location } = req.body;
         
-        // Allow different dates to have independent sessions.
-        // Only block if the selected date already has an open session.
-        const openSessionForDate = await pool.query(
-            "SELECT id FROM attendance WHERE employee_id = $1 AND COALESCE(attendance_date, DATE(check_in)) = $2::date AND check_out IS NULL",
-            [employee_id, attendanceDate]
+        // Global active session check: ensure user isn't checked in for ANY date at the moment
+        const globalActiveSession = await pool.query(
+            "SELECT id, DATE(check_in) as date FROM attendance WHERE employee_id = $1 AND check_out IS NULL",
+            [employee_id]
         );
 
-        if (openSessionForDate.rows.length > 0) {
+        if (globalActiveSession.rows.length > 0) {
+            const activeDate = new Date(globalActiveSession.rows[0].date).toLocaleDateString();
             return res.status(400).json({ 
-                error: 'You already have an active check-in session for this date. Please check out first.' 
+                error: `You already have an active check-in session from ${activeDate}. Please check out first.` 
             });
         }
 
-        const checkInAt = new Date();
-        const istNow = getIstParts(checkInAt);
-        const checkInTime = istNow.hour * 60 + istNow.minute;
-        const status = checkInTime > LATE_AFTER_MINUTES ? 'Late' : 'Present';
+        // Prevent multiple completed attendance records for the same day
+        const completedToday = await pool.query(
+            "SELECT id FROM attendance WHERE employee_id = $1 AND DATE(check_in) = $2::date AND check_out IS NOT NULL",
+            [employee_id, attendanceDate]
+        );
+        if (completedToday.rows.length > 0) {
+            return res.status(400).json({
+                error: 'You have already completed an attendance record for today. Only one check-in/check-out cycle is allowed per day.'
+            });
+        }
+
+        const assignedShift = await getShiftForDate(employee_id, attendanceDate);
+        const checkInAt = buildTimestampForDate(attendanceDate);
+        const checkInTime = checkInAt.getHours() * 60 + checkInAt.getMinutes();
+        const shiftStartMinutes = parseTimeToMinutes(assignedShift?.start_time);
+        const status = shiftStartMinutes != null && checkInTime > shiftStartMinutes ? 'Late' : 'Present';
 
         // Always create a new record for multiple check-ins
         const result = await pool.query(
-            "INSERT INTO attendance (employee_id, attendance_date, check_in, status, location) VALUES ($1, $2::date, $3, $4, $5) RETURNING *",
-            [employee_id, attendanceDate, checkInAt, status, location]
+            "INSERT INTO attendance (employee_id, check_in, status, location) VALUES ($1, $2, $3, $4) RETURNING *",
+            [employee_id, checkInAt, status, location]
         );
 
         res.json(result.rows[0]);
@@ -258,15 +210,24 @@ const checkOut = async (req, res) => {
             return res.status(400).json({ error: 'Employee account not found.' });
         }
 
-        await autoCheckoutOverdueSessions(employee_id);
-
         const attendanceDate = parseAttendanceDate(req.body?.attendance_date);
+        
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        if (attendanceDate > todayStr) {
+            return res.status(400).json({ error: 'Check-out is not allowed for future dates.' });
+        }
 
-        const checkOutAt = new Date();
+        if (attendanceDate < todayStr) {
+            return res.status(400).json({ error: 'Check-out is only allowed for today. Past dates cannot be checked out.' });
+        }
+
+        const checkOutAt = buildTimestampForDate(attendanceDate);
 
         // Find the active record and update it 
         const result = await pool.query(
-            "UPDATE attendance SET check_out = $1 WHERE employee_id = $2 AND COALESCE(attendance_date, DATE(check_in)) = $3::date AND check_out IS NULL RETURNING *",
+            "UPDATE attendance SET check_out = $1 WHERE employee_id = $2 AND DATE(check_in) = $3::date AND check_out IS NULL RETURNING *",
             [checkOutAt, employee_id, attendanceDate]
         );
 
@@ -274,20 +235,9 @@ const checkOut = async (req, res) => {
             return res.status(400).json({ error: 'No active check-in found to check out.' });
         }
 
-        const record = result.rows[0];
-        const istNow = getIstParts(checkOutAt);
-        const checkOutTime = istNow.hour * 60 + istNow.minute;
-
-        if (checkOutTime < EARLY_BEFORE_MINUTES) {
-            await pool.query(
-                "UPDATE attendance SET status = 'Early' WHERE id = $1",
-                [record.id]
-            );
-            record.status = 'Early';
-        }
-
         // Integrity check: if checkout time is before checkin (e.g. clock drift or manual backdating issue)
         // Adjust checkout to match checkin so at least it's 0 duration
+        const record = result.rows[0];
         if (new Date(record.check_out) < new Date(record.check_in)) {
             await pool.query(
                 "UPDATE attendance SET check_out = check_in WHERE id = $1",
@@ -317,12 +267,10 @@ const getMyAttendance = async (req, res) => {
             return res.json([]);
         }
 
-        await autoCheckoutOverdueSessions(employee_id);
-
         console.log('[Attendance /my] Final employee_id:', employee_id);
 
         const result = await pool.query(
-            "SELECT *, COALESCE(attendance_date, DATE(check_in)) AS attendance_date_resolved FROM attendance WHERE employee_id = $1 ORDER BY COALESCE(attendance_date, DATE(check_in)) DESC, check_in DESC",
+            "SELECT * FROM attendance WHERE employee_id = $1 ORDER BY check_in DESC",
             [employee_id]
         );
         res.json(result.rows);
@@ -369,7 +317,7 @@ const getAllAttendance = async (req, res) => {
                            END
                        ) AS total_hours
                 FROM attendance
-                WHERE COALESCE(attendance_date, DATE(check_in)) = $1::date
+                WHERE DATE(check_in) = $1::date
                 GROUP BY employee_id
             ) a ON a.employee_id = e.id
             WHERE 1=1
@@ -410,32 +358,30 @@ const getMonthlyAttendanceExport = async (req, res) => {
         let query = `
             SELECT
                 e.id AS employee_id,
-                COALESCE(NULLIF(TRIM(COALESCE(e.employee_id, '')), ''), 'NA') AS employee_display_id,
                 e.full_name,
                 e.department,
                 COALESCE(SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END), 0) AS present_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Late' THEN 1 ELSE 0 END), 0) AS late_days,
-                COALESCE(SUM(CASE WHEN a.status = 'Early' THEN 1 ELSE 0 END), 0) AS early_days,
                 COALESCE(SUM(CASE WHEN a.status = 'On Leave' THEN 1 ELSE 0 END), 0) AS on_leave_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END), 0) AS absent_days,
                 COALESCE(SUM(CASE WHEN a.status = 'Half-Day' THEN 1 ELSE 0 END), 0) AS half_day_count,
                 COALESCE(COUNT(a.att_date), 0) AS recorded_days,
-                COALESCE(ROUND(SUM(a.total_hours), 2), 0) AS total_hours
+                COALESCE(ROUND(SUM(a.total_hours)::numeric, 2), 0) AS total_hours
             FROM employees e
             LEFT JOIN (
                 SELECT employee_id,
-                       COALESCE(attendance_date, DATE(check_in)) AS att_date,
+                       DATE(check_in) AS att_date,
                        MIN(status) AS status,
                        SUM(
                            CASE
                                WHEN check_in IS NOT NULL AND check_out IS NOT NULL
-                               THEN GREATEST(0, TIMESTAMPDIFF(SECOND, check_in, check_out) / 3600)
+                               THEN GREATEST(0, EXTRACT(EPOCH FROM (check_out - check_in)) / 3600)
                                ELSE 0
                            END
                        ) AS total_hours
                 FROM attendance
-                WHERE COALESCE(attendance_date, DATE(check_in)) BETWEEN DATE($1) AND DATE($2)
-                GROUP BY employee_id, COALESCE(attendance_date, DATE(check_in))
+                WHERE DATE(check_in) BETWEEN $1::date AND $2::date
+                GROUP BY employee_id, DATE(check_in)
             ) a ON a.employee_id = e.id
             WHERE 1=1
         `;
@@ -453,7 +399,7 @@ const getMonthlyAttendanceExport = async (req, res) => {
         }
 
         query += `
-            GROUP BY e.id, e.employee_id, e.full_name, e.department
+            GROUP BY e.id, e.full_name, e.department
             ORDER BY e.full_name ASC
         `;
 
@@ -556,7 +502,7 @@ const createAttendance = async (req, res) => {
 
         // Check if record already exists for this employee on this date
         const existing = await pool.query(
-            "SELECT * FROM attendance WHERE employee_id = $1 AND COALESCE(attendance_date, DATE(check_in)) = $2::date",
+            "SELECT * FROM attendance WHERE employee_id = $1 AND DATE(check_in) = $2::date",
             [employee_id, date]
         );
 
@@ -564,11 +510,10 @@ const createAttendance = async (req, res) => {
             return res.status(400).json({ error: 'Attendance record already exists for this employee on this date' });
         }
 
-        // Create attendance record with status only (no check-in/out times).
-        // This avoids auto-triggering employee check-in when HR/Admin marks status manually.
+        // Create attendance record with status only (no check-in/out times)
         const result = await pool.query(
-            "INSERT INTO attendance (employee_id, attendance_date, check_in, status) VALUES ($1, $2::date, $3, $4) RETURNING *",
-            [employee_id, date, null, status]
+            "INSERT INTO attendance (employee_id, check_in, status) VALUES ($1, $2::date, $3) RETURNING *",
+            [employee_id, date, status]
         );
 
         res.json(result.rows[0]);

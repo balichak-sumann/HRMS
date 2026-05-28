@@ -130,6 +130,10 @@ const updateProfile = async (req, res) => {
     const emergencyContactRegex = /^\d{10}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+    if (typeof name === 'string' && !name.trim()) {
+        return res.status(400).json({ error: 'Please enter full name' });
+    }
+
     if (typeof name === 'string' && name.trim() && !nameValidationRegex.test(name.trim())) {
         return res.status(400).json({
             error: 'Full Name can contain only alphabets, spaces, apostrophes, dots, and hyphens.'

@@ -161,6 +161,13 @@ const startOffboarding = async (req, res) => {
             return res.status(404).json({ error: 'Employee not found' });
         }
 
+        // Check employee is currently active
+        const empStatus = String(employeeRes.rows[0].status || '').toLowerCase();
+        if (empStatus === 'inactive' || empStatus === 'terminated') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Cannot start offboarding for an already inactive/terminated employee' });
+        }
+
         const activeCaseRes = await client.query(
             `SELECT id FROM offboarding_cases
              WHERE employee_id = $1 AND status = 'in_progress'
@@ -207,7 +214,7 @@ const startOffboarding = async (req, res) => {
 
         const assetTableCheck = await client.query(
             `SELECT COUNT(*) AS assets_exists FROM information_schema.tables 
-             WHERE table_schema = 'u945818629_HRMS' AND table_name = 'assets'`
+             WHERE table_name = 'assets' AND table_schema = DATABASE()`
         );
 
         if (assetTableCheck.rows[0]?.assets_exists > 0) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HRSidebar from './HRSidebar';
 import Navbar from './Navbar';
+import AnimatedPage from './AnimatedPage';
 
 const HRLayout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,7 +57,7 @@ const HRLayout = ({ children }) => {
                     maxWidth: '1400px',
                     margin: '0 auto'
                 }}>
-                    {children}
+                    <AnimatedPage>{children}</AnimatedPage>
                 </main>
             </div>
 

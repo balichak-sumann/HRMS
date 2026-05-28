@@ -41,6 +41,7 @@ const CallModal = ({
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(type === 'voice');
     const [error, setError] = useState(null);
+    const [callDuration, setCallDuration] = useState(0);
 
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
@@ -357,6 +358,21 @@ const CallModal = ({
     const isCallActive = callStatus === 'connected';
     const isRinging = callStatus === 'ringing';
 
+    // Call duration timer
+    React.useEffect(() => {
+        if (!isCallActive) return;
+        const interval = setInterval(() => {
+            setCallDuration(prev => prev + 1);
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isCallActive]);
+
+    const formatDuration = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    };
+
     return (
         <div style={{
             position: 'fixed',
@@ -387,6 +403,17 @@ const CallModal = ({
                         playsInline
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
+                    {/* Connected state - show name and duration overlay */}
+                    {isCallActive && (
+                        <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: 'white', fontSize: '18px', fontWeight: '700', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+                                {remoteUser?.name || 'Unknown'}
+                            </span>
+                            <span style={{ color: '#10B981', fontSize: '14px', fontWeight: '600', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+                                🟢 {formatDuration(callDuration)}
+                            </span>
+                        </div>
+                    )}
                     {!isCallActive && (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', padding: '20px', textAlign: 'center' }}>
                             {error ? (

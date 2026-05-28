@@ -1,0 +1,52 @@
+{
+  "name": "website",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "start": "node scripts/start.cjs",
+    "prebuild": "npm install --prefix server",
+    "dev:all": "node scripts/dev-all.js",
+    "install:all": "npm install && npm install --prefix server",
+    "deploy": "npm run --prefix server db:deploy",
+    "migrate": "npm run --prefix server db:deploy",
+    "seed": "node scripts/seed.cjs",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "db:migrate": "npm run --prefix server db:migrate",
+    "db:deploy": "npm run --prefix server db:deploy",
+    "db:status": "npm run --prefix server db:status",
+    "db:studio": "npm run --prefix server db:studio",
+    "db:all": "./start.sh"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.3.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "buffer": "^6.0.3",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^0.577.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.13.1",
+    "recharts": "^3.7.0",
+    "socket.io-client": "^4.8.3",
+    "socket.io-parser": "^4.2.6",
+    "vite": "^8.0.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0"
+  }
+}

@@ -18,9 +18,12 @@ const createOfferLetter = async (req, res) => {
 
         const missingFields = [];
         if (!candidate_name || !String(candidate_name).trim()) missingFields.push('candidate_name');
+        if (!rawCtc || Number(rawCtc) <= 0) missingFields.push('ctc');
+        if (!department || !String(department).trim() || department === 'Select Department') missingFields.push('department');
+        if (!joining_date) missingFields.push('joining_date');
 
         if (missingFields.length > 0) {
-            return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
+            return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}. Please fill in all mandatory fields.` });
         }
 
         if (normalizedEmail && !emailRegex.test(normalizedEmail)) {

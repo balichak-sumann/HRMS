@@ -146,7 +146,15 @@ const Navbar = ({ onMenuClick, isMobile }) => {
             };
 
             setNotifications((prev) => {
+                // Deduplicate by ID
                 if (payload?.id && prev.some(n => n.id === payload.id)) return prev;
+                // Deduplicate by content within last 5 seconds
+                const fiveSecondsAgo = Date.now() - 5000;
+                const isDuplicate = prev.some(n => 
+                    n.message === item.message && 
+                    new Date(n.created_at).getTime() > fiveSecondsAgo
+                );
+                if (isDuplicate) return prev;
                 return [item, ...prev].slice(0, 50);
             });
 
@@ -307,10 +315,10 @@ const Navbar = ({ onMenuClick, isMobile }) => {
                     {showNotifications && (
                         <div className="card shadow-lg" style={{
                             position: 'absolute',
-                            right: '100%', // place to the left of the bell icon
-                            top: '0',
-                            marginRight: '16px', // add a gap between bell and popup
-                            width: '320px',
+                            right: '0',
+                            top: '100%',
+                            marginTop: '8px',
+                            width: '340px',
                             padding: '16px',
                             zIndex: 1000,
                             maxHeight: '400px',
@@ -319,7 +327,6 @@ const Navbar = ({ onMenuClick, isMobile }) => {
                             color: 'var(--text-main)',
                             boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                             borderRadius: '16px',
-                            transition: 'right 0.2s',
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                 <h4 style={{ fontSize: 'var(--font-lg)', fontWeight: '700', color: 'var(--text-main)' }}>Notifications</h4>

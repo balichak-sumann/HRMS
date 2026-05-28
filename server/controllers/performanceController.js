@@ -43,6 +43,15 @@ const createCycle = async (req, res) => {
         return res.status(400).json({ error: 'name, start_date and end_date are required' });
     }
 
+    if (new Date(end_date) <= new Date(start_date)) {
+        return res.status(400).json({ error: 'end_date must be after start_date' });
+    }
+
+    const allowedStatuses = ['draft', 'active', 'completed'];
+    if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ error: `Invalid status. Allowed: ${allowedStatuses.join(', ')}` });
+    }
+
     try {
         const creator = await resolveEmployee(req);
         const result = await pool.query(
@@ -300,6 +309,7 @@ const submitSelfAppraisal = async (req, res) => {
 
         for (const item of items) {
             if (!item.goal_id || typeof item.rating !== 'number') continue;
+            if (item.rating < 1 || item.rating > 5 || !Number.isInteger(item.rating)) continue;
             await client.query(
                 `INSERT INTO self_appraisal_items (self_appraisal_id, goal_id, rating, comment)
                  VALUES ($1, $2, $3, $4)`,
@@ -370,6 +380,7 @@ const submitManagerAppraisal = async (req, res) => {
 
         for (const item of items) {
             if (!item.goal_id || typeof item.rating !== 'number') continue;
+            if (item.rating < 1 || item.rating > 5 || !Number.isInteger(item.rating)) continue;
             await client.query(
                 `INSERT INTO manager_appraisal_items (manager_appraisal_id, goal_id, rating, comment)
                  VALUES ($1, $2, $3, $4)`,
@@ -470,6 +481,10 @@ const submitPeerFeedback = async (req, res) => {
 
     if (!cycle_id || !employee_id || typeof rating !== 'number') {
         return res.status(400).json({ error: 'cycle_id, employee_id and rating are required' });
+    }
+
+    if (rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+        return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
     }
 
     try {

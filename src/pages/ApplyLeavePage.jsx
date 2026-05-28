@@ -80,14 +80,7 @@ const ApplyLeavePage = () => {
                 submitData.append('attachment', file);
             }
 
-            console.log('--- SUBMITTING LEAVE ---');
-            console.log('Sending to api.post(/leaves)');
-            for (let pair of submitData.entries()) {
-                console.log(pair[0], pair[1]);
-            }
-
             const response = await api.post('/leaves', submitData);
-            console.log('Server responded with:', response);
 
 
             toast.success('Leave application submitted successfully!');
@@ -204,7 +197,16 @@ const ApplyLeavePage = () => {
                                 <input
                                     type="file"
                                     id="leave-attachment"
-                                    onChange={(e) => setFile(e.target.files[0])}
+                                    onChange={(e) => {
+                                        const selectedFile = e.target.files[0];
+                                        if (selectedFile && selectedFile.size > 5 * 1024 * 1024) {
+                                            toast.error('File size must be less than 5MB');
+                                            e.target.value = '';
+                                            return;
+                                        }
+                                        setFile(selectedFile);
+                                    }}
+                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                                     style={{ display: 'none' }}
                                 />
                                 <label htmlFor="leave-attachment" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>

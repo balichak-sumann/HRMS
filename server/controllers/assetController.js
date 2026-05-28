@@ -260,7 +260,7 @@ const returnAsset = async (req, res) => {
              SET is_cleared = TRUE,
                  cleared_by = $1,
                  cleared_at = NOW(),
-                 notes = COALESCE(i.notes, '') || CASE WHEN COALESCE(i.notes, '') = '' THEN '' ELSE E'\n' END || $2,
+                 notes = CONCAT(COALESCE(i.notes, ''), CASE WHEN COALESCE(i.notes, '') = '' THEN '' ELSE '\n' END, $2),
                  updated_at = NOW()
              FROM offboarding_cases c
              WHERE i.case_id = c.id

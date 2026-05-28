@@ -247,15 +247,22 @@ const assignShiftToEmployee = async (req, res) => {
                    AND (effective_to IS NULL OR effective_to >= $2)`,
                 [employee_id, effectiveFrom]
             );
+
+            // Insert the new permanent assignment
+            await client.query(
+                `INSERT INTO employee_shift_assignments (
+                    employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [employee_id, shift_id, effectiveFrom, effectiveTo, actorId]
+            );
         }
 
-        // Insert the new assignment
+        // Fetch the latest assignment for response
         const assigned = await client.query(
-            `INSERT INTO employee_shift_assignments (
-                employee_id, shift_id, effective_from, effective_to, assigned_by, updated_at
-             ) VALUES ($1, $2, $3, $4, $5, NOW())
-             RETURNING *`,
-            [employee_id, shift_id, effectiveFrom, effectiveTo, actorId]
+            `SELECT * FROM employee_shift_assignments
+             WHERE employee_id = $1 AND shift_id = $2 AND effective_from = $3::date
+             ORDER BY created_at DESC LIMIT 1`,
+            [employee_id, shift_id, effectiveFrom]
         );
 
         await client.query('COMMIT');

@@ -32,11 +32,17 @@ const HRDepartmentsPage = () => {
 
     const submitForm = async (e) => {
         e.preventDefault();
+        if (!form.name.trim()) {
+            toast.error('Department name is required');
+            return;
+        }
         try {
             if (editingId) {
                 await api.patch(`/departments/${editingId}`, form);
+                toast.success('Department updated successfully');
             } else {
                 await api.post('/departments', form);
+                toast.success('Department created successfully');
             }
             setForm({ name: '', description: '' });
             setEditingId(null);

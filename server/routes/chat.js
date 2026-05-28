@@ -2,21 +2,32 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { auth } = require('../middleware/auth');
 const chatController = require('../controllers/chatController');
+
+// Ensure upload directory exists
+const chatUploadDir = path.join(__dirname, '..', 'uploads', 'chat');
+if (!fs.existsSync(chatUploadDir)) {
+    fs.mkdirSync(chatUploadDir, { recursive: true });
+}
 
 // Multer Storage Configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/chat/');
+        cb(null, chatUploadDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, uniqueSuffix + '-' + safeName);
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 router.get('/contacts', auth, chatController.getContacts);
 router.get('/groups', auth, chatController.getGroups);

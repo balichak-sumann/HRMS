@@ -8,11 +8,11 @@ const offboardingController = require('../controllers/offboardingController');
 router.use(auth);
 router.use(auditLogger('Employee Offboarding'));
 
-router.post('/cases', authorize(['hr']), offboardingController.startOffboarding);
-router.get('/cases', authorize(['hr']), offboardingController.getCasesForHR);
-router.get('/cases/:id', authorize(['hr']), offboardingController.getCaseDetailsForHR);
-router.patch('/cases/:caseId/items/:itemId/assignment', authorize(['hr']), offboardingController.updateChecklistAssignment);
-router.post('/cases/:id/finalize', authorize(['hr']), offboardingController.finalizeOffboarding);
+router.post('/cases', authorize(['hr', 'admin']), offboardingController.startOffboarding);
+router.get('/cases', authorize(['hr', 'admin']), offboardingController.getCasesForHR);
+router.get('/cases/:id', authorize(['hr', 'admin']), offboardingController.getCaseDetailsForHR);
+router.patch('/cases/:caseId/items/:itemId/assignment', authorize(['hr', 'admin']), offboardingController.updateChecklistAssignment);
+router.post('/cases/:id/finalize', authorize(['hr', 'admin']), offboardingController.finalizeOffboarding);
 
 router.patch('/checklist/:itemId/clear', authorize(['hr', 'employee']), offboardingController.markChecklistItem);
 

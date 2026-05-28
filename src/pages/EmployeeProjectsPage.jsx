@@ -36,10 +36,6 @@ const EmployeeProjectsPage = () => {
     const handleSubmitReport = async (e) => {
         e.preventDefault();
         if (!selectedProject) return;
-        if (String(selectedProject.status || '').trim().toLowerCase() !== 'active') {
-            alert('This project is closed. Daily reports are disabled.');
-            return;
-        }
         try {
             await api.post(`/projects/${selectedProject.id}/reports`, formData);
             alert('Report submitted successfully!');
@@ -69,26 +65,21 @@ const EmployeeProjectsPage = () => {
                             <div
                                 key={p.id}
                                 className={`card ${selectedProject?.id === p.id ? 'active' : ''}`}
-                                onClick={() => {
-                                    if (String(p.status || '').trim().toLowerCase() === 'active') {
-                                        setSelectedProject(p);
-                                    }
-                                }}
+                                onClick={() => setSelectedProject(p)}
                                 style={{
-                                    cursor: String(p.status || '').trim().toLowerCase() === 'active' ? 'pointer' : 'not-allowed',
+                                    cursor: 'pointer',
                                     border: selectedProject?.id === p.id ? '2px solid var(--primary)' : '1px solid var(--border)',
-                                    opacity: String(p.status || '').trim().toLowerCase() === 'active' ? 1 : 0.6,
                                     transition: 'all 0.2s'
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                     <h4 style={{ fontWeight: '700' }}>{p.name}</h4>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{p.progress}%</span>
+                                    <span className={`project-status-${(p.status || 'active').toLowerCase().replace(/\s+/g, '-')}`}>
+                                        {p.status || 'Active'}
+                                    </span>
                                 </div>
-                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>Client: {p.client}</p>
-                                {String(p.status || '').trim().toLowerCase() !== 'active' && (
-                                    <p style={{ fontSize: '12px', color: '#B45309', fontWeight: '700', marginBottom: '10px' }}>Closed project</p>
-                                )}
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Client: {p.client}</p>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>Progress: {p.progress}%</p>
                                 <div style={{ height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden' }}>
                                     <div style={{ width: `${p.progress}%`, height: '100%', background: 'var(--primary)' }}></div>
                                 </div>
@@ -143,7 +134,6 @@ const EmployeeProjectsPage = () => {
                                 </div>
                                 <button
                                     type="submit"
-                                    disabled={String(selectedProject.status || '').trim().toLowerCase() !== 'active'}
                                     style={{
                                         width: '100%', padding: '14px', background: 'var(--primary)', color: 'white',
                                         border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer',

@@ -193,8 +193,29 @@ const EmployeeTaxDeclarationPage = () => {
     };
 
     const submitDeclaration = async () => {
+        // Validate items exist locally
+        const validItems = items.filter(row => row.item_label && Number(row.declared_amount) > 0);
+        if (validItems.length === 0) {
+            alert('Please add at least one declaration item with a label and amount before submitting.');
+            return;
+        }
+
         try {
             setSubmitting(true);
+
+            // Auto-save before submitting to ensure items are persisted
+            const savePayload = {
+                financial_year: financialYear,
+                declaration_id: selectedDeclarationId || undefined,
+                items: items.map((row) => ({
+                    id: row.id,
+                    section_code: row.section_code,
+                    item_label: row.item_label,
+                    declared_amount: Number(row.declared_amount || 0),
+                })),
+            };
+            await api.put('/income-tax/my', savePayload);
+
             const data = await api.post('/income-tax/my/submit', {
                 financial_year: financialYear,
                 declaration_id: selectedDeclarationId || undefined,
@@ -367,10 +388,10 @@ const EmployeeTaxDeclarationPage = () => {
                                             disabled={isReviewed}
                                         />
                                     </td>
-                                    <td style={{ padding: '8px', fontWeight: '600', color: row.status === 'approved' ? 'var(--status-approved-text)' : 'inherit' }}>
-                                        {row.status === 'approved' && row.approved_amount != null
+                                    <td style={{ padding: '8px', fontWeight: '600', color: String(row.status || '').toLowerCase() === 'approved' ? 'var(--status-approved-text)' : 'inherit' }}>
+                                        {String(row.status || '').toLowerCase() === 'approved' && row.approved_amount != null
                                             ? `₹${Number(row.approved_amount).toLocaleString('en-IN')}`
-                                            : row.status === 'rejected' ? '₹0' : '-'}
+                                            : String(row.status || '').toLowerCase() === 'rejected' ? '₹0' : '-'}
                                     </td>
                                     <td style={{ padding: '8px' }}>
                                         <span className={`status-badge ${row.status || 'pending'}`}>

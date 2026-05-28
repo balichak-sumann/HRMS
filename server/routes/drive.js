@@ -7,6 +7,7 @@ const { auth } = require('../middleware/auth');
 const { auditLogger } = require('../middleware/auditLogger');
 const driveController = require('../controllers/driveController');
 
+router.use(auth);
 router.use(auditLogger('Cloud Drive'));
 
 // Multer Storage Configuration
@@ -23,13 +24,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-router.get('/contents', auth, driveController.getContents);
-router.get('/storage-usage', auth, driveController.getStorageUsage);
-router.post('/upload', auth, upload.single('file'), driveController.uploadFile);
-router.post('/folder', auth, driveController.createFolder);
-router.patch('/folders/:id', auth, driveController.renameFolder);
-router.delete('/folders/:id', auth, driveController.deleteFolder);
-router.delete('/files/:id', auth, driveController.deleteFile);
-router.get('/download/:id', auth, driveController.downloadFile);
+router.get('/contents', driveController.getContents);
+router.get('/storage-usage', driveController.getStorageUsage);
+router.post('/upload', upload.single('file'), driveController.uploadFile);
+router.post('/folder', driveController.createFolder);
+router.patch('/folders/:id', driveController.renameFolder);
+router.delete('/folders/:id', driveController.deleteFolder);
+router.delete('/files/:id', driveController.deleteFile);
+router.get('/download/:id', driveController.downloadFile);
 
 module.exports = router;

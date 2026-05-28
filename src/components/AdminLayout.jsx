@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminSidebar from './AdminSidebar';
 import Navbar from './Navbar';
+import AnimatedPage from './AnimatedPage';
 
 const AdminLayout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -55,7 +56,7 @@ const AdminLayout = ({ children }) => {
                     maxWidth: '1400px',
                     margin: '0 auto'
                 }}>
-                    {children}
+                    <AnimatedPage>{children}</AnimatedPage>
                 </main>
             </div>
 

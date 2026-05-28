@@ -55,19 +55,6 @@ const validateQuestion = (question) => {
     return null;
 };
 
-const hasColumn = async (client, tableName, columnName) => {
-    const result = await client.query(
-        `SELECT COUNT(*) AS count
-         FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = $1
-           AND COLUMN_NAME = $2`,
-        [tableName, columnName]
-    );
-
-    return Number(result.rows?.[0]?.count || 0) > 0;
-};
-
 const createSurvey = async (req, res) => {
     const {
         title,
@@ -92,10 +79,6 @@ const createSurvey = async (req, res) => {
         return res.status(400).json({ error: 'target_department_id is required for department surveys' });
     }
 
-    if (survey_type !== undefined && survey_type !== null && typeof survey_type !== 'string') {
-        return res.status(400).json({ error: 'survey_type must be a string when provided' });
-    }
-
     for (const question of questions) {
         const error = validateQuestion(question);
         if (error) return res.status(400).json({ error });
@@ -106,43 +89,20 @@ const createSurvey = async (req, res) => {
         await client.query('BEGIN');
 
         const creator = await resolveEmployee(req, client);
-        const hasSurveyTypeColumn = await hasColumn(client, 'surveys', 'survey_type');
-
-        const insertColumns = [
-            'title',
-            'description',
-            'created_by',
-            'target_type',
-            'target_department_id',
-            'is_anonymous',
-            'deadline',
-        ];
-
-        const insertValues = [
-            title,
-            description || null,
-            creator?.id || null,
-            target_type,
-            target_type === 'department' ? target_department_id : null,
-            !!is_anonymous,
-            deadline || null,
-        ];
-
-        if (hasSurveyTypeColumn) {
-            insertColumns.push('survey_type');
-            insertValues.push(survey_type || null);
-        }
-
-        insertColumns.push('status');
-        insertValues.push('draft');
-
-        const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
         const surveyResult = await client.query(
             `INSERT INTO surveys
-             (${insertColumns.join(', ')})
-             VALUES (${placeholders})
+             (title, description, created_by, target_type, target_department_id, is_anonymous, deadline, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
              RETURNING *`,
-            insertValues
+            [
+                title,
+                description || null,
+                creator?.id || null,
+                target_type,
+                target_type === 'department' ? target_department_id : null,
+                !!is_anonymous,
+                deadline || null,
+            ]
         );
 
         const survey = surveyResult.rows[0];
@@ -175,9 +135,8 @@ const createSurvey = async (req, res) => {
         res.status(201).json({ ...survey, questions: createdQuestions });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('createSurvey error:', err.message, err.stack);
-        const message = err.message || 'Server error';
-        res.status(500).json({ error: message });
+        console.error('createSurvey error:', err.message);
+        res.status(500).json({ error: 'Server error' });
     } finally {
         client.release();
     }

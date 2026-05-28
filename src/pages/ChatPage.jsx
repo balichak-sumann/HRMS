@@ -451,7 +451,11 @@ const ChatPage = () => {
 
         const handleReceiveMessage = (message) => {
             console.log('New message received:', message);
-            setMessages(prev => [...prev, message]);
+            setMessages(prev => {
+                // Prevent duplicates (from optimistic update or double-emit)
+                if (prev.some(m => m.id === message.id)) return prev;
+                return [...prev, message];
+            });
         };
 
         const handleUserOnline = (userId) => {
@@ -574,6 +578,19 @@ const ChatPage = () => {
             };
 
             await api.post('/chat/message', payload);
+
+            // Optimistic update — add message to local state immediately
+            const optimisticMessage = {
+                id: Date.now().toString(),
+                sender_id: currentUser?.employee_uuid || currentUser?.id,
+                receiver_id: activeChat.type === 'group' ? null : activeChat.id,
+                group_id: activeChat.type === 'group' ? activeChat.id : null,
+                content: payload.content,
+                attachment_url: attachmentUrl || null,
+                sender_name: currentUser?.full_name || currentUser?.name || 'You',
+                created_at: new Date().toISOString(),
+            };
+            setMessages(prev => [...prev, optimisticMessage]);
         } catch (error) {
             console.error('Send error:', error);
         } finally {

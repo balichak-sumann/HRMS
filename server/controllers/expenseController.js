@@ -32,16 +32,50 @@ const resolveEmployee = async (req) => {
 const submitExpenseClaim = async (req, res) => {
     const { category, amount, expense_date, description } = req.body;
 
-    if (!category || !['Travel', 'Food', 'Equipment', 'Other'].includes(category)) {
-        return res.status(400).json({ error: 'Valid category is required' });
+    // Category validation — check against system_lookups or use default list
+    const DEFAULT_CATEGORIES = ['Travel', 'Food', 'Equipment', 'Medical', 'Office Supplies', 'Software', 'Training', 'Other'];
+    let allowedCategories = DEFAULT_CATEGORIES;
+    try {
+        const lookupRes = await pool.query(
+            "SELECT value FROM system_lookups WHERE category = 'EXPENSE_CATEGORY' AND is_active = TRUE ORDER BY sort_order"
+        );
+        if (lookupRes.rows.length > 0) {
+            allowedCategories = lookupRes.rows.map(r => r.value);
+        }
+    } catch (_) {
+        // Fall back to default categories
+    }
+
+    if (!category || !allowedCategories.includes(category)) {
+        return res.status(400).json({ error: `Valid category is required. Allowed: ${allowedCategories.join(', ')}` });
     }
 
     if (!amount || Number(amount) <= 0) {
         return res.status(400).json({ error: 'Amount must be greater than 0' });
     }
 
+    if (Number(amount) > 10000000) {
+        return res.status(400).json({ error: 'Amount exceeds maximum allowed limit' });
+    }
+
     if (!expense_date) {
         return res.status(400).json({ error: 'Expense date is required' });
+    }
+
+    // Validate date format and no future dates
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date)) {
+        return res.status(400).json({ error: 'Expense date must be in YYYY-MM-DD format' });
+    }
+
+    const expDateObj = new Date(expense_date + 'T00:00:00Z');
+    if (isNaN(expDateObj.getTime())) {
+        return res.status(400).json({ error: 'Invalid expense date' });
+    }
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (expDateObj > today) {
+        return res.status(400).json({ error: 'Expense date cannot be in the future' });
     }
 
     try {
@@ -168,6 +202,12 @@ const reviewExpenseClaim = async (req, res) => {
         if (claim.status !== 'Pending') {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Only pending claims can be reviewed' });
+        }
+
+        // Prevent self-review
+        if (claim.employee_id === reviewer.id) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ error: 'You cannot review your own expense claim' });
         }
 
         const canReview = ['hr', 'admin'].includes(req.user.role) || claim.reporting_manager_id === reviewer.id;

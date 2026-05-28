@@ -168,27 +168,32 @@ const createTask = async (req, res) => {
 // ─── Submit daily report (Employee) ──────────────────────────────
 const createReport = async (req, res) => {
     const { work_done, hours, blockers } = req.body;
+
+    if (!work_done || !String(work_done).trim()) {
+        return res.status(400).json({ error: 'Work done description is required' });
+    }
+
+    if (!hours || Number(hours) <= 0) {
+        return res.status(400).json({ error: 'Hours spent must be greater than 0' });
+    }
+
     try {
-        const projectRes = await pool.query(
-            `SELECT id, name, status
-             FROM projects
-             WHERE id = $1
-             LIMIT 1`,
+        // Check project status - prevent reports on closed/completed projects
+        const projectCheck = await pool.query(
+            'SELECT id, status FROM projects WHERE id = $1',
             [req.params.id]
         );
-
-        if (projectRes.rows.length === 0) {
+        if (projectCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Project not found' });
         }
-
-        const projectStatus = String(projectRes.rows[0].status || '').trim().toLowerCase();
-        if (projectStatus && projectStatus !== 'active') {
-            return res.status(400).json({ error: 'Project is closed. Daily reports are disabled for closed projects.' });
+        const projectStatus = String(projectCheck.rows[0].status || '').toLowerCase();
+        if (projectStatus === 'completed' || projectStatus === 'closed' || projectStatus === 'cancelled') {
+            return res.status(400).json({ error: `Cannot submit reports for a ${projectStatus} project` });
         }
 
         const result = await pool.query(
             "INSERT INTO daily_reports (project_id, employee_id, work_done, hours, blockers) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-            [req.params.id, req.user.employee_uuid || req.user.id, work_done, hours, blockers]
+            [req.params.id, req.user.employee_uuid || req.user.id, work_done, Number(hours), blockers || null]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -219,68 +224,6 @@ const getProjectReports = async (req, res) => {
     }
 };
 
-// ─── Add employee to project ──────────────────────────────────
-const addProjectMember = async (req, res) => {
-    const { employee_id } = req.body;
-
-    if (!employee_id) {
-        return res.status(400).json({ error: 'employee_id is required' });
-    }
-
-    try {
-        const projectRes = await pool.query(
-            `SELECT id FROM projects WHERE id = $1 LIMIT 1`,
-            [req.params.id]
-        );
-        if (projectRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Project not found' });
-        }
-
-        const employeeRes = await pool.query(
-            `SELECT id, full_name, department FROM employees WHERE id = $1 LIMIT 1`,
-            [employee_id]
-        );
-        if (employeeRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Employee not found' });
-        }
-
-        const existing = await pool.query(
-            `SELECT project_id, employee_id FROM project_members WHERE project_id = $1 AND employee_id = $2 LIMIT 1`,
-            [req.params.id, employee_id]
-        );
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ error: 'Employee is already a project member' });
-        }
-
-        await pool.query(
-            `INSERT INTO project_members (project_id, employee_id) VALUES ($1, $2)`,
-            [req.params.id, employee_id]
-        );
-
-        res.json({ success: true, full_name: employeeRes.rows[0].full_name });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-};
-
-// ─── Remove employee from project ──────────────────────────────
-const removeProjectMember = async (req, res) => {
-    try {
-        const result = await pool.query(
-            `DELETE FROM project_members WHERE project_id = $1 AND employee_id = $2 RETURNING project_id, employee_id`,
-            [req.params.id, req.params.employeeId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Project member not found' });
-        }
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Server error' });
-    }
-};
-
 // ─── Get user's own report history ───────────────────────────────
 const getMyReports = async (req, res) => {
     try {
@@ -305,8 +248,6 @@ module.exports = {
     reopenProject,
     getProjectById,
     createTask,
-    addProjectMember,
-    removeProjectMember,
     createReport,
     getProjectReports,
     getMyReports

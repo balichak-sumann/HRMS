@@ -115,7 +115,14 @@ const HRSidebar = ({ isOpen, toggleSidebar, isMobile }) => {
         },
     ]), []);
 
-    const isItemActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+    const isItemActive = (path) => {
+        if (location.pathname === path) return true;
+        const hasChildItems = menuGroups.some(g => 
+            g.items.some(item => item.path !== path && item.path.startsWith(path + '/'))
+        );
+        if (hasChildItems) return location.pathname === path;
+        return location.pathname.startsWith(path + '/');
+    };
     const isGroupActive = (group) => group.items.some((item) => isItemActive(item.path));
 
     const toggleGroup = (label) => {

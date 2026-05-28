@@ -1,0 +1,598 @@
+{
+  "audit_timestamp": "2026-04-07T00:00:00Z",
+  "audit_scope": "Complete codebase database schema and compatibility audit",
+  "database_platform": "MySQL/MariaDB (migrated from PostgreSQL)",
+  "schema_column_mismatches": [
+    {
+      "table": "complaints",
+      "issue": "DUPLICATE_COLUMN",
+      "affected_columns": ["attachment", "attachment_url"],
+      "description": "Schema has both 'attachment' and 'attachment_url' columns. Code uses 'attachment_url'. The 'attachment' column appears redundant.",
+      "severity": "MEDIUM",
+      "recommendation": "Consolidate to single 'attachment_url' column or clarify purpose of 'attachment' column"
+    },
+    {
+      "table": "messages",
+      "issue": "DUPLICATE_COLUMN",
+      "affected_columns": ["attachment", "attachment_url"],
+      "description": "Schema has both 'attachment' and 'attachment_url' columns. Code uses 'attachment_url'. Duplicates appear intentional but should be verified.",
+      "severity": "MEDIUM",
+      "recommendation": "Verify if both columns are needed or consolidate"
+    },
+    {
+      "table": "onboarding_case_tasks",
+      "issue": "MISSING_COLUMN_IN_CODE",
+      "schema_columns": ["template_task_id"],
+      "code_usage": "Column is referenced in schema but migration code may not always populate it",
+      "severity": "LOW",
+      "instances": ["onboardingController.js"]
+    }
+  ],
+  "missing_rewrite_rules": [
+    {
+      "pattern": "EXTRACT(EPOCH FROM ...)",
+      "postgresql_syntax": "EXTRACT(EPOCH FROM (timestamp_col1 - timestamp_col2)) / 3600",
+      "affected_queries": [
+        "attendanceController.js:279 - Calculate hours worked from EPOCH",
+        "attendanceController.js:342 - Calculate hours worked from EPOCH",
+        "helpdeskController.js:490 - Calculate avg resolution time in hours"
+      ],
+      "mysql_equivalent": "TIMESTAMPDIFF(HOUR, start_time, end_time)",
+      "severity": "CRITICAL",
+      "status": "NOT_HANDLED_BY_REWRITE_RULES"
+    },
+    {
+      "pattern": "EXTRACT(EPOCH FROM (datetime_col)) / 3600",
+      "description": "Gap in db/index.js rewriteExtract function - only handles MONTH/DAY/YEAR extraction",
+      "affected_controllers": ["attendanceController", "helpdeskController"],
+      "total_instances": 3,
+      "severity": "CRITICAL",
+      "action_required": "Add EXTRACT(EPOCH ...) rewrite rule to db/index.js"
+    },
+    {
+      "pattern": "GREATEST(0, expression)",
+      "postgresql_syntax": "GREATEST(0, EXTRACT(EPOCH FROM (check_out - check_in)) / 3600)",
+      "affected_queries": [
+        "attendanceController.js:279 - Ensure hours_worked >= 0",
+        "attendanceController.js:342 - Ensure hours_worked >= 0"
+      ],
+      "mysql_equivalent": "GREATEST(0, TIMESTAMPDIFF(HOUR, check_in, check_out))",
+      "severity": "CRITICAL",
+      "status": "NOT_HANDLED",
+      "note": "GREATEST is not in rewrite rules"
+    },
+    {
+      "pattern": "generate_series()",
+      "postgresql_syntax": "SELECT generate_series($1::date, $1::date + INTERVAL '6 days', INTERVAL '1 day')::date AS day",
+      "affected_queries": ["shiftController.js:454 - Generate date range for weekly display"],
+      "mysql_equivalent": "Must use custom query with DATE_ADD in loop or union",
+      "severity": "HIGH",
+      "status": "NOT_HANDLED",
+      "recommendation": "Use application-level loop to generate date range or refactor query"
+    },
+    {
+      "pattern": "::date TYPE CAST",
+      "instances_count": 30,
+      "affected_queries": [
+        "attendanceController.js - Multiple DATE comparisons",
+        "payrollController.js - Date range calculations",
+        "shiftController.js - Date arithmetic",
+        "salaryRevisionController.js:54"
+      ],
+      "severity": "HIGH",
+      "status": "PARTIALLY_HANDLED",
+      "note": "rewriteCasts removes all :: casts, but this may cause issues with implicit type conversion"
+    },
+    {
+      "pattern": "::int TYPE CAST",
+      "instances_count": 35,
+      "mysql_handling": "CAST() or implicit conversion should work",
+      "affected_areas": ["COUNT() results", "COALESCE() calculations"],
+      "severity": "MEDIUM"
+    },
+    {
+      "pattern": "::uuid[] ARRAY CAST",
+      "affected_queries": [
+        "payrollController.js:481 - WHERE id = ANY($2::uuid[])",
+        "payrollController.js:491 - WHERE id = ANY($2::uuid[])",
+        "performanceController.js:588 - WHERE employee_id = ANY($2::uuid[])"
+      ],
+      "severity": "CRITICAL",
+      "status": "PARTIALLY_HANDLED",
+      "note": "rewriteArrayAny converts ANY() to IN() but doesn't handle array casting"
+    }
+  ],
+  "unsupported_features": [
+    {
+      "feature": "WITH queries (CTE - Common Table Expressions)",
+      "count": 3,
+      "instances": [
+        {
+          "file": "analyticsController.js",
+          "line": 149,
+          "pattern": "WITH inserted AS (INSERT ... RETURNING ...)",
+          "description": "Named CTE with INSERT...RETURNING"
+        },
+        {
+          "file": "chatController.js",
+          "line": 211,
+          "pattern": "WITH inserted AS (INSERT ... RETURNING ...)",
+          "description": "Named CTE with INSERT...RETURNING"
+        },
+        {
+          "file": "driveController.js",
+          "line": 185,
+          "pattern": "WITH RECURSIVE folder_tree AS (...)",
+          "description": "Recursive CTE for hierarchical folder traversal"
+        }
+      ],
+      "severity": "CRITICAL",
+      "status": "NOT_SUPPORTED",
+      "mysql_impact": "db/index.js throws error: 'WITH queries still need manual MySQL conversion.'",
+      "action_required": "Manual refactor needed - Cannot be automated"
+    },
+    {
+      "feature": "to_regclass()",
+      "count": 1,
+      "instances": [
+        {
+          "file": "offboardingController.js",
+          "line": 198,
+          "pattern": "SELECT to_regclass('public.assets') AS assets_table",
+          "description": "PostgreSQL metadata function to check if table exists"
+        }
+      ],
+      "severity": "CRITICAL",
+      "status": "NOT_SUPPORTED",
+      "mysql_equivalent": "SELECT table_name FROM information_schema.tables WHERE table_schema='current' AND table_name='table_name'",
+      "current_handling": "db/index.js throws error: 'to_regclass() still needs manual MySQL conversion.'"
+    },
+    {
+      "feature": "ON CONFLICT DO NOTHING",
+      "count": 3,
+      "instances": [
+        {
+          "file": "authController.js",
+          "line": 345,
+          "pattern": "INSERT INTO token_blacklist ... ON CONFLICT (token) DO NOTHING",
+          "rewrite_status": "Converted to INSERT IGNORE"
+        },
+        {
+          "file": "holidayController.js",
+          "line": 31,
+          "pattern": "INSERT INTO holidays ... ON CONFLICT DO NOTHING",
+          "note": "Missing conflict column specification"
+        },
+        {
+          "file": "holidayController.js",
+          "line": 53,
+          "pattern": "INSERT INTO holidays ... ON CONFLICT DO NOTHING",
+          "note": "Missing conflict column specification"
+        }
+      ],
+      "severity": "MEDIUM",
+      "status": "HANDLED_WITH_ISSUES",
+      "rewrite_rule": "rewriteConflict converts to INSERT IGNORE",
+      "issue_detail": "Some ON CONFLICT statements missing column specification - may cause syntax errors"
+    },
+    {
+      "feature": "ON CONFLICT DO UPDATE",
+      "count": 2,
+      "instances": [
+        {
+          "file": "performanceController.js",
+          "line": 253,
+          "pattern": "INSERT INTO self_appraisals ... ON CONFLICT (cycle_id, employee_id) DO UPDATE"
+        },
+        {
+          "file": "performanceController.js",
+          "line": 307,
+          "pattern": "INSERT INTO manager_appraisals ... ON CONFLICT (cycle_id, employee_id, manager_id) DO UPDATE"
+        }
+      ],
+      "severity": "MEDIUM",
+      "status": "HANDLED",
+      "rewrite_rule": "rewriteConflict converts to ON DUPLICATE KEY UPDATE"
+    },
+    {
+      "feature": "ON CONFLICT with EXCLUDED pseudo-table",
+      "count": 1,
+      "instances": [
+        {
+          "file": "offboardingController.js",
+          "line": 571,
+          "pattern": "INSERT ... ON CONFLICT (case_id) DO UPDATE SET ... = EXCLUDED.field"
+        }
+      ],
+      "severity": "MEDIUM",
+      "status": "HANDLED",
+      "rewrite_rule": "rewriteConflict converts EXCLUDED to VALUES()"
+    },
+    {
+      "feature": "ANY() operator for array operations",
+      "count": 3,
+      "instances": [
+        {
+          "file": "offboardingController.js",
+          "line": 487,
+          "pattern": "OR i.assigned_role = ANY($2)"
+        },
+        {
+          "file": "payrollController.js",
+          "line": 481,
+          "pattern": "WHERE id = ANY($2::uuid[])"
+        },
+        {
+          "file": "payrollController.js",
+          "line": 491,
+          "pattern": "WHERE id = ANY($2::uuid[])"
+        }
+      ],
+      "severity": "HIGH",
+      "status": "HANDLED",
+      "rewrite_rule": "rewriteArrayAny converts to IN operator"
+    },
+    {
+      "feature": "INTERVAL arithmetic with INTERVAL 'N days'",
+      "count": 15,
+      "examples": [
+        "NOW() - INTERVAL '30 days'",
+        "NOW() + INTERVAL '24 hours'",
+        "CURRENT_DATE + INTERVAL '1 month'",
+        "$3::date - INTERVAL '1 day'"
+      ],
+      "severity": "MEDIUM",
+      "status": "HANDLED",
+      "rewrite_rule": "rewriteIntervals handles most common patterns",
+      "coverage": "~80% - Some edge cases may not be covered"
+    }
+  ],
+  "all_tables": [
+    "announcements",
+    "appraisal_cycles",
+    "appraisal_participants",
+    "asset_assignments",
+    "assets",
+    "attendance",
+    "audit_logs",
+    "chat_group_members",
+    "chat_groups",
+    "complaints",
+    "daily_reports",
+    "departments",
+    "documents",
+    "employee_celebrations",
+    "employee_shift_assignments",
+    "employees",
+    "expense_claims",
+    "file_shares",
+    "files",
+    "folders",
+    "goals",
+    "helpdesk_attachments",
+    "helpdesk_comments",
+    "helpdesk_tickets",
+    "holidays",
+    "income_tax_declaration_items",
+    "income_tax_declaration_proofs",
+    "income_tax_declarations",
+    "leave_balances",
+    "leave_encashment_policy",
+    "leave_encashment_requests",
+    "leaves",
+    "manager_appraisal_items",
+    "manager_appraisals",
+    "meeting_participants",
+    "meetings",
+    "messages",
+    "notifications",
+    "offboarding_cases",
+    "offboarding_checklist_items",
+    "offboarding_exit_interviews",
+    "offer_letters",
+    "onboarding_case_tasks",
+    "onboarding_cases",
+    "onboarding_template_tasks",
+    "onboarding_templates",
+    "password_reset_tokens",
+    "payroll",
+    "payroll_statutory_settings",
+    "payroll_tds_slabs",
+    "peer_feedback",
+    "profiles",
+    "project_members",
+    "projects",
+    "salary_revisions",
+    "self_appraisal_items",
+    "self_appraisals",
+    "shifts",
+    "survey_answers",
+    "survey_questions",
+    "survey_responses",
+    "surveys",
+    "tasks",
+    "token_blacklist"
+  ],
+  "critical_issues": [
+    {
+      "issue": "EXTRACT(EPOCH FROM ...) conversion missing",
+      "severity": "CRITICAL",
+      "impact": "Attendance hours calculation will fail",
+      "affected_code": ["attendanceController.js:279", "attendanceController.js:342", "helpdeskController.js:490"],
+      "required_fix": "Add EXTRACT(EPOCH ...) handling to db/index.js rewriteExtract function",
+      "mysql_mapping": "Replace with TIMESTAMPDIFF() or UNIX_TIMESTAMP() difference"
+    },
+    {
+      "issue": "GREATEST() function not rewritten",
+      "severity": "CRITICAL",
+      "impact": "Hours calculation could return negative values",
+      "affected_code": ["attendanceController.js:279", "attendanceController.js:342"],
+      "required_fix": "Add GREATEST() rewrite rule to db/index.js",
+      "mysql_equivalent": "GREATEST() is supported in MySQL 5.0+, no rewrite needed if version >= 5.0"
+    },
+    {
+      "issue": "generate_series() not supported",
+      "severity": "CRITICAL",
+      "impact": "Week schedule generation will fail",
+      "affected_code": ["shiftController.js:454"],
+      "required_fix": "Refactor to application-level loop or use UNION with DATE_ADD"
+    },
+    {
+      "issue": "WITH queries cannot be automatically converted",
+      "severity": "CRITICAL",
+      "impact": "CTE queries will throw error: 'WITH queries still need manual MySQL conversion'",
+      "affected_code": ["analyticsController.js:149", "chatController.js:211", "driveController.js:185"],
+      "required_fix": "Manual refactor - Convert CTEs to scalar subqueries or JOINs",
+      "blocking": true
+    },
+    {
+      "issue": "to_regclass() metadata function not supported",
+      "severity": "CRITICAL",
+      "impact": "Table existence check will throw error",
+      "affected_code": ["offboardingController.js:198"],
+      "required_fix": "Use information_schema.tables query instead",
+      "blocking": true,
+      "quick_fix": "Use TRY-CATCH or check information_schema directly"
+    },
+    {
+      "issue": "ON CONFLICT DO NOTHING without column specification",
+      "severity": "HIGH",
+      "impact": "May cause syntax errors or unpredictable behavior",
+      "affected_code": ["holidayController.js:31", "holidayController.js:53"],
+      "required_fix": "Add conflict column specification: ON CONFLICT (name, date) DO NOTHING",
+      "note": "On MySQL, convert to INSERT IGNORE by specifying UNIQUE index"
+    },
+    {
+      "issue": "Type cast ::date with arithmetic operations",
+      "severity": "HIGH",
+      "impact": "Date arithmetic may fail if types not properly handled",
+      "affected_code": ["shiftController.js:208", "shiftController.js:227", "shiftController.js:243"],
+      "pattern": "($4::date - INTERVAL '1 day')::date",
+      "note": "Casts are stripped but expression must still work in MySQL"
+    },
+    {
+      "issue": "Array type casts ::uuid[] may not work correctly",
+      "severity": "HIGH",
+      "impact": "IN operator may not maintain type safety",
+      "affected_code": ["payrollController.js:481", "payrollController.js:491", "performanceController.js:588"],
+      "note": "MySQL doesn't use type casts, but array semantics must be preserved"
+    }
+  ],
+  "rewrite_rules_summary": {
+    "total_rules": 10,
+    "rules": [
+      {
+        "name": "rewriteCasts",
+        "pattern": "::[a-zA-Z_][a-zA-Z0-9_\\[\\]]*",
+        "action": "Remove all PostgreSQL type casts",
+        "coverage": "~95%",
+        "issues": "May break type-dependent expressions"
+      },
+      {
+        "name": "rewriteDateFormatting",
+        "pattern": "TO_CHAR(col, 'pattern')",
+        "action": "Convert to DATE_FORMAT()",
+        "coverage": "Partial - only handles 'Mon DD' and 'YYYY-MM-DD' patterns",
+        "issues": "Custom date formats not supported"
+      },
+      {
+        "name": "rewriteAgeExpressions",
+        "pattern": "EXTRACT(YEAR FROM AGE(CURRENT_DATE, col))",
+        "action": "Convert to TIMESTAMPDIFF(YEAR, col, CURDATE())",
+        "coverage": "~100% for age calculations",
+        "issues": "None known"
+      },
+      {
+        "name": "rewriteExtract",
+        "pattern": "EXTRACT(MONTH|DAY|YEAR FROM col)",
+        "action": "Convert to MONTH()/DAY()/YEAR()",
+        "coverage": "Partial - only handles MONTH/DAY/YEAR",
+        "missing": "EPOCH extraction not handled"
+      },
+      {
+        "name": "rewriteIntervals",
+        "pattern": "NOW() ± INTERVAL 'N days|hours'",
+        "action": "Convert to DATE_ADD/DATE_SUB",
+        "coverage": "~80%",
+        "issues": "Complex intervals may not be handled"
+      },
+      {
+        "name": "rewriteCaseInsensitiveLike",
+        "pattern": "ILIKE",
+        "action": "Convert to LIKE",
+        "coverage": "~100%",
+        "note": "MySQL LIKE is case-insensitive by default"
+      },
+      {
+        "name": "rewriteArrayAny",
+        "pattern": "= ANY($N) or IN(ANY($N))",
+        "action": "Convert to IN operator",
+        "coverage": "~90%",
+        "issues": "Type casting not preserved"
+      },
+      {
+        "name": "rewriteConflict",
+        "pattern": "ON CONFLICT ... DO [NOTHING|UPDATE]",
+        "action": "Convert to INSERT IGNORE or ON DUPLICATE KEY UPDATE",
+        "coverage": "~85%",
+        "issues": "Some CONFLICT specifications may fail"
+      },
+      {
+        "name": "rewriteSelectHelpers",
+        "pattern": "COUNT(*) without alias",
+        "action": "Add AS count alias",
+        "coverage": "~100%"
+      },
+      {
+        "name": "rewriteBooleanLiterals",
+        "pattern": "TRUE|FALSE",
+        "action": "Keep as literals (MySQL supports boolean literals)",
+        "coverage": "~100%"
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "CRITICAL",
+      "action": "Fix EXTRACT(EPOCH ...) conversion",
+      "steps": [
+        "Add new rewrite rule to db/index.js for EXTRACT(EPOCH FROM ...)",
+        "Pattern: /EXTRACT\\(EPOCH\\s+FROM\\s+([^)]+)\\)/gi",
+        "Replacement: 'TIMESTAMPDIFF(SECOND, <start>, <end>)/3600' or 'UNIX_TIMESTAMP(<end>) - UNIX_TIMESTAMP(<start>)' / 3600",
+        "Test with attendance and helpdesk controllers"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Handle GREATEST/LEAST functions",
+      "steps": [
+        "Verify MySQL version supports GREATEST (available since 5.0)",
+        "If older version, add custom function or refactor queries",
+        "Add rewrite rule if needed for specific handling"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Refactor WITH queries",
+      "steps": [
+        "analyticsController.js line 149 - Replace WITH inserted CTE with explicit INSERT + SELECT",
+        "chatController.js line 211 - Replace WITH inserted CTE with explicit INSERT + SELECT",
+        "driveController.js line 185 - Replace WITH RECURSIVE with application-level recursion or iterative query"
+      ],
+      "impact": "High - affects message creation and folder navigation features"
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Replace to_regclass() metadata function",
+      "steps": [
+        "Replace in offboardingController.js line 198",
+        "Use: SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='assets'",
+        "Wrap in try-catch to handle gracefully"
+      ]
+    },
+    {
+      "priority": "HIGH",
+      "action": "Add ON CONFLICT column specifications",
+      "steps": [
+        "holidayController.js line 31: Add (name, date) after ON CONFLICT",
+        "holidayController.js line 53: Add (name, date) after ON CONFLICT"
+      ]
+    },
+    {
+      "priority": "HIGH",
+      "action": "Refactor generate_series() usage",
+      "steps": [
+        "shiftController.js line 454 - Generate date range in application instead",
+        "Or use UNION with multiple DATE_ADD calls"
+      ]
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Verify type cast compatibility",
+      "steps": [
+        "Test all ::date type casts after cast removal",
+        "Test all ::int type casts - MySQL should handle implicitly",
+        "Test ::uuid[] array operations with IN operator"
+      ]
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Consolidate duplicate columns",
+      "steps": [
+        "Review 'attachment' vs 'attachment_url' in complaints and messages",
+        "Keep one column and deprecate the other",
+        "Update all code references"
+      ]
+    },
+    {
+      "priority": "LOW",
+      "action": "Add comprehensive integration tests",
+      "steps": [
+        "Test all RETURNING clause queries after conversion",
+        "Test all date/timestamp comparisons",
+        "Test all IN operator queries",
+        "Test all INSERT IGNORE queries"
+      ]
+    }
+  ],
+  "migration_status": {
+    "database_platform_conversion": "PostgreSQL → MySQL/MariaDB",
+    "schema_compatibility": "Mostly compatible with issues listed above",
+    "query_rewrite_coverage": "~80% - Critical gaps in EXTRACT(EPOCH), WITH queries, generate_series",
+    "estimated_manual_fixes_required": 10,
+    "blocking_issues": 3,
+    "total_affected_queries": 45,
+    "overall_risk_level": "HIGH"
+  },
+  "detailed_table_schema": {
+    "announcements": {
+      "columns": ["id", "title", "content", "author_id", "created_at"],
+      "primary_key": "id",
+      "foreign_keys": ["author_id → employees.id"]
+    },
+    "attendance": {
+      "columns": ["id", "employee_id", "check_in", "check_out", "status", "created_at", "hours_worked", "location"],
+      "primary_key": "id",
+      "critical_note": "hours_worked calculation uses EXTRACT(EPOCH ...) - needs fix"
+    },
+    "complaints": {
+      "columns": ["id", "employee_id", "category", "description", "attachment_url", "is_anonymous", "status", "created_at", "reviewed_by", "attachment"],
+      "primary_key": "id",
+      "issue": "Duplicate columns: attachment and attachment_url"
+    },
+    "leaves": {
+      "columns": ["id", "employee_id", "leave_type", "start_date", "end_date", "days", "reason", "attachment_url", "status", "created_at", "reviewed_by", "reviewed_at"],
+      "primary_key": "id",
+      "status": "All columns present and mapped correctly"
+    },
+    "messages": {
+      "columns": ["id", "sender_id", "receiver_id", "group_id", "content", "attachment_url", "created_at", "is_read", "attachment"],
+      "primary_key": "id",
+      "issue": "Duplicate columns: attachment and attachment_url"
+    },
+    "meetings": {
+      "columns": ["id", "title", "agenda", "date_time", "duration", "room_url", "created_by", "created_at", "scheduled_at", "duration_minutes", "meeting_link", "status", "meeting_type", "last_person_left_at", "first_person_joined_at"],
+      "primary_key": "id",
+      "note": "Multiple duration/link columns - may indicate legacy or experimental fields"
+    },
+    "onboarding_case_tasks": {
+      "columns": ["id", "case_id", "template_task_id", "title", "description", "requires_document", "is_completed", "completed_at", "completed_by", "document_url", "sort_order", "created_at", "updated_at"],
+      "primary_key": "id"
+    },
+    "payroll": {
+      "columns": ["id", "employee_id", "month", "year", "basic_salary", "allowances", "deductions", "net_salary", "status", "created_at", "generated_by", "sent_at", "pf", "tds", "hra", "ptax", "conveyance", "special_allowance", "emp_code", "designation", "department", "location", "processed_days", "paid_days", "pan_no", "bank_account", "bank_name", "pf_employee", "pf_employer", "esi_employee", "esi_employer", "reimbursements", "leave_encashment"],
+      "primary_key": "id",
+      "note": "Very wide table with 32+ columns - uses complex INSERT with multiple deduction/allowance fields"
+    }
+  },
+  "next_steps": [
+    "1. Address CRITICAL issues immediately (WITH queries, to_regclass, EXTRACT(EPOCH))",
+    "2. Test all RETURNING clause conversions manually",
+    "3. Verify date type casting behavior after cast removal",
+    "4. Test attendance hours calculation thoroughly",
+    "5. Test folder navigation in drive module",
+    "6. Test message creation in analytics and chat modules",
+    "7. Consolidate duplicate attachment columns",
+    "8. Create comprehensive integration test suite"
+  ]
+}

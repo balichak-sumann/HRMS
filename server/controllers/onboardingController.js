@@ -221,6 +221,19 @@ const assignTemplate = async (req, res) => {
         const assigner = await resolveEmployee(req);
 
         await client.query('BEGIN');
+
+        // --- Duplicate assignment check ---
+        const existingCase = await client.query(
+            `SELECT id FROM onboarding_cases 
+             WHERE employee_id = $1 AND template_id = $2 AND status = 'active'
+             LIMIT 1`,
+            [employee_id, template_id]
+        );
+        if (existingCase.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'This employee already has an active onboarding case with this template' });
+        }
+
         const created = await createOnboardingCaseFromTemplate({
             client,
             employeeId: employee_id,

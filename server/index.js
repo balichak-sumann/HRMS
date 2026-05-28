@@ -31,6 +31,10 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '10mb' }));
 
+// Sanitize all incoming request bodies and query params
+const { sanitizeInput } = require('./middleware/sanitize');
+app.use(sanitizeInput);
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 if (process.env.NODE_ENV === 'production') {
@@ -258,6 +262,31 @@ io.onlineUsers = onlineUsers;
 
 scheduleCelebrationJob(io);
 
+// Update meeting statuses every 5 minutes
+const cron = require('node-cron');
+cron.schedule('*/5 * * * *', async () => {
+    try {
+        // Mark meetings as 'completed' if they were joined and the scheduled time + duration has passed
+        await pool.query(`
+            UPDATE meetings 
+            SET status = 'completed' 
+            WHERE status = 'active' 
+              AND first_person_joined_at IS NOT NULL
+              AND date_time < DATE_SUB(NOW(), INTERVAL COALESCE(duration, 60) MINUTE)
+        `);
+        // Mark meetings as 'missed' if no one joined and scheduled time + 30 min buffer has passed
+        await pool.query(`
+            UPDATE meetings 
+            SET status = 'missed' 
+            WHERE status = 'active' 
+              AND first_person_joined_at IS NULL
+              AND date_time < DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+        `);
+    } catch (err) {
+        console.error('[Cron] Meeting status update failed:', err.message);
+    }
+});
+
 if (process.env.CELEBRATIONS_RUN_ON_STARTUP === 'true') {
     processCelebrations(io)
         .then((result) => {
@@ -281,6 +310,11 @@ app.get('/api/health', async (req, res) => {
             error: 'Database connection failed',
         });
     }
+});
+
+// ─── API 404 handler — catch unmatched /api/* routes ─────────────
+app.use('/api', (req, res) => {
+    res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
 });
 
 if (process.env.NODE_ENV === 'production') {

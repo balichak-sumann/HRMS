@@ -3,6 +3,30 @@ const { Pool } = require('../db');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Simple in-memory cache to reduce DB queries per request
+const profileStatusCache = new Map(); // key: profileId, value: { status, expiresAt }
+const CACHE_TTL_MS = 60 * 1000; // 1 minute
+
+const getCachedProfileStatus = (profileId) => {
+    const cached = profileStatusCache.get(profileId);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.status;
+    }
+    profileStatusCache.delete(profileId);
+    return null;
+};
+
+const setCachedProfileStatus = (profileId, status) => {
+    profileStatusCache.set(profileId, { status, expiresAt: Date.now() + CACHE_TTL_MS });
+    // Evict old entries periodically
+    if (profileStatusCache.size > 10000) {
+        const now = Date.now();
+        for (const [key, val] of profileStatusCache) {
+            if (val.expiresAt <= now) profileStatusCache.delete(key);
+        }
+    }
+};
+
 /**
  * authenticateToken — verifies JWT and checks against blacklist
  */
@@ -25,12 +49,17 @@ const auth = async (req, res, next) => {
             return res.status(401).json({ error: 'Token has been invalidated. Please log in again.' });
         }
 
-        // Check if user account is still active
-        const profileCheck = await pool.query(
-            'SELECT status FROM profiles WHERE id = $1',
-            [decoded.id]
-        );
-        const profileStatus = String(profileCheck.rows[0]?.status || '').toLowerCase();
+        // Check if user account is still active (with cache)
+        let profileStatus = getCachedProfileStatus(decoded.id);
+        if (profileStatus === null) {
+            const profileCheck = await pool.query(
+                'SELECT status FROM profiles WHERE id = $1',
+                [decoded.id]
+            );
+            profileStatus = String(profileCheck.rows[0]?.status || '').toLowerCase();
+            setCachedProfileStatus(decoded.id, profileStatus);
+        }
+
         if (profileStatus === 'inactive') {
             return res.status(403).json({ error: 'ACCOUNT_DEACTIVATED', message: 'Your account has been deactivated. Please contact an administrator.' });
         }
