@@ -145,16 +145,6 @@ const LoginPage = () => {
                         }}
                     />
                 ))}
-                {/* Slide indicators */}
-                <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '6px', zIndex: 2 }}>
-                    {SLIDES.map((_, i) => (
-                        <div key={i} style={{
-                            width: activeSlide === i ? '20px' : '6px', height: '6px',
-                            borderRadius: '3px', background: activeSlide === i ? '#3B82F6' : 'rgba(255,255,255,0.3)',
-                            transition: 'all 0.3s',
-                        }} />
-                    ))}
-                </div>
             </div>
 
             {/* Right — Login Form */}
