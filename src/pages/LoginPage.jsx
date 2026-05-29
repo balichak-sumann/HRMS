@@ -204,7 +204,7 @@ const LoginPage = () => {
                     fontSize: '20px',
                     fontWeight: '600',
                     textAlign: 'center',
-                    color: 'var(--text-main)',
+                    color: '#f1f5f9',
                     marginTop: '0',
                     marginBottom: '24px'
                 }}>Welcome Back</h2>
@@ -212,7 +212,7 @@ const LoginPage = () => {
                 {/* Tab Selector */}
                 <div style={{
                     display: 'flex',
-                    background: 'var(--input-bg)',
+                    background: 'rgba(30,41,59,0.5)',
                     padding: '4px',
                     borderRadius: '8px',
                     marginBottom: '24px'
@@ -227,7 +227,7 @@ const LoginPage = () => {
                             fontSize: '14px',
                             fontWeight: role === 'admin' ? '700' : '500',
                             cursor: 'pointer',
-                            background: role === 'admin' ? 'var(--card-bg)' : 'transparent',
+                            background: role === 'admin' ? 'rgba(15,23,42,0.8)' : 'transparent',
                             color: role === 'admin' ? 'var(--primary)' : 'var(--text-muted)',
                             boxShadow: role === 'admin' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
                             transition: 'all 0.2s',
@@ -251,7 +251,7 @@ const LoginPage = () => {
                             fontSize: '14px',
                             fontWeight: role === 'employee' ? '700' : '500',
                             cursor: 'pointer',
-                            background: role === 'employee' ? 'var(--card-bg)' : 'transparent',
+                            background: role === 'employee' ? 'rgba(15,23,42,0.8)' : 'transparent',
                             color: role === 'employee' ? 'var(--primary)' : 'var(--text-muted)',
                             boxShadow: role === 'employee' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
                             transition: 'all 0.2s',
@@ -269,7 +269,7 @@ const LoginPage = () => {
 
                 <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Email Address</label>
+                        <label style={{ fontSize: '14px', fontWeight: '500', color: '#f1f5f9' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>
                             <Mail size={16} style={{
                                 position: 'absolute',
@@ -295,10 +295,10 @@ const LoginPage = () => {
                                     paddingTop: '12px',
                                     paddingBottom: '12px',
                                     borderRadius: '8px',
-                                    border: '1px solid var(--border)',
+                                    border: '1px solid rgba(148,163,184,0.3)',
                                     outline: 'none',
                                     fontSize: '14px',
-                                    background: otpStep ? '#f8fafc' : 'white'
+                                    background: 'rgba(30,41,59,0.6)', color: '#f1f5f9'
                                 }}
                             />
                         </div>
@@ -307,7 +307,7 @@ const LoginPage = () => {
                     {!otpStep && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Password</label>
+                                <label style={{ fontSize: '14px', fontWeight: '500', color: '#f1f5f9' }}>Password</label>
                                 <button
                                     type="button"
                                     onClick={() => navigate('/forgot-password')}
@@ -349,9 +349,11 @@ const LoginPage = () => {
                                         paddingTop: '12px',
                                         paddingBottom: '12px',
                                         borderRadius: '8px',
-                                        border: '1px solid var(--border)',
+                                        border: '1px solid rgba(148,163,184,0.3)',
                                         outline: 'none',
-                                        fontSize: '14px'
+                                        fontSize: '14px',
+                                        background: 'rgba(30,41,59,0.6)',
+                                        color: '#f1f5f9'
                                     }}
                                 />
                                 <button
@@ -366,7 +368,7 @@ const LoginPage = () => {
                                         transform: 'translateY(-50%)',
                                         border: 'none',
                                         background: 'transparent',
-                                        color: 'var(--text-muted)',
+                                        color: '#94a3b8',
                                         cursor: 'pointer',
                                         padding: '2px',
                                         display: 'flex',
@@ -382,7 +384,7 @@ const LoginPage = () => {
 
                     {otpStep && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Enter OTP</label>
+                            <label style={{ fontSize: '14px', fontWeight: '500', color: '#f1f5f9' }}>Enter OTP</label>
                             <input
                                 type="text"
                                 placeholder="6-digit OTP"
@@ -398,14 +400,16 @@ const LoginPage = () => {
                                     paddingTop: '10px',
                                     paddingBottom: '10px',
                                     borderRadius: '8px',
-                                    border: '1px solid var(--border)',
+                                    border: '1px solid rgba(148,163,184,0.3)',
                                     outline: 'none',
                                     fontSize: '16px',
                                     letterSpacing: '4px',
-                                    textAlign: 'center'
+                                    textAlign: 'center',
+                                    background: 'rgba(30,41,59,0.6)',
+                                    color: '#f1f5f9'
                                 }}
                             />
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
                                 {otpHint || 'We sent a one-time password to your email.'}
                             </div>
                             <button
