@@ -92,16 +92,19 @@ model assets {
 }
 
 model attendance {
-  id           String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
-  employee_id  String?    @db.Char(36)
-  attendance_date DateTime  @db.Date
-  check_in     DateTime?
-  check_out    DateTime?
-  status       String?    @db.Text
-  created_at   DateTime?  @default(now())
-  hours_worked Decimal?   @db.Decimal(10, 0)
-  location     String?    @db.Text
-  employees    employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                String     @id @default(dbgenerated("(uuid())")) @db.Char(36)
+  employee_id       String?    @db.Char(36)
+  attendance_date   DateTime   @db.Date
+  check_in          DateTime?
+  check_out         DateTime?
+  status            String?    @db.Text
+  created_at        DateTime?  @default(now())
+  hours_worked      Decimal?   @db.Decimal(10, 0)
+  location          String?    @db.Text
+  checkin_photo     String?    @db.Text
+  checkout_photo    String?    @db.Text
+  checkout_location String?    @db.Text
+  employees         employees? @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([attendance_date], map: "attendance_attendance_date_idx")
   @@index([employee_id], map: "attendance_employee_id_fkey")
@@ -1001,6 +1004,7 @@ model profiles {
   offer_letters         offer_letters[]
   password_reset_tokens password_reset_tokens[]
   payroll               payroll[]
+  user_settings         user_settings?
   employees             employees?              @relation("profiles_employee_uuidToemployees", fields: [employee_uuid], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([employee_uuid], map: "idx_profiles_employee_uuid")
@@ -1199,4 +1203,12 @@ model token_blacklist {
   token          String    @unique(length: 191) @db.Text
   invalidated_at DateTime? @default(now())
   expires_at     DateTime
+}
+
+model user_settings {
+  profile_id          String   @id @db.Char(36)
+  attendance_reminder Int      @default(1)
+  profiles            profiles @relation(fields: [profile_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([profile_id])
 }

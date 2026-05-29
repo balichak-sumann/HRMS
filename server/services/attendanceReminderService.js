@@ -94,7 +94,8 @@ const sendCheckInReminders = async (minutesBefore = 0) => {
             JOIN user_settings us ON us.profile_id = p.id
             WHERE us.attendance_reminder = 1
               AND e.status = 'active'
-              AND LOWER(COALESCE(e.role, '')) != 'admin'
+              AND LOWER(COALESCE(p.role, '')) NOT IN ('admin', 'hr')
+              AND LOWER(COALESCE(e.role, '')) NOT IN ('admin', 'hr', 'hr manager', 'super admin', 'owner admin')
               AND e.id NOT IN (
                   SELECT employee_id FROM attendance
                   WHERE attendance_date = $1

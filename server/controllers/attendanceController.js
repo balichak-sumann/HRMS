@@ -369,7 +369,9 @@ const getAllAttendance = async (req, res) => {
         params.push(date);
 
         // Exclude admin and HR accounts from attendance list
-        query += ` AND (e.role IS NULL OR LOWER(e.role) NOT IN ('admin', 'hr', 'hr manager'))`;
+        query += ` AND e.id NOT IN (
+            SELECT employee_uuid FROM profiles WHERE role IN ('admin', 'hr') AND employee_uuid IS NOT NULL
+        ) AND (e.role IS NULL OR LOWER(e.role) NOT IN ('admin', 'hr', 'hr manager', 'super admin', 'owner admin'))`;
 
         // If viewer is HR, exclude their own record (HR can't override own attendance)
         if (req.user.role === 'hr') {
@@ -443,7 +445,9 @@ const getMonthlyAttendanceExport = async (req, res) => {
         const params = [startDate, endDate];
 
         // Exclude admin and HR accounts from attendance export
-        query += ` AND (e.role IS NULL OR LOWER(e.role) NOT IN ('admin', 'hr', 'hr manager'))`;
+        query += ` AND e.id NOT IN (
+            SELECT employee_uuid FROM profiles WHERE role IN ('admin', 'hr') AND employee_uuid IS NOT NULL
+        ) AND (e.role IS NULL OR LOWER(e.role) NOT IN ('admin', 'hr', 'hr manager', 'super admin', 'owner admin'))`;
 
         if (department) {
             params.push(department);

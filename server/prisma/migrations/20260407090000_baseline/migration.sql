@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE `announcements` (
     `id` CHAR(36) NOT NULL DEFAULT (uuid()),
     `title` TEXT NOT NULL,
