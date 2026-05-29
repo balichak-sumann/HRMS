@@ -182,68 +182,78 @@ const HROrgChartPage = () => {
                 </div>
             </div>
 
-            <div className="card" style={{ padding: '18px', overflowX: 'auto' }}>
+            <div className="card" style={{ padding: '24px', overflowX: 'auto' }}>
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '70px' }}>
                         <Loader2 className="animate-spin" size={36} color="var(--primary)" />
                     </div>
-                ) : roots.length === 0 ? (
+                ) : roots.length === 0 && employees.length === 0 ? (
                     <p style={{ color: 'var(--text-muted)' }}>No employees found for this filter.</p>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         {/* Company Root */}
                         <div style={{
-                            padding: '14px 28px', background: 'linear-gradient(135deg, #1E40AF, #3B82F6)',
-                            borderRadius: '12px', color: 'white', fontWeight: '700', fontSize: '16px',
+                            padding: '12px 24px', background: 'linear-gradient(135deg, #1E40AF, #3B82F6)',
+                            borderRadius: '10px', color: 'white', fontWeight: '700', fontSize: '15px',
                             boxShadow: '0 4px 16px rgba(59,130,246,0.3)', textAlign: 'center'
                         }}>
                             IndusInnovate Technologies
                         </div>
-                        <div style={{ width: '2px', height: '30px', background: '#94A3B8' }} />
+                        <div style={{ width: '2px', height: '24px', background: '#94A3B8' }} />
 
-                        {/* Department Branches */}
-                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center', position: 'relative' }}>
-                            {/* Horizontal connector line */}
-                            {departments.filter(d => !departmentFilter || d.id === departmentFilter).length > 1 && (
-                                <div style={{ position: 'absolute', top: '0', left: '15%', right: '15%', height: '2px', background: '#94A3B8' }} />
-                            )}
-
+                        {/* Departments with their employees */}
+                        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
                             {departments
                                 .filter(d => !departmentFilter || d.id === departmentFilter)
                                 .map(dept => {
                                     const deptEmployees = (employees || []).filter(e =>
-                                        e.department_name === dept.name || e.department_id === dept.id
+                                        (e.department_name === dept.name || e.department_id === dept.id) &&
+                                        String(e.role || '').toLowerCase() !== 'admin'
                                     );
-                                    if (deptEmployees.length === 0 && departmentFilter) return null;
-
-                                    // Find department head (manager with no manager in same dept, or first employee)
-                                    const deptRoots = deptEmployees.filter(e => !e.manager_id || !deptEmployees.some(de => de.id === e.manager_id));
+                                    // Hide empty departments
+                                    if (deptEmployees.length === 0) return null;
 
                                     return (
                                         <div key={dept.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                            <div style={{ width: '2px', height: '20px', background: '#94A3B8' }} />
+                                            <div style={{ width: '2px', height: '16px', background: '#94A3B8' }} />
                                             {/* Department Node */}
                                             <div style={{
-                                                padding: '10px 20px', background: 'var(--input-bg)',
-                                                border: '2px solid var(--primary)', borderRadius: '10px',
+                                                padding: '8px 16px', background: 'var(--input-bg)',
+                                                border: '2px solid var(--primary)', borderRadius: '8px',
                                                 fontWeight: '700', fontSize: '13px', color: 'var(--primary)',
-                                                textAlign: 'center', minWidth: '140px',
-                                                boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                                textAlign: 'center',
                                             }}>
                                                 {dept.name}
-                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '2px' }}>
-                                                    {deptEmployees.length} member{deptEmployees.length !== 1 ? 's' : ''}
-                                                </div>
                                             </div>
+                                            <div style={{ width: '2px', height: '12px', background: '#CBD5E1' }} />
 
-                                            {deptRoots.length > 0 && (
-                                                <>
-                                                    <div style={{ width: '2px', height: '16px', background: '#CBD5E1' }} />
-                                                    <ul style={{ padding: 0, margin: 0, display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                                        {deptRoots.map(emp => <Node key={emp.id} employee={emp} />)}
-                                                    </ul>
-                                                </>
-                                            )}
+                                            {/* Employees in this department */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                                                {deptEmployees.map(emp => (
+                                                    <button
+                                                        key={emp.id}
+                                                        onClick={() => onNodeClick(emp)}
+                                                        style={{
+                                                            border: '1px solid var(--border)',
+                                                            background: 'var(--card-bg)',
+                                                            borderRadius: '10px',
+                                                            padding: '8px 12px',
+                                                            width: '180px',
+                                                            cursor: 'pointer',
+                                                            textAlign: 'left',
+                                                            display: 'flex',
+                                                            gap: '8px',
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <AvatarBadge employee={emp} />
+                                                        <div>
+                                                            <p style={{ fontWeight: '600', fontSize: '12px', color: 'var(--text-main)', margin: 0 }}>{emp.full_name}</p>
+                                                            <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>{emp.designation || emp.role || 'Employee'}</p>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     );
                                 })}

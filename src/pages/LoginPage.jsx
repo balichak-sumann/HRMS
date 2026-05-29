@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Loader2, Eye, EyeOff, Shield, User } from 'lucide-react';
+
+const SLIDES = Array.from({ length: 9 }, (_, i) => `/login-slides/slide-${i + 1}.png`);
 
 const LoginPage = () => {
     const [role, setRole] = useState('admin');
@@ -13,6 +15,12 @@ const LoginPage = () => {
     const [otpStep, setOtpStep] = useState(false);
     const [otp, setOtp] = useState('');
     const [preAuthToken, setPreAuthToken] = useState('');
+    const [activeSlide, setActiveSlide] = useState(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => setActiveSlide(s => (s + 1) % SLIDES.length), 3000);
+        return () => clearInterval(timer);
+    }, []);
     const [otpHint, setOtpHint] = useState('');
     const navigate = useNavigate();
     const { login, verifyLoginOtp, user, profile } = useAuth();
@@ -95,18 +103,79 @@ const LoginPage = () => {
     return (
         <div style={{
             minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--main-bg)',
-            padding: '24px'
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            background: '#000',
+            position: 'relative',
+            gap: '0px',
         }}>
+            {/* Full-page background image with low opacity */}
+            <div style={{
+                position: 'absolute', inset: 0,
+                backgroundImage: 'url(/login-bg.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                opacity: 0.3,
+                pointerEvents: 'none',
+            }} />
+            {/* Left — Storytelling Carousel */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                background: 'transparent',
+                zIndex: 1,
+            }}>
+                {SLIDES.map((src, i) => (
+                    <img
+                        key={i}
+                        src={src}
+                        alt=""
+                        style={{
+                            position: 'absolute',
+                            maxWidth: '85%',
+                            maxHeight: '85%',
+                            objectFit: 'contain',
+                            right: '-5%',
+                            opacity: activeSlide === i ? 1 : 0,
+                            transform: activeSlide === i ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(10px)',
+                            transition: 'opacity 0.8s ease, transform 1s ease',
+                        }}
+                    />
+                ))}
+                {/* Slide indicators */}
+                <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '6px', zIndex: 2 }}>
+                    {SLIDES.map((_, i) => (
+                        <div key={i} style={{
+                            width: activeSlide === i ? '20px' : '6px', height: '6px',
+                            borderRadius: '3px', background: activeSlide === i ? '#3B82F6' : 'rgba(255,255,255,0.3)',
+                            transition: 'all 0.3s',
+                        }} />
+                    ))}
+                </div>
+            </div>
+
+            {/* Right — Login Form */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                paddingLeft: '20px',
+                paddingRight: '40px',
+                position: 'relative',
+                zIndex: 1,
+            }}>
             <div style={{
                 width: '100%',
                 maxWidth: '440px',
-                background: 'var(--card-bg)',
+                background: 'rgba(15, 23, 42, 0.6)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
                 borderRadius: '16px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
                 padding: '40px'
             }}>
                 {/* Logo Section */}
@@ -202,12 +271,14 @@ const LoginPage = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>
-                            <Mail size={18} style={{
+                            <Mail size={16} style={{
                                 position: 'absolute',
-                                left: '12px',
+                                left: '14px',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
-                                color: 'var(--text-muted)'
+                                color: '#9CA3AF',
+                                pointerEvents: 'none',
+                                zIndex: 1,
                             }} />
                             <input
                                 type="email"
@@ -219,10 +290,10 @@ const LoginPage = () => {
                                 style={{
                                     width: '100%',
                                     boxSizing: 'border-box',
-                                    paddingLeft: '42px',
+                                    paddingLeft: '48px',
                                     paddingRight: '12px',
-                                    paddingTop: '10px',
-                                    paddingBottom: '10px',
+                                    paddingTop: '12px',
+                                    paddingBottom: '12px',
                                     borderRadius: '8px',
                                     border: '1px solid var(--border)',
                                     outline: 'none',
@@ -254,12 +325,14 @@ const LoginPage = () => {
                                 </button>
                             </div>
                             <div style={{ position: 'relative' }}>
-                                <Lock size={18} style={{
+                                <Lock size={16} style={{
                                     position: 'absolute',
-                                    left: '12px',
+                                    left: '14px',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
-                                    color: 'var(--text-muted)'
+                                    color: '#9CA3AF',
+                                    pointerEvents: 'none',
+                                    zIndex: 1,
                                 }} />
                                 <input
                                     className="login-password-input"
@@ -271,10 +344,10 @@ const LoginPage = () => {
                                     style={{
                                         width: '100%',
                                         boxSizing: 'border-box',
-                                        paddingLeft: '42px',
+                                        paddingLeft: '48px',
                                         paddingRight: '44px',
-                                        paddingTop: '10px',
-                                        paddingBottom: '10px',
+                                        paddingTop: '12px',
+                                        paddingBottom: '12px',
                                         borderRadius: '8px',
                                         border: '1px solid var(--border)',
                                         outline: 'none',
@@ -396,6 +469,7 @@ const LoginPage = () => {
                         {loading ? (otpStep ? 'Verifying OTP...' : 'Signing in...') : (otpStep ? 'Verify OTP' : 'Sign In')}
                     </button>
                 </form>
+            </div>
             </div>
         </div>
     );
