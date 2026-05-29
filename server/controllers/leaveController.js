@@ -79,6 +79,13 @@ const createLeave = async (req, res) => {
         return res.status(400).json({ error: 'end_date cannot be before start_date' });
     }
 
+    // Prevent applying leave for past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (startDateObj < today) {
+        return res.status(400).json({ error: 'Cannot apply leave for past dates' });
+    }
+
     // Calculate days from dates (ignore user-supplied days to prevent manipulation)
     const calculatedDays = Math.ceil((endDateObj - startDateObj) / (1000 * 60 * 60 * 24)) + 1;
 

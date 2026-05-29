@@ -236,78 +236,114 @@ const EmployeeAttendancePage = () => {
         setTodayRecord(activeSession || mostRecentSession || null);
     }, [attendance, selectedDate]);
 
-    const handleCheckIn = async () => {
+    const [cameraStream, setCameraStream] = useState(null);
+    const [cameraMode, setCameraMode] = useState(null); // 'checkin' | 'checkout'
+    const videoRef = React.useRef(null);
+
+    const openCamera = async (mode) => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } });
+            setCameraStream(stream);
+            setCameraMode(mode);
+        } catch (err) {
+            alert('Camera access is required. Please allow camera permission in your browser settings.');
+        }
+    };
+
+    // Attach stream to video element when it mounts
+    React.useEffect(() => {
+        if (videoRef.current && cameraStream) {
+            videoRef.current.srcObject = cameraStream;
+            videoRef.current.play().catch(() => {});
+        }
+        return () => {
+            if (cameraStream && !cameraMode) {
+                cameraStream.getTracks().forEach(t => t.stop());
+            }
+        };
+    }, [cameraStream, cameraMode]);
+
+    const closeCamera = () => {
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        setCameraStream(null);
+        setCameraMode(null);
+    };
+
+    const captureAndSubmit = async () => {
+        if (!videoRef.current || !cameraStream) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = 480;
+        canvas.height = 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoRef.current, 0, 0, 480, 480);
+        cameraStream.getTracks().forEach(t => t.stop());
+        setCameraStream(null);
+
+        const photoBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.75));
+        if (!photoBlob) { alert('Failed to capture photo.'); setCameraMode(null); return; }
+
+        if (cameraMode === 'checkin') {
+            setCameraMode(null);
+            await doCheckIn(photoBlob);
+        } else {
+            setCameraMode(null);
+            await doCheckOut(photoBlob);
+        }
+    };
+
+    const handleCheckIn = () => {
         if (isCheckingIn) return;
-        if (activeSessionForSelectedDate) {
-            await fetchAttendance();
-            return;
-        }
-        if (isCheckInBlocked) {
-            alert(`Check-in is disabled for this date (${checkInBlockReason}).`);
-            return;
-        }
+        if (activeSessionForSelectedDate) { fetchAttendance(); return; }
+        if (isCheckInBlocked) { alert(`Check-in is disabled for this date (${checkInBlockReason}).`); return; }
+        openCamera('checkin');
+    };
+
+    const doCheckIn = async (photoBlob) => {
         try {
             setIsCheckingIn(true);
             setLoading(true);
             let locationString = "Unknown Location";
 
-            // 1. Try Browser Geolocation (GPS)
             if ("geolocation" in navigator) {
                 try {
                     const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            timeout: 12000,
-                            maximumAge: 0,
-                            enableHighAccuracy: true
-                        });
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 12000, maximumAge: 0, enableHighAccuracy: true });
                     });
-
                     const { latitude, longitude } = position.coords;
-
-                    // OpenStreetMap Reverse Geocoding
                     try {
-                        const res = await fetch(
-                            `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&accept-language=en&lat=${latitude}&lon=${longitude}`
-                        );
-                        const data = await res.json();
-                        const addr = data.address || {};
-                        locationString = buildPreciseLocationLabel(addr, latitude, longitude);
+                        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&accept-language=en&lat=${latitude}&lon=${longitude}`);
+                        const data = await geoRes.json();
+                        locationString = buildPreciseLocationLabel(data.address || {}, latitude, longitude);
                     } catch (geoErr) {
                         locationString = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
                     }
                 } catch (posErr) {
-                    console.warn("GPS access denied or failed, falling back to IP...");
-
-                    // 2. IP-based Geolocation Fallback
                     try {
                         const ipRes = await fetch('https://ipapi.co/json/');
                         const ipData = await ipRes.json();
-                        const ipParts = [ipData.city, ipData.region].filter(Boolean);
-                        locationString = `${ipParts.join(', ') || 'Unknown City'} (IP Approx)`;
-                    } catch (ipErr) {
-                        console.error("IP Geolocation also failed", ipErr);
-                    }
-                }
-            } else {
-                // Fallback for browsers without geolocation support
-                try {
-                    const ipRes = await fetch('https://ipapi.co/json/');
-                    const ipData = await ipRes.json();
-                    const ipParts = [ipData.city, ipData.region].filter(Boolean);
-                    locationString = `${ipParts.join(', ') || 'Unknown City'} (IP Approx)`;
-                } catch (ipErr) {
-                    console.error("IP Geolocation failed", ipErr);
+                        locationString = `${[ipData.city, ipData.region].filter(Boolean).join(', ') || 'Unknown City'} (IP Approx)`;
+                    } catch (ipErr) { /* keep Unknown */ }
                 }
             }
 
-            await api.post('/attendance/check-in', { location: locationString, attendance_date: selectedDate });
+            const formData = new FormData();
+            formData.append('location', locationString);
+            formData.append('attendance_date', selectedDate);
+            formData.append('photo', photoBlob, `checkin-${Date.now()}.jpg`);
+
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/attendance/check-in', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Check-in failed (${res.status})`);
+            }
             await fetchAttendance();
         } catch (err) {
-            const message = (err?.message || '').toLowerCase();
-            if (message.includes('active check-in session for this date')) {
-                await fetchAttendance();
-                return;
-            }
+            if ((err?.message || '').toLowerCase().includes('active check-in session')) { await fetchAttendance(); return; }
             alert(err.message);
         } finally {
             setLoading(false);
@@ -315,18 +351,57 @@ const EmployeeAttendancePage = () => {
         }
     };
 
-    const handleCheckOut = async () => {
+    const handleCheckOut = () => {
         if (isCheckingOut) return;
+        openCamera('checkout');
+    };
+
+    const doCheckOut = async (photoBlob) => {
         try {
             setIsCheckingOut(true);
-            await api.post('/attendance/check-out', { attendance_date: displayedAttendanceDate });
+
+            // Get location for checkout
+            let locationString = "Unknown Location";
+            if ("geolocation" in navigator) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 12000, maximumAge: 0, enableHighAccuracy: true });
+                    });
+                    const { latitude, longitude } = position.coords;
+                    try {
+                        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&accept-language=en&lat=${latitude}&lon=${longitude}`);
+                        const data = await geoRes.json();
+                        locationString = buildPreciseLocationLabel(data.address || {}, latitude, longitude);
+                    } catch (geoErr) {
+                        locationString = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+                    }
+                } catch (posErr) {
+                    try {
+                        const ipRes = await fetch('https://ipapi.co/json/');
+                        const ipData = await ipRes.json();
+                        locationString = `${[ipData.city, ipData.region].filter(Boolean).join(', ') || 'Unknown City'} (IP Approx)`;
+                    } catch (ipErr) { /* keep Unknown */ }
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('attendance_date', displayedAttendanceDate);
+            formData.append('location', locationString);
+            formData.append('photo', photoBlob, `checkout-${Date.now()}.jpg`);
+
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/attendance/check-out', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Check-out failed (${res.status})`);
+            }
             await fetchAttendance();
         } catch (err) {
-            // If a duplicate/late click happens after successful checkout, treat it as a no-op.
-            if ((err.message || '').toLowerCase().includes('no active check-in found')) {
-                await fetchAttendance();
-                return;
-            }
+            if ((err.message || '').toLowerCase().includes('no active check-in found')) { await fetchAttendance(); return; }
             alert(err.message);
         } finally {
             setIsCheckingOut(false);
@@ -336,7 +411,7 @@ const EmployeeAttendancePage = () => {
     const calculateHours = (start, end) => {
         if (!start) return 0;
         const startTime = new Date(start);
-        const endTime = end ? new Date(end) : currentTime; // Use stateful currentTime for reactivity
+        const endTime = end ? new Date(end) : currentTime;
         const durationMs = endTime - startTime;
         return Math.max(0, durationMs) / (1000 * 60 * 60);
     };
@@ -430,6 +505,39 @@ const EmployeeAttendancePage = () => {
 
     return (
         <div style={{ maxWidth: '920px', margin: '-6px auto 0', height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Camera Modal */}
+            {cameraMode && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                    <h2 style={{ color: 'white', fontSize: '20px', fontWeight: '700' }}>
+                        {cameraMode === 'checkin' ? '📸 Check-In Photo' : '📸 Check-Out Photo'}
+                    </h2>
+                    <div style={{ width: '320px', height: '320px', borderRadius: '16px', overflow: 'hidden', border: '3px solid #3B82F6', background: '#000' }}>
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                        />
+                    </div>
+                    <p style={{ color: '#94a3b8', fontSize: '13px' }}>Position your face in the frame and click Capture</p>
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                        <button
+                            onClick={captureAndSubmit}
+                            style={{ padding: '14px 32px', background: '#10B981', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                            ✓ Capture & Submit
+                        </button>
+                        <button
+                            onClick={closeCamera}
+                            style={{ padding: '14px 32px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                            ✕ Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <header style={{ marginBottom: isShortViewport ? '8px' : '12px', flexShrink: 0 }}>
                 <h1 style={{ fontSize: '24px', color: 'var(--text-main)', marginBottom: '6px' }}>Attendance Tracker</h1>
                 <p style={{ color: 'var(--text-muted)' }}>Keep track of your daily presence and work hours.</p>

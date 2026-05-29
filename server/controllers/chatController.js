@@ -222,6 +222,14 @@ const getHistory = async (req, res) => {
 // ─── Send message ────────────────────────────────────────────────
 const sendMessage = async (req, res) => {
     const { content, receiver_id, group_id, attachment_url } = req.body;
+    if (!content || !String(content).trim()) {
+        if (!attachment_url) {
+            return res.status(400).json({ error: 'Message content is required' });
+        }
+    }
+    if (!receiver_id && !group_id) {
+        return res.status(400).json({ error: 'receiver_id or group_id is required' });
+    }
     try {
         const emp = await pool.query(`
             SELECT e.id FROM employees e 
@@ -272,7 +280,7 @@ const sendMessage = async (req, res) => {
                          ORDER BY
                             CASE WHEN LOWER(TRIM(p.email)) = LOWER(TRIM(e.email)) THEN 0 ELSE 1 END,
                             CASE WHEN p.employee_id::text = e.id::text THEN 0 ELSE 1 END,
-                            p.updated_at DESC NULLS LAST
+                            COALESCE(p.updated_at, '1970-01-01') DESC
                          LIMIT 1`,
                         [receiver_id]
                     );

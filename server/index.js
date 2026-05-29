@@ -13,6 +13,7 @@ const path = require('path');
 const app = express();
 const server = require('http').createServer(app);
 const { scheduleCelebrationJob, processCelebrations } = require('./services/celebrationService');
+const { scheduleAttendanceReminders } = require('./services/attendanceReminderService');
 const io = require('socket.io')(server, {
     cors: {
         origin: "*",
@@ -261,6 +262,7 @@ io.on('connection', (socket) => {
 io.onlineUsers = onlineUsers;
 
 scheduleCelebrationJob(io);
+scheduleAttendanceReminders();
 
 // Update meeting statuses every 5 minutes
 const cron = require('node-cron');

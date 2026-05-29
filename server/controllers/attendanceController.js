@@ -155,14 +155,28 @@ const checkIn = async (req, res) => {
         
         // Global active session check: ensure user isn't checked in for ANY date at the moment
         const globalActiveSession = await pool.query(
-            "SELECT id, DATE(check_in) as date FROM attendance WHERE employee_id = $1 AND check_out IS NULL",
+            "SELECT id, attendance_date as date FROM attendance WHERE employee_id = $1 AND check_in IS NOT NULL AND check_out IS NULL",
             [employee_id]
         );
 
         if (globalActiveSession.rows.length > 0) {
-            const activeDate = new Date(globalActiveSession.rows[0].date).toLocaleDateString();
+            const rawDate = globalActiveSession.rows[0].date;
+            const activeDate = rawDate instanceof Date
+                ? rawDate.toLocaleDateString()
+                : String(rawDate || '').slice(0, 10);
             return res.status(400).json({ 
                 error: `You already have an active check-in session from ${activeDate}. Please check out first.` 
+            });
+        }
+
+        // Block check-in if employee has an approved leave for this date
+        const approvedLeave = await pool.query(
+            "SELECT id, leave_type FROM leaves WHERE employee_id = $1 AND status = 'Approved' AND $2 BETWEEN start_date AND end_date LIMIT 1",
+            [employee_id, attendanceDate]
+        );
+        if (approvedLeave.rows.length > 0) {
+            return res.status(400).json({
+                error: `Check-in not allowed. You have an approved ${approvedLeave.rows[0].leave_type || ''} leave for this date.`
             });
         }
 
@@ -181,12 +195,30 @@ const checkIn = async (req, res) => {
         const checkInAt = buildTimestampForDate(attendanceDate);
         const checkInTime = checkInAt.getHours() * 60 + checkInAt.getMinutes();
         const shiftStartMinutes = parseTimeToMinutes(assignedShift?.start_time);
+        const shiftEndMinutes = parseTimeToMinutes(assignedShift?.end_time) || (23 * 60 + 59); // Default 23:59
+
+        console.log(`[CheckIn Debug] time=${checkInTime}min, shiftEnd=${shiftEndMinutes}min, raw_end=${assignedShift?.end_time}`);
+
+        // Block check-in after shift ends
+        if (shiftEndMinutes && checkInTime > shiftEndMinutes) {
+            return res.status(400).json({
+                error: `Check-in not allowed. Your shift ended at ${String(assignedShift?.end_time || '').slice(0, 5) || '23:59'}. Please contact HR if you need an override.`
+            });
+        }
+
         const status = shiftStartMinutes != null && checkInTime > shiftStartMinutes ? 'Late' : 'Present';
 
-        // Always create a new record for multiple check-ins
+        // Handle check-in photo — REQUIRED
+        if (!req.file) {
+            return res.status(400).json({
+                error: 'Photo is required for check-in. Please allow camera access and try again.'
+            });
+        }
+        const checkinPhotoPath = `/uploads/attendance/${req.file.filename}`;
+
         const result = await pool.query(
-            "INSERT INTO attendance (employee_id, check_in, status, location) VALUES ($1, $2, $3, $4) RETURNING *",
-            [employee_id, checkInAt, status, location]
+            "INSERT INTO attendance (employee_id, attendance_date, check_in, status, location, checkin_photo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+            [employee_id, attendanceDate, checkInAt, status, location, checkinPhotoPath]
         );
 
         res.json(result.rows[0]);
@@ -225,10 +257,14 @@ const checkOut = async (req, res) => {
 
         const checkOutAt = buildTimestampForDate(attendanceDate);
 
+        // Handle checkout photo and location
+        const checkoutPhotoPath = req.file ? `/uploads/attendance/${req.file.filename}` : null;
+        const checkoutLocation = req.body?.location || null;
+
         // Find the active record and update it 
         const result = await pool.query(
-            "UPDATE attendance SET check_out = $1 WHERE employee_id = $2 AND DATE(check_in) = $3::date AND check_out IS NULL RETURNING *",
-            [checkOutAt, employee_id, attendanceDate]
+            "UPDATE attendance SET check_out = $1, checkout_photo = $2, checkout_location = $3 WHERE employee_id = $4 AND check_in IS NOT NULL AND check_out IS NULL RETURNING *",
+            [checkOutAt, checkoutPhotoPath, checkoutLocation, employee_id]
         );
 
         if (result.rows.length === 0) {
@@ -300,7 +336,10 @@ const getAllAttendance = async (req, res) => {
                 a.check_out,
                 COALESCE(a.status, 'On Leave') AS status,
                 a.location,
-                a.total_hours
+                a.total_hours,
+                a.checkin_photo,
+                a.checkout_photo,
+                a.checkout_location
             FROM employees e
             LEFT JOIN (
                 SELECT employee_id,
@@ -309,6 +348,9 @@ const getAllAttendance = async (req, res) => {
                        CASE WHEN COUNT(check_in) > COUNT(check_out) THEN NULL ELSE MAX(check_out) END AS check_out,
                        MIN(status) AS status,
                        MAX(location) AS location,
+                       MAX(checkin_photo) AS checkin_photo,
+                       MAX(checkout_photo) AS checkout_photo,
+                       MAX(checkout_location) AS checkout_location,
                        SUM(
                            CASE
                                WHEN check_in IS NOT NULL AND check_out IS NOT NULL
@@ -317,7 +359,7 @@ const getAllAttendance = async (req, res) => {
                            END
                        ) AS total_hours
                 FROM attendance
-                WHERE DATE(check_in) = $1::date
+                WHERE attendance_date = $1::date
                 GROUP BY employee_id
             ) a ON a.employee_id = e.id
             WHERE 1=1
@@ -325,6 +367,18 @@ const getAllAttendance = async (req, res) => {
         const params = [];
 
         params.push(date);
+
+        // Exclude admin and HR accounts from attendance list
+        query += ` AND (e.role IS NULL OR LOWER(e.role) NOT IN ('admin', 'hr', 'hr manager'))`;
+
+        // If viewer is HR, exclude their own record (HR can't override own attendance)
+        if (req.user.role === 'hr') {
+            const hrEmp = await pool.query('SELECT id FROM employees WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1', [req.user.email]);
+            if (hrEmp.rows.length > 0) {
+                params.push(hrEmp.rows[0].id);
+                query += ` AND e.id != $${params.length}`;
+            }
+        }
 
         if (department) {
             params.push(department);
@@ -387,6 +441,9 @@ const getMonthlyAttendanceExport = async (req, res) => {
         `;
 
         const params = [startDate, endDate];
+
+        // Exclude admin and HR accounts from attendance export
+        query += ` AND (e.role IS NULL OR LOWER(e.role) NOT IN ('admin', 'hr', 'hr manager'))`;
 
         if (department) {
             params.push(department);
@@ -502,17 +559,22 @@ const createAttendance = async (req, res) => {
 
         // Check if record already exists for this employee on this date
         const existing = await pool.query(
-            "SELECT * FROM attendance WHERE employee_id = $1 AND DATE(check_in) = $2::date",
+            "SELECT * FROM attendance WHERE employee_id = $1 AND attendance_date = $2::date",
             [employee_id, date]
         );
 
         if (existing.rows.length > 0) {
-            return res.status(400).json({ error: 'Attendance record already exists for this employee on this date' });
+            // Update existing record instead of failing
+            const updated = await pool.query(
+                "UPDATE attendance SET status = $1 WHERE employee_id = $2 AND attendance_date = $3::date RETURNING *",
+                [status, employee_id, date]
+            );
+            return res.json(updated.rows[0]);
         }
 
         // Create attendance record with status only (no check-in/out times)
         const result = await pool.query(
-            "INSERT INTO attendance (employee_id, check_in, status) VALUES ($1, $2::date, $3) RETURNING *",
+            "INSERT INTO attendance (employee_id, attendance_date, status) VALUES ($1, $2::date, $3) RETURNING *",
             [employee_id, date, status]
         );
 

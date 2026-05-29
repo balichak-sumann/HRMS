@@ -190,9 +190,65 @@ const HROrgChartPage = () => {
                 ) : roots.length === 0 ? (
                     <p style={{ color: 'var(--text-muted)' }}>No employees found for this filter.</p>
                 ) : (
-                    <ul style={{ padding: 0, margin: 0, display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                        {roots.map((employee) => <Node key={employee.id} employee={employee} />)}
-                    </ul>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0' }}>
+                        {/* Company Root */}
+                        <div style={{
+                            padding: '14px 28px', background: 'linear-gradient(135deg, #1E40AF, #3B82F6)',
+                            borderRadius: '12px', color: 'white', fontWeight: '700', fontSize: '16px',
+                            boxShadow: '0 4px 16px rgba(59,130,246,0.3)', textAlign: 'center'
+                        }}>
+                            IndusInnovate Technologies
+                        </div>
+                        <div style={{ width: '2px', height: '30px', background: '#94A3B8' }} />
+
+                        {/* Department Branches */}
+                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', justifyContent: 'center', position: 'relative' }}>
+                            {/* Horizontal connector line */}
+                            {departments.filter(d => !departmentFilter || d.id === departmentFilter).length > 1 && (
+                                <div style={{ position: 'absolute', top: '0', left: '15%', right: '15%', height: '2px', background: '#94A3B8' }} />
+                            )}
+
+                            {departments
+                                .filter(d => !departmentFilter || d.id === departmentFilter)
+                                .map(dept => {
+                                    const deptEmployees = (employees || []).filter(e =>
+                                        e.department_name === dept.name || e.department_id === dept.id
+                                    );
+                                    if (deptEmployees.length === 0 && departmentFilter) return null;
+
+                                    // Find department head (manager with no manager in same dept, or first employee)
+                                    const deptRoots = deptEmployees.filter(e => !e.manager_id || !deptEmployees.some(de => de.id === e.manager_id));
+
+                                    return (
+                                        <div key={dept.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                            <div style={{ width: '2px', height: '20px', background: '#94A3B8' }} />
+                                            {/* Department Node */}
+                                            <div style={{
+                                                padding: '10px 20px', background: 'var(--input-bg)',
+                                                border: '2px solid var(--primary)', borderRadius: '10px',
+                                                fontWeight: '700', fontSize: '13px', color: 'var(--primary)',
+                                                textAlign: 'center', minWidth: '140px',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                            }}>
+                                                {dept.name}
+                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', marginTop: '2px' }}>
+                                                    {deptEmployees.length} member{deptEmployees.length !== 1 ? 's' : ''}
+                                                </div>
+                                            </div>
+
+                                            {deptRoots.length > 0 && (
+                                                <>
+                                                    <div style={{ width: '2px', height: '16px', background: '#CBD5E1' }} />
+                                                    <ul style={{ padding: 0, margin: 0, display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                                        {deptRoots.map(emp => <Node key={emp.id} employee={emp} />)}
+                                                    </ul>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    </div>
                 )}
             </div>
 

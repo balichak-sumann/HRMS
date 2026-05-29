@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import {
     Briefcase, Plus, Calendar, User,
     CheckCircle2, Clock, MoreVertical,
@@ -420,9 +421,9 @@ const HRProjectsPage = () => {
             {/* Detail Panel (Conditional) */}
             {selectedProject && projectDetail && (
                 <div className="project-detail-panel" style={{
-                    position: 'fixed', right: 0, top: 0, width: '40%', height: '100vh',
+                    position: 'fixed', right: 0, top: 0, width: '420px', maxWidth: '90vw', height: '100vh',
                     background: 'var(--card-bg)', borderLeft: '1px solid var(--border)', zIndex: 100,
-                    padding: '40px', overflowY: 'auto', boxShadow: '-10px 0 30px rgba(0,0,0,0.05)'
+                    padding: '24px', overflowY: 'auto', boxShadow: '-10px 0 30px rgba(0,0,0,0.05)'
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                         <button
@@ -441,14 +442,66 @@ const HRProjectsPage = () => {
                         </span>
                     </div>
 
-                    <div style={{ marginBottom: '40px' }}>
-                        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>Project Hub</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Real-time team collaboration and task tracking.</p>
+                    <div style={{ marginBottom: '20px' }}>
+                        <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>Project Hub</h2>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '12px', fontSize: '13px' }}>Edit project details below.</p>
+
+                        {/* Editable Project Details */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px', background: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                            <div>
+                                <label style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>PROJECT NAME</label>
+                                <input className="input-field" defaultValue={projectDetail.name || ''} id="edit-project-name" style={{ fontSize: '12px', width: '100%' }} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>CLIENT</label>
+                                <input className="input-field" defaultValue={projectDetail.client || ''} placeholder="Client" id="edit-project-client" style={{ fontSize: '12px', width: '100%' }} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>DEADLINE</label>
+                                <input type="date" className="input-field" defaultValue={projectDetail.deadline ? String(projectDetail.deadline).slice(0, 10) : ''} id="edit-project-deadline" style={{ fontSize: '12px', width: '100%' }} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>STATUS</label>
+                                <select className="input-field" defaultValue={projectDetail.status || 'Active'} id="edit-project-status" style={{ fontSize: '12px', width: '100%' }}>
+                                    <option value="Active">Active</option>
+                                    <option value="On Hold">On Hold</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const payload = {
+                                            name: document.getElementById('edit-project-name')?.value,
+                                            client: document.getElementById('edit-project-client')?.value,
+                                            deadline: document.getElementById('edit-project-deadline')?.value || null,
+                                            status: document.getElementById('edit-project-status')?.value,
+                                        };
+                                        try {
+                                            await api.put(`/projects/${selectedProject.id}`, payload);
+                                            alert('Project updated successfully');
+                                            fetchProjects();
+                                            fetchProjectDetail(selectedProject.id);
+                                        } catch (err) {
+                                            alert(err?.response?.data?.error || 'Failed to update project');
+                                        }
+                                    }}
+                                    style={{
+                                        padding: '8px 18px', background: 'var(--primary)', color: 'white',
+                                        border: 'none', borderRadius: '6px', fontWeight: '600', fontSize: '12px', cursor: 'pointer',
+                                    }}
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <section style={{ marginBottom: '40px' }}>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Users size={18} color="var(--primary)" /> Team Members ({projectDetail.members?.length || 0})
+                    <section style={{ marginBottom: '20px' }}>
+                        <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Users size={16} color="var(--primary)" /> Team Members ({projectDetail.members?.length || 0})
                         </h3>
                         <div style={{ marginBottom: '16px', display: 'grid', gap: '8px', gridTemplateColumns: '1fr auto' }}>
                             <select value={selectedMemberEmployee || ''} onChange={(e) => setSelectedMemberEmployee(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
@@ -480,26 +533,7 @@ const HRProjectsPage = () => {
 
 
 
-                    <section>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <FileText size={18} color="var(--primary)" /> Daily Reports
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {projectDetail.reports?.map((r, i) => (
-                                <div key={i} style={{ padding: '16px', border: '1px solid var(--border)', background: 'var(--input-bg)', borderRadius: '12px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                        <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-main)' }}>{r.full_name}</span>
-                                        <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{new Date(r.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                    <p style={{ fontSize: '13px', color: 'var(--text-main)', lineHeight: 1.5 }}>{r.work_done}</p>
-                                    <div style={{ marginTop: '12px', display: 'flex', gap: '12px' }}>
-                                        <span style={{ fontSize: '11px', padding: '2px 8px', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-muted)' }}>{r.hours}h Worked</span>
-                                        {r.blockers && <span style={{ fontSize: '11px', padding: '2px 8px', background: '#FEF2F2', borderRadius: '4px', color: '#EF4444' }}>⚠️ {r.blockers}</span>}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                    <DailyTasksSection projectId={selectedProject.id} />
 
                     <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -589,12 +623,15 @@ const HRProjectsPage = () => {
                                     border: '1px solid var(--border)',
                                     borderRadius: '8px',
                                     padding: '8px',
-                                    background: '#F3F4F6',
+                                    background: 'var(--input-bg)',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '4px'
                                 }}>
-                                    {employees.map(emp => (
+                                    {employees.filter(emp => {
+                                        const role = String(emp.role || '').toLowerCase();
+                                        return role !== 'admin' && role !== 'hr';
+                                    }).map(emp => (
                                         <label key={emp.id} style={{
                                             display: 'flex',
                                             alignItems: 'center',
@@ -604,8 +641,8 @@ const HRProjectsPage = () => {
                                             borderRadius: '6px',
                                             transition: 'background 0.2s',
                                             fontSize: '14px',
-                                            color: '#000000',
-                                            backgroundColor: newProject.team.includes(emp.id.toString()) ? '#E5E7EB' : 'transparent'
+                                            color: 'var(--text-main)',
+                                            backgroundColor: newProject.team.includes(emp.id.toString()) ? 'var(--primary)15' : 'transparent'
                                         }}>
                                             <input
                                                 type="checkbox"
@@ -633,6 +670,151 @@ const HRProjectsPage = () => {
                 </div>
             )}
         </div>
+    );
+};
+
+// ─── Daily Tasks Section (for HR/Admin detail panel) ─────────────
+const DailyTasksSection = ({ projectId }) => {
+    const [tasks, setTasks] = useState([]);
+    const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
+    const [showAll, setShowAll] = useState(false);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [employeeFilter, setEmployeeFilter] = useState('');
+
+    useEffect(() => {
+        if (projectId && modalOpen) fetchTasks();
+    }, [projectId, dateFilter, showAll, modalOpen]);
+
+    const fetchTasks = async () => {
+        try {
+            const query = showAll ? '' : `?date=${dateFilter}`;
+            const data = await api.get(`/projects/${projectId}/tasks${query}`);
+            setTasks(data || []);
+        } catch (err) { setTasks([]); }
+    };
+
+    const employees = [...new Map(tasks.map(t => [t.employee_id, t.full_name])).entries()];
+
+    const filteredTasks = employeeFilter
+        ? tasks.filter(t => t.employee_id === employeeFilter)
+        : tasks;
+
+    // Flatten all tasks into a single table with date column
+    const rows = filteredTasks.map(t => ({
+        ...t,
+        dateStr: t.date instanceof Date
+            ? `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}-${String(t.date.getDate()).padStart(2,'0')}`
+            : String(t.date || '').slice(0, 10),
+    })).sort((a, b) => b.dateStr.localeCompare(a.dateStr) || a.full_name.localeCompare(b.full_name));
+
+    const modal = modalOpen ? ReactDOM.createPortal(
+        <div
+            onClick={() => setModalOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+        >
+            <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '14px', width: '100%', maxWidth: '950px', maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}>
+                {/* Header */}
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '17px', fontWeight: '700', margin: 0, color: 'var(--text-main)' }}>
+                        Daily Task Reports {!showAll && `— ${dateFilter}`}
+                    </h2>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select
+                            value={employeeFilter}
+                            onChange={(e) => setEmployeeFilter(e.target.value)}
+                            style={{ padding: '6px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text-main)' }}
+                        >
+                            <option value="">All Employees</option>
+                            {employees.map(([id, name]) => (
+                                <option key={id} value={id}>{name}</option>
+                            ))}
+                        </select>
+                        {!showAll && (
+                            <input
+                                type="date"
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                                style={{ padding: '6px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text-main)' }}
+                            />
+                        )}
+                        <button
+                            onClick={() => setShowAll(!showAll)}
+                            style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '600', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', background: showAll ? 'var(--primary)' : 'transparent', color: showAll ? 'white' : 'var(--text-main)' }}
+                        >
+                            {showAll ? 'Today Only' : 'All History'}
+                        </button>
+                        <button
+                            onClick={() => setModalOpen(false)}
+                            style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '600', border: 'none', borderRadius: '6px', cursor: 'pointer', background: '#EF4444', color: 'white' }}
+                        >
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+
+                {/* Body — single table */}
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {rows.length === 0 ? (
+                        <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '50px 0', fontSize: '14px' }}>No tasks found.</p>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)' }}>
+                                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                    {showAll && <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>DATE</th>}
+                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>EMPLOYEE</th>
+                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>TASK</th>
+                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', width: '100px' }}>STATUS</th>
+                                    <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', width: '60px' }}>TIME</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map((t) => (
+                                    <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                        {showAll && <td style={{ padding: '10px 14px', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t.dateStr}</td>}
+                                        <td style={{ padding: '10px 14px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{t.full_name}</td>
+                                        <td style={{ padding: '10px 14px', color: 'var(--text-main)' }}>{t.title}</td>
+                                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                            <span style={{
+                                                padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: '700',
+                                                background: t.status === 'Finished' ? '#DCFCE7' : t.status === 'In Progress' ? '#FEF3C7' : t.status === 'Partially Finished' ? '#E0E7FF' : 'var(--input-bg)',
+                                                color: t.status === 'Finished' ? '#166534' : t.status === 'In Progress' ? '#92400E' : t.status === 'Partially Finished' ? '#3730A3' : 'var(--text-muted)',
+                                            }}>{t.status || 'Pending'}</span>
+                                        </td>
+                                        <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '600', color: 'var(--text-main)' }}>
+                                            {t.time_spent ? `${t.time_spent}h` : '—'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body
+    ) : null;
+
+    return (
+        <section style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    <FileText size={16} color="var(--primary)" /> Daily Tasks
+                </h3>
+                <button
+                    onClick={() => { setShowAll(false); setModalOpen(true); fetchTasks(); }}
+                    style={{ padding: '5px 12px', fontSize: '11px', fontWeight: '600', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', background: 'var(--primary)', color: 'white' }}
+                >
+                    View Today
+                </button>
+                <button
+                    onClick={() => { setShowAll(true); setModalOpen(true); fetchTasks(); }}
+                    style={{ padding: '5px 12px', fontSize: '11px', fontWeight: '600', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', background: 'var(--card-bg)', color: 'var(--text-main)' }}
+                >
+                    View All
+                </button>
+            </div>
+            {modal}
+        </section>
     );
 };
 

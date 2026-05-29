@@ -382,4 +382,50 @@ const changePassword = async (req, res) => {
     }
 };
 
-module.exports = { getProfile, updateProfile, changePassword };
+// ─── Get User Settings ───────────────────────────────────────────
+const getUserSettings = async (req, res) => {
+    try {
+        const profileId = req.user.id;
+        const result = await pool.query(
+            'SELECT attendance_reminder FROM user_settings WHERE profile_id = $1 LIMIT 1',
+            [profileId]
+        );
+
+        if (result.rows.length === 0) {
+            // Default: reminder enabled
+            return res.json({ attendance_reminder: true });
+        }
+
+        res.json({
+            attendance_reminder: !!result.rows[0].attendance_reminder
+        });
+    } catch (err) {
+        console.error('getUserSettings error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Update User Settings ────────────────────────────────────────
+const updateUserSettings = async (req, res) => {
+    try {
+        const profileId = req.user.id;
+        const { attendance_reminder } = req.body;
+
+        const reminderValue = attendance_reminder ? 1 : 0;
+
+        // Upsert
+        await pool.query(
+            `INSERT INTO user_settings (profile_id, attendance_reminder)
+             VALUES ($1, $2)
+             ON DUPLICATE KEY UPDATE attendance_reminder = $2`,
+            [profileId, reminderValue]
+        );
+
+        res.json({ attendance_reminder: !!reminderValue });
+    } catch (err) {
+        console.error('updateUserSettings error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+module.exports = { getProfile, updateProfile, changePassword, getUserSettings, updateUserSettings };

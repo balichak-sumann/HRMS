@@ -450,10 +450,23 @@ const ChatPage = () => {
         const currentSocket = socket.current;
 
         const handleReceiveMessage = (message) => {
-            console.log('New message received:', message);
+            console.log('[Chat] receive_message event:', message?.id, 'from:', message?.sender_id);
             setMessages(prev => {
-                // Prevent duplicates (from optimistic update or double-emit)
-                if (prev.some(m => m.id === message.id)) return prev;
+                // Prevent duplicates
+                if (prev.some(m => m.id === message.id || (m.id && m.id === message.id))) return prev;
+                // Also check optimistic messages by content+timestamp proximity
+                const isDuplicate = prev.some(m => 
+                    m.content === message.content && 
+                    m.sender_id === message.sender_id &&
+                    Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 5000
+                );
+                if (isDuplicate) {
+                    // Replace optimistic with real message
+                    return prev.map(m => 
+                        (m.content === message.content && m.sender_id === message.sender_id && Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 5000)
+                            ? message : m
+                    );
+                }
                 return [...prev, message];
             });
         };
@@ -1010,13 +1023,14 @@ const ChatPage = () => {
                                                 lineHeight: '1.5'
                                             }}>
                                                 {m.attachment_url ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                         {m.attachment_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                                                             <img
                                                                 src={m.attachment_url}
-                                                                alt="Attachment"
-                                                                style={{ maxWidth: '100%', borderRadius: '8px', cursor: 'pointer' }}
+                                                                alt="Image"
+                                                                style={{ maxWidth: '260px', maxHeight: '300px', borderRadius: '10px', cursor: 'pointer', objectFit: 'cover', display: 'block' }}
                                                                 onClick={() => window.open(m.attachment_url, '_blank')}
+                                                                onError={(e) => { e.target.style.display = 'none'; }}
                                                             />
                                                         ) : (
                                                             <a

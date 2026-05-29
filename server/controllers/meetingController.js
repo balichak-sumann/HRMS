@@ -297,6 +297,17 @@ const addParticipant = async (req, res) => {
                 [profileId, 'Meeting Invite', inviteMessage, 'meeting']
             );
 
+            // Email notification
+            const { sendNotificationEmail } = require('../services/emailService');
+            sendNotificationEmail({
+                to: targetProfileRes.rows[0]?.email || null,
+                name: targetProfileRes.rows[0]?.full_name || null,
+                title: 'Meeting Invite',
+                message: inviteMessage,
+                actionUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/employee/meetings/${meeting.id}`,
+                actionLabel: 'Join Meeting',
+            });
+
             // Socket notification
             if (req.io) {
                 req.io.to(profileId).emit('notification_created', notification.rows[0]);

@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { auth, authorize } = require('../middleware/auth');
+const { enforceStorageQuota } = require('../middleware/storageQuota');
 const {
     submitExpenseClaim,
     getMyExpenseClaims,
@@ -41,7 +42,7 @@ const upload = multer({
 router.use(auth);
 
 router.get('/mine', authorize(['employee']), getMyExpenseClaims);
-router.post('/submit', authorize(['employee']), upload.single('receipt'), submitExpenseClaim);
+router.post('/submit', authorize(['employee']), upload.single('receipt'), enforceStorageQuota, submitExpenseClaim);
 
 router.get('/review', authorize(['hr', 'employee']), getReviewableClaims);
 router.patch('/review/:id', authorize(['hr', 'employee']), reviewExpenseClaim);

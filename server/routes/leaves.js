@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { auth, authorize } = require('../middleware/auth');
 const { auditLogger } = require('../middleware/auditLogger');
+const { enforceStorageQuota } = require('../middleware/storageQuota');
 const leaveController = require('../controllers/leaveController');
 
 // Configure Multer - ensure directory exists
@@ -39,7 +40,7 @@ const upload = multer({
 router.use(auditLogger('Leave Management'));
 
 router.get('/', auth, leaveController.getLeaves);
-router.post('/', auth, upload.single('attachment'), leaveController.createLeave);
+router.post('/', auth, upload.single('attachment'), enforceStorageQuota, leaveController.createLeave);
 router.patch('/:id', auth, authorize(['hr']), leaveController.updateLeaveStatus);
 
 module.exports = router;

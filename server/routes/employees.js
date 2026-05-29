@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const employeeController = require('../controllers/employeeController');
+const { enforceStorageQuota } = require('../middleware/storageQuota');
 
 // Configure multer for avatar uploads
 const storage = multer.diskStorage({
@@ -40,8 +41,8 @@ router.get('/dashboard-stats', auth, employeeController.getDashboardStats);
 router.get('/', auth, employeeController.getEmployees);
 router.get('/hr-accounts', auth, authorize(['admin']), employeeController.getHrAccounts);
 router.get('/:id', auth, employeeController.getEmployeeById);
-router.post('/', auth, authorize(['hr', 'admin']), upload.single('avatar'), employeeController.createEmployee);
-router.patch('/:id', auth, authorize(['hr', 'admin']), upload.single('avatar'), employeeController.updateEmployee);
+router.post('/', auth, authorize(['hr', 'admin']), upload.single('avatar'), enforceStorageQuota, employeeController.createEmployee);
+router.patch('/:id', auth, authorize(['hr', 'admin']), upload.single('avatar'), enforceStorageQuota, employeeController.updateEmployee);
 router.patch('/:id/reactivate', auth, authorize(['hr', 'admin']), employeeController.reactivateEmployee);
 router.delete('/:id', auth, authorize(['hr', 'admin']), employeeController.deleteEmployee);
 

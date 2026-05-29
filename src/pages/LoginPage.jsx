@@ -218,7 +218,8 @@ const LoginPage = () => {
                                 disabled={otpStep}
                                 style={{
                                     width: '100%',
-                                    paddingLeft: '40px',
+                                    boxSizing: 'border-box',
+                                    paddingLeft: '42px',
                                     paddingRight: '12px',
                                     paddingTop: '10px',
                                     paddingBottom: '10px',
@@ -269,7 +270,8 @@ const LoginPage = () => {
                                     required
                                     style={{
                                         width: '100%',
-                                        paddingLeft: '40px',
+                                        boxSizing: 'border-box',
+                                        paddingLeft: '42px',
                                         paddingRight: '44px',
                                         paddingTop: '10px',
                                         paddingBottom: '10px',

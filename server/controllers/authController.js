@@ -7,7 +7,7 @@ const { sendPasswordResetEmail, sendLoginOtpEmail, isConsoleEmailEnabled } = req
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey_indus_2026';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOGIN_OTP_EXPIRY_MINUTES = 10;
@@ -317,6 +317,7 @@ const verifyLoginOtp = async (req, res) => {
     }
 
     try {
+        console.log('[OTP Debug] JWT_SECRET length:', JWT_SECRET?.length, 'token length:', pre_auth_token?.length);
         const decoded = jwt.verify(pre_auth_token, JWT_SECRET);
         if (decoded?.purpose !== 'login_otp' || !decoded?.id || !decoded?.otp_session_id) {
             return res.status(400).json({ error: 'Invalid OTP session. Please login again.' });
@@ -426,9 +427,10 @@ const verifyLoginOtp = async (req, res) => {
         });
     } catch (err) {
         if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
+            console.error('[OTP Verify] Token error:', err.name, err.message);
             return res.status(401).json({ error: 'OTP session expired. Please login again.' });
         }
-        console.error(err.message);
+        console.error('[OTP Verify] Error:', err.message);
         res.status(500).json({ error: 'Server error' });
     }
 };

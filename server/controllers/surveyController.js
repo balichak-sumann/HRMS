@@ -223,6 +223,21 @@ const publishSurvey = async (req, res) => {
             }
         }
 
+        // Send email to all targeted employees
+        const { sendNotificationEmail } = require('../services/emailService');
+        for (const row of targetProfiles.rows) {
+            if (row.email) {
+                sendNotificationEmail({
+                    to: row.email,
+                    name: row.full_name || null,
+                    title: 'New Survey Available',
+                    message: `A new survey "${title}" has been published. Please take a moment to fill it out.`,
+                    actionUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/employee/surveys`,
+                    actionLabel: 'Fill Survey',
+                });
+            }
+        }
+
         res.json(updated.rows[0]);
     } catch (err) {
         await client.query('ROLLBACK');

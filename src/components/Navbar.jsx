@@ -52,10 +52,18 @@ const Navbar = ({ onMenuClick, isMobile }) => {
 
     const formatNotificationTime = (value) => {
         if (!value) return 'Just now';
-        const date = new Date(value);
+        let dateStr = String(value);
+        // If no timezone info, assume UTC (MySQL DATETIME doesn't include TZ)
+        if (!dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('T')) {
+            dateStr = dateStr.replace(' ', 'T') + 'Z';
+        } else if (dateStr.includes('T') && !dateStr.includes('Z') && !dateStr.includes('+')) {
+            dateStr += 'Z';
+        }
+        const date = new Date(dateStr);
         if (Number.isNaN(date.getTime())) return 'Just now';
 
         const diffMs = Date.now() - date.getTime();
+        if (diffMs < 0) return 'Just now';
         const minutes = Math.floor(diffMs / 60000);
         if (minutes < 1) return 'Just now';
         if (minutes < 60) return `${minutes}m ago`;
@@ -359,12 +367,38 @@ const Navbar = ({ onMenuClick, isMobile }) => {
                                     visibleNotifications.map(n => (
                                         <div
                                             key={n.id}
+                                            onClick={() => {
+                                                if (n.type === 'chat_message') {
+                                                    const basePath = profile?.role === 'admin' ? '/admin' : profile?.role === 'hr' ? '/hr' : '/employee';
+                                                    // Extract sender from notification message (format: "SenderName: message")
+                                                    navigate(`${basePath}/chat`);
+                                                    setShowNotifications(false);
+                                                } else if (n.type === 'meeting') {
+                                                    const basePath = profile?.role === 'admin' ? '/admin' : profile?.role === 'hr' ? '/hr' : '/employee';
+                                                    navigate(`${basePath}/meetings`);
+                                                    setShowNotifications(false);
+                                                } else if (n.type === 'helpdesk_assignment' || n.type === 'helpdesk') {
+                                                    const basePath = profile?.role === 'admin' ? '/admin' : profile?.role === 'hr' ? '/hr' : '/employee';
+                                                    navigate(`${basePath}/helpdesk`);
+                                                    setShowNotifications(false);
+                                                } else if (n.type === 'shift') {
+                                                    const basePath = profile?.role === 'employee' ? '/employee' : profile?.role === 'hr' ? '/hr' : '/admin';
+                                                    navigate(`${basePath}/attendance`);
+                                                    setShowNotifications(false);
+                                                } else if (n.type === 'survey') {
+                                                    const basePath = profile?.role === 'employee' ? '/employee' : profile?.role === 'hr' ? '/hr' : '/admin';
+                                                    navigate(`${basePath}/surveys`);
+                                                    setShowNotifications(false);
+                                                } else {
+                                                    setShowNotifications(false);
+                                                }
+                                            }}
                                             style={{
                                                 display: 'flex',
                                                 gap: '12px',
                                                 padding: '8px',
                                                 borderRadius: '8px',
-                                                cursor: 'default',
+                                                cursor: 'pointer',
                                                 transition: 'all 0.2s',
                                                 opacity: isNotificationRead(n) ? 0.75 : 1
                                             }}

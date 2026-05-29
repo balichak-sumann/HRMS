@@ -262,16 +262,16 @@ const HRPayrollEmployeePage = () => {
 
         // Prorate all Earnings
         const basic_salary = hasZeroFactor
-            ? Math.max(0, Number(overrides.basic_salary ?? current.basic_salary ?? 0))
+            ? Math.max(0, Number(overrides.basic_salary ?? 0))
             : Math.round(baseBasic * factor);
         const hra = hasZeroFactor
-            ? Math.max(0, Number(overrides.hra ?? current.hra ?? 0))
+            ? Math.max(0, Number(overrides.hra ?? 0))
             : Math.round(baseHra * factor);
         const conveyance = hasZeroFactor
-            ? Math.max(0, Number(overrides.conveyance ?? current.conveyance ?? 0))
+            ? Math.max(0, Number(overrides.conveyance ?? 0))
             : Math.round(baseConveyance * factor);
         const specialAllowance = hasZeroFactor
-            ? Math.max(0, Number(overrides.specialAllowance ?? current.specialAllowance ?? 0))
+            ? Math.max(0, Number(overrides.specialAllowance ?? 0))
             : Math.round(baseSpecial * factor);
         const allowances = conveyance + specialAllowance;
         const baseSalaryEarnings = basic_salary + hra + allowances;

@@ -14,6 +14,7 @@ const HRAttendancePage = () => {
     });
     const [updatingId, setUpdatingId] = useState(null);
     const [openDropdownId, setOpenDropdownId] = useState(null);
+    const [previewPhoto, setPreviewPhoto] = useState(null);
 
     useEffect(() => {
         fetchAttendance();
@@ -75,12 +76,10 @@ const HRAttendancePage = () => {
     };
 
     const handleStatusChange = async (record, newStatus) => {
-        // For records without an ID, create a new attendance record first
         let attendanceId = record.id;
-        const trackingId = record.id || record.employee_id;
 
         try {
-            setUpdatingId(trackingId);
+            setUpdatingId(record.employee_id);
             
             if (!attendanceId) {
                 // Create new attendance record if it doesn't exist
@@ -101,7 +100,7 @@ const HRAttendancePage = () => {
             ));
         } catch (err) {
             console.error('Failed to update status', err);
-            alert('Failed to update status: ' + (err.message || 'Unknown error'));
+            alert('Failed to update status: ' + (err?.response?.data?.error || err.message || 'Unknown error'));
         } finally {
             setUpdatingId(null);
         }
@@ -265,8 +264,8 @@ const HRAttendancePage = () => {
             </div>
 
             {/* Table */}
-            <div className="card" style={{ padding: 0 }}>
-                <div className="table-scroll-wrapper">
+            <div className="card" style={{ padding: 0, overflow: 'visible' }}>
+                <div className="table-scroll-wrapper" style={{ overflow: 'visible' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                         <thead style={{ background: '#F9FAFB', borderBottom: '1px solid var(--border)' }}>
                             <tr>
@@ -289,93 +288,61 @@ const HRAttendancePage = () => {
                                         <td style={{ padding: '16px', fontWeight: '500' }}>{row.full_name}</td>
                                         <td style={{ padding: '16px', color: 'var(--text-muted)' }}>{row.department}</td>
                                         <td style={{ padding: '16px' }}>
-                                            <div>{formatTime(row.check_in)}</div>
-                                            {row.location && (
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                    📍 {row.location}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {row.checkin_photo && (
+                                                    <img src={row.checkin_photo} alt="" onClick={() => setPreviewPhoto(row.checkin_photo)} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #10B981', cursor: 'pointer' }} />
+                                                )}
+                                                <div>
+                                                    <div>{formatTime(row.check_in)}</div>
+                                                    {row.location && (
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📍 {row.location}</div>
+                                                    )}
                                                 </div>
-                                            )}
+                                            </div>
                                         </td>
-                                        <td style={{ padding: '16px' }}>{formatTime(row.check_out)}</td>
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {row.checkout_photo && (
+                                                    <img src={row.checkout_photo} alt="" onClick={() => setPreviewPhoto(row.checkout_photo)} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #EF4444', cursor: 'pointer' }} />
+                                                )}
+                                                <div>
+                                                    <div>{formatTime(row.check_out)}</div>
+                                                    {row.checkout_location && (
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📍 {row.checkout_location}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td style={{ padding: '16px' }}>
                                             {row.total_hours !== undefined && row.total_hours !== null
                                                 ? `${Number(row.total_hours).toFixed(1)}h`
                                                 : `${calculateHours(row.check_in, row.check_out)}h`
                                             }
                                         </td>
-                                        <td style={{ padding: '16px', position: 'relative' }}>
-                                            <>
-                                                <button
-                                                    onClick={() => setOpenDropdownId(openDropdownId === (row.id || row.employee_id) ? null : (row.id || row.employee_id))}
-                                                    disabled={updatingId === (row.id || row.employee_id)}
-                                                    style={{
-                                                        padding: '8px 16px',
-                                                        borderRadius: '20px',
-                                                        border: 'none',
-                                                        background: getStatusColor(row.status).bg,
-                                                        color: getStatusColor(row.status).text,
-                                                        fontSize: '13px',
-                                                        fontWeight: '600',
-                                                        cursor: updatingId === (row.id || row.employee_id) ? 'not-allowed' : 'pointer',
-                                                        opacity: updatingId === (row.id || row.employee_id) ? 0.6 : 1,
-                                                        transition: 'all 0.2s',
-                                                        minWidth: 'auto',
-                                                        textAlign: 'center'
-                                                    }}
-                                                >
-                                                    {row.status ? getStatusColor(row.status).label : '+ Set Status'}
-                                                </button>
-                                                
-                                                {openDropdownId === (row.id || row.employee_id) && (
-                                                    <div style={{
-                                                        position: 'absolute',
-                                                        top: '100%',
-                                                        left: 0,
-                                                        marginTop: '4px',
-                                                        background: 'white',
-                                                        border: '1px solid var(--border)',
-                                                        borderRadius: '8px',
-                                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                                        zIndex: 10,
-                                                        minWidth: '160px'
-                                                    }}>
-                                                        {['Present', 'Late', 'On Leave', 'Absent'].map(status => {
-                                                            const colorObj = getStatusColor(status);
-                                                            return (
-                                                                <button
-                                                                    key={status}
-                                                                    onClick={() => {
-                                                                        handleStatusChange(row, status);
-                                                                        setOpenDropdownId(null);
-                                                                    }}
-                                                                    style={{
-                                                                        display: 'block',
-                                                                        width: '100%',
-                                                                        padding: '10px 16px',
-                                                                        border: 'none',
-                                                                        background: row.status === status ? colorObj.bg : 'white',
-                                                                        color: row.status === status ? colorObj.text : 'var(--text-main)',
-                                                                        fontSize: '13px',
-                                                                        fontWeight: '500',
-                                                                        cursor: 'pointer',
-                                                                        textAlign: 'left',
-                                                                        borderBottom: status !== 'Absent' ? '1px solid var(--border)' : 'none',
-                                                                        transition: 'all 0.2s'
-                                                                    }}
-                                                                    onMouseOver={(e) => {
-                                                                        e.currentTarget.style.background = colorObj.bg + '66';
-                                                                    }}
-                                                                    onMouseOut={(e) => {
-                                                                        e.currentTarget.style.background = row.status === status ? colorObj.bg : 'white';
-                                                                    }}
-                                                                >
-                                                                    {colorObj.label}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </>
+                                        <td style={{ padding: '16px' }}>
+                                            <select
+                                                value={row.status || 'On Leave'}
+                                                onChange={(e) => handleStatusChange(row, e.target.value)}
+                                                disabled={updatingId === row.employee_id}
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid var(--border)',
+                                                    background: getStatusColor(row.status).bg,
+                                                    color: getStatusColor(row.status).text,
+                                                    fontSize: '13px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    outline: 'none',
+                                                    minWidth: '130px',
+                                                }}
+                                            >
+                                                <option value="Present">✓ Present</option>
+                                                <option value="Late">⏰ Late</option>
+                                                <option value="Half-Day">½ Half-Day</option>
+                                                <option value="On Leave">🏖 On Leave</option>
+                                                <option value="Absent">✕ Absent</option>
+                                            </select>
                                         </td>
                                     </tr>
                                 ))
@@ -384,6 +351,16 @@ const HRAttendancePage = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Photo Lightbox */}
+            {previewPhoto && (
+                <div
+                    onClick={() => setPreviewPhoto(null)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                    <img src={previewPhoto} alt="Attendance Photo" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                </div>
+            )}
         </div >
     );
 };

@@ -70,16 +70,35 @@ const getStorageUsage = async (req, res) => {
         const myId = await getEmpId(req.user.email);
         if (!myId) return res.status(404).json({ error: 'Profile not found' });
 
-        const result = await pool.query(
-            `SELECT COALESCE(SUM(size), 0)::bigint AS used_bytes
-             FROM files
-             WHERE owner_id = $1`,
+        // Drive files
+        const driveResult = await pool.query(
+            `SELECT COALESCE(SUM(size), 0) AS used_bytes FROM files WHERE owner_id = $1`,
             [myId]
         );
+        let usedBytes = Number(driveResult.rows[0]?.used_bytes || 0);
 
-        const usedBytes = Number(result.rows[0]?.used_bytes || 0);
-        // Quota can be configured later per role/user; default is 10 GB for now.
-        const quotaBytes = 10 * 1024 * 1024 * 1024;
+        // Tax proofs
+        const taxResult = await pool.query(
+            `SELECT COALESCE(SUM(file_size), 0) AS used_bytes FROM income_tax_declaration_proofs WHERE uploaded_by = $1`,
+            [myId]
+        );
+        usedBytes += Number(taxResult.rows[0]?.used_bytes || 0);
+
+        // Estimate leave/expense attachments (~500KB each)
+        const leaveResult = await pool.query(
+            `SELECT COUNT(*) AS cnt FROM leaves WHERE employee_id = $1 AND attachment_url IS NOT NULL AND attachment_url != ''`,
+            [myId]
+        );
+        usedBytes += Number(leaveResult.rows[0]?.cnt || 0) * 500 * 1024;
+
+        const expenseResult = await pool.query(
+            `SELECT COUNT(*) AS cnt FROM expense_claims WHERE employee_id = $1 AND receipt_url IS NOT NULL AND receipt_url != ''`,
+            [myId]
+        );
+        usedBytes += Number(expenseResult.rows[0]?.cnt || 0) * 500 * 1024;
+
+        // 1 GB per user quota
+        const quotaBytes = 1 * 1024 * 1024 * 1024;
 
         res.json({ used_bytes: usedBytes, quota_bytes: quotaBytes });
     } catch (err) {
@@ -109,6 +128,9 @@ const uploadFile = async (req, res) => {
 // ─── Create folder ───────────────────────────────────────────────
 const createFolder = async (req, res) => {
     const { name, parent_id, is_company, is_hr_only } = req.body;
+    if (!name || !String(name).trim()) {
+        return res.status(400).json({ error: 'Folder name is required' });
+    }
     try {
         const myId = await getEmpId(req.user.email);
 

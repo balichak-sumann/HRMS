@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 const SettingsPage = () => {
     const { profile, setProfile } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [attendanceReminder, setAttendanceReminder] = useState(true);
+    const [reminderLoading, setReminderLoading] = useState(false);
 
     // Notification State
     const [notifications, setNotifications] = useState({
@@ -32,6 +34,34 @@ const SettingsPage = () => {
         document.documentElement.setAttribute('data-font-size', appearance.fontSize);
         localStorage.setItem('fontSize', appearance.fontSize);
     }, [appearance.fontSize]);
+
+    // Fetch attendance reminder setting
+    React.useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const data = await api.get('/user/settings');
+                setAttendanceReminder(!!data.attendance_reminder);
+            } catch (err) {
+                console.error('Failed to fetch user settings', err);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const handleReminderToggle = async () => {
+        const newValue = !attendanceReminder;
+        setAttendanceReminder(newValue);
+        setReminderLoading(true);
+        try {
+            await api.put('/user/settings', { attendance_reminder: newValue });
+            toast.success(newValue ? 'Attendance reminder enabled' : 'Attendance reminder disabled');
+        } catch (err) {
+            setAttendanceReminder(!newValue); // revert
+            toast.error('Failed to update setting');
+        } finally {
+            setReminderLoading(false);
+        }
+    };
 
     // Password State
     const [passwords, setPasswords] = useState({
@@ -227,6 +257,16 @@ const SettingsPage = () => {
                             active={notifications.updates}
                             onToggle={() => setNotifications(prev => ({ ...prev, updates: !prev.updates }))}
                         />
+                        <div style={{ borderTop: '1px solid var(--border)', marginTop: '8px', paddingTop: '8px' }}>
+                            <Toggle
+                                label="Attendance Check-In Reminder"
+                                active={attendanceReminder}
+                                onToggle={handleReminderToggle}
+                            />
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px', paddingLeft: '2px' }}>
+                                Get an email reminder if you forget to check in by 9:30 AM. Auto-checkout after 12 hours.
+                            </p>
+                        </div>
                     </div>
                 </section>
 

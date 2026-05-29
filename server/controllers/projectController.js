@@ -4,6 +4,12 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+const getIstTodayYmd = () => {
+    const now = new Date();
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, '0')}-${String(ist.getDate()).padStart(2, '0')}`;
+};
+
 // ─── GET all projects (HR) or assigned projects (Employee) ────────
 const getProjects = async (req, res) => {
     try {
@@ -56,6 +62,9 @@ const getProjects = async (req, res) => {
 // ─── Create a new project (HR Only) ──────────────────────────────
 const createProject = async (req, res) => {
     const { name, client, deadline, team } = req.body;
+    if (!name || !String(name).trim()) {
+        return res.status(400).json({ error: 'Project name is required' });
+    }
     try {
         const result = await pool.query(
             "INSERT INTO projects (name, client, deadline) VALUES ($1, $2, $3) RETURNING *",
@@ -74,6 +83,55 @@ const createProject = async (req, res) => {
         }
 
         res.json(project);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Update a project (HR/Admin) ─────────────────────────────────
+const updateProject = async (req, res) => {
+    const { name, client, deadline, status } = req.body;
+    try {
+        const existing = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
+        if (existing.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+        const updates = [];
+        const values = [];
+        let idx = 1;
+
+        if (name !== undefined) { updates.push(`name = $${idx}`); values.push(name); idx++; }
+        if (client !== undefined) { updates.push(`client = $${idx}`); values.push(client); idx++; }
+        if (deadline !== undefined) { updates.push(`deadline = $${idx}`); values.push(deadline || null); idx++; }
+        if (status !== undefined) { updates.push(`status = $${idx}`); values.push(status); idx++; }
+
+        if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+
+        values.push(req.params.id);
+        const result = await pool.query(
+            `UPDATE projects SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+            values
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Delete a project (HR/Admin) ─────────────────────────────────
+const deleteProject = async (req, res) => {
+    try {
+        const existing = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
+        if (existing.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+        // Delete related data first
+        await pool.query('DELETE FROM project_members WHERE project_id = $1', [req.params.id]);
+        await pool.query('DELETE FROM daily_report_tasks WHERE project_id = $1', [req.params.id]);
+        await pool.query('DELETE FROM daily_reports WHERE project_id = $1', [req.params.id]);
+        await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+
+        res.json({ message: 'Project deleted successfully' });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server error' });
@@ -165,35 +223,27 @@ const createTask = async (req, res) => {
     }
 };
 
-// ─── Submit daily report (Employee) ──────────────────────────────
-const createReport = async (req, res) => {
-    const { work_done, hours, blockers } = req.body;
-
-    if (!work_done || !String(work_done).trim()) {
-        return res.status(400).json({ error: 'Work done description is required' });
-    }
-
-    if (!hours || Number(hours) <= 0) {
-        return res.status(400).json({ error: 'Hours spent must be greater than 0' });
+// ─── Create a single task (immediately visible to team) ──────────
+const createReportTask = async (req, res) => {
+    const { title } = req.body;
+    if (!title || !String(title).trim()) {
+        return res.status(400).json({ error: 'Task title is required' });
     }
 
     try {
-        // Check project status - prevent reports on closed/completed projects
-        const projectCheck = await pool.query(
-            'SELECT id, status FROM projects WHERE id = $1',
-            [req.params.id]
-        );
-        if (projectCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Project not found' });
-        }
-        const projectStatus = String(projectCheck.rows[0].status || '').toLowerCase();
-        if (projectStatus === 'completed' || projectStatus === 'closed' || projectStatus === 'cancelled') {
-            return res.status(400).json({ error: `Cannot submit reports for a ${projectStatus} project` });
+        const projectCheck = await pool.query('SELECT id, status FROM projects WHERE id = $1', [req.params.id]);
+        if (projectCheck.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+        const pStatus = String(projectCheck.rows[0].status || '').toLowerCase();
+        if (['completed', 'closed', 'cancelled'].includes(pStatus)) {
+            return res.status(400).json({ error: `Cannot add tasks to a ${pStatus} project` });
         }
 
+        const employeeId = req.user.employee_uuid || req.user.id;
+        const today = getIstTodayYmd();
+
         const result = await pool.query(
-            "INSERT INTO daily_reports (project_id, employee_id, work_done, hours, blockers) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-            [req.params.id, req.user.employee_uuid || req.user.id, work_done, Number(hours), blockers || null]
+            "INSERT INTO daily_report_tasks (project_id, employee_id, date, title) VALUES ($1, $2, $3, $4) RETURNING *",
+            [req.params.id, employeeId, today, String(title).trim()]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -202,21 +252,163 @@ const createReport = async (req, res) => {
     }
 };
 
-// ─── Get reports for a project ───────────────────────────────────
+// ─── Update a task (time_spent, status, or title) ────────────────
+const updateReportTask = async (req, res) => {
+    const { taskId } = req.params;
+    const { title, time_spent, status } = req.body;
+
+    try {
+        const employeeId = req.user.employee_uuid || req.user.id;
+        const today = getIstTodayYmd();
+
+        // Verify ownership and same day
+        const existing = await pool.query(
+            'SELECT * FROM daily_report_tasks WHERE id = $1',
+            [taskId]
+        );
+        if (existing.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
+
+        const task = existing.rows[0];
+        const rawDate = task.date;
+        let taskDate;
+        if (rawDate instanceof Date) {
+            taskDate = `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`;
+        } else {
+            taskDate = String(rawDate || '').slice(0, 10);
+        }
+
+        // Only the owner can edit, and only on the same day (unless HR/admin)
+        const isOwner = String(task.employee_id) === String(employeeId);
+        const isHrAdmin = ['hr', 'admin'].includes(req.user.role);
+
+        if (!isOwner && !isHrAdmin) {
+            return res.status(403).json({ error: 'You can only edit your own tasks' });
+        }
+        if (!isHrAdmin && taskDate !== today) {
+            return res.status(400).json({ error: 'Cannot edit tasks from previous days' });
+        }
+
+        const updates = [];
+        const values = [];
+        let idx = 1;
+
+        if (title !== undefined) { updates.push(`title = $${idx}`); values.push(String(title).trim()); idx++; }
+        if (time_spent !== undefined) { updates.push(`time_spent = $${idx}`); values.push(Number(time_spent) || null); idx++; }
+        if (status !== undefined) {
+            const valid = ['Finished', 'In Progress', 'Partially Finished'];
+            if (!valid.includes(status)) return res.status(400).json({ error: `Status must be: ${valid.join(', ')}` });
+            updates.push(`status = $${idx}`); values.push(status); idx++;
+        }
+
+        if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+
+        values.push(taskId);
+        const result = await pool.query(
+            `UPDATE daily_report_tasks SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+            values
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Delete a task (same day only) ───────────────────────────────
+const deleteReportTask = async (req, res) => {
+    const { taskId } = req.params;
+    try {
+        const employeeId = req.user.employee_uuid || req.user.id;
+        const today = getIstTodayYmd();
+
+        const existing = await pool.query('SELECT * FROM daily_report_tasks WHERE id = $1', [taskId]);
+        if (existing.rows.length === 0) return res.status(404).json({ error: 'Task not found' });
+
+        const task = existing.rows[0];
+        const rawDate = task.date;
+        let taskDate;
+        if (rawDate instanceof Date) {
+            taskDate = `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`;
+        } else {
+            taskDate = String(rawDate || '').slice(0, 10);
+        }
+        const isOwner = String(task.employee_id) === String(employeeId);
+        const isHrAdmin = ['hr', 'admin'].includes(req.user.role);
+
+        if (!isOwner && !isHrAdmin) return res.status(403).json({ error: 'Access denied' });
+        if (!isHrAdmin && taskDate !== today) return res.status(400).json({ error: 'Cannot delete tasks from previous days' });
+
+        await pool.query('DELETE FROM daily_report_tasks WHERE id = $1', [taskId]);
+        res.json({ message: 'Task deleted' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Get tasks for a project (team view) ─────────────────────────
+const getReportTasks = async (req, res) => {
+    try {
+        const { date } = req.query;
+        const role = req.user.role;
+        const isHrAdmin = ['hr', 'admin'].includes(role);
+
+        let query = `
+            SELECT t.*, COALESCE(e.full_name, 'Unknown') as full_name
+            FROM daily_report_tasks t
+            LEFT JOIN employees e ON t.employee_id = e.id
+            WHERE t.project_id = $1
+        `;
+        const params = [req.params.id];
+
+        if (!isHrAdmin) {
+            const targetDate = date || getIstTodayYmd();
+            params.push(targetDate);
+            query += ` AND t.date = $${params.length}`;
+        } else if (date) {
+            params.push(date);
+            query += ` AND t.date = $${params.length}`;
+        }
+
+        query += ' ORDER BY t.date DESC, t.created_at ASC';
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Get reports for a project (team view — today only for employees, all for HR/admin) ──
 const getProjectReports = async (req, res) => {
     try {
-        const result = await pool.query(`
+        const { date } = req.query;
+        const role = req.user.role;
+        const isHrOrAdmin = ['hr', 'admin'].includes(role);
+
+        let query = `
             SELECT r.*, 
-                   COALESCE(
-                       e.full_name, 
-                       (SELECT e2.full_name FROM employees e2 JOIN profiles p ON e2.email = p.email WHERE p.id = r.employee_id LIMIT 1),
-                       'Unknown Employee'
-                   ) as full_name 
+                   COALESCE(e.full_name, 'Unknown Employee') as full_name 
             FROM daily_reports r
             LEFT JOIN employees e ON r.employee_id = e.id
             WHERE r.project_id = $1
-            ORDER BY r.created_at DESC
-        `, [req.params.id]);
+        `;
+        const params = [req.params.id];
+
+        if (!isHrOrAdmin) {
+            // Employees can only see today's reports
+            const today = date || getIstTodayYmd();
+            params.push(today);
+            query += ` AND r.date = $${params.length}`;
+        } else if (date) {
+            params.push(date);
+            query += ` AND r.date = $${params.length}`;
+        }
+
+        query += ' ORDER BY r.date DESC, r.created_at DESC';
+
+        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (err) {
         console.error(err.message);
@@ -241,14 +433,65 @@ const getMyReports = async (req, res) => {
     }
 };
 
+// ─── Add Project Member ──────────────────────────────────────────
+const addProjectMember = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { employee_id, role } = req.body;
+
+        if (!employee_id) {
+            return res.status(400).json({ error: 'employee_id is required' });
+        }
+
+        await pool.query(
+            `INSERT INTO project_members (project_id, employee_id, role)
+             VALUES ($1, $2, $3)`,
+            [id, employee_id, role || 'member']
+        );
+
+        res.json({ message: 'Member added successfully' });
+    } catch (err) {
+        if (err?.code === '23505') {
+            return res.status(400).json({ error: 'Member already exists in this project' });
+        }
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// ─── Remove Project Member ───────────────────────────────────────
+const removeProjectMember = async (req, res) => {
+    try {
+        const { id, employeeId } = req.params;
+
+        await pool.query(
+            'DELETE FROM project_members WHERE project_id = $1 AND employee_id = $2',
+            [id, employeeId]
+        );
+
+        res.json({ message: 'Member removed successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
 module.exports = {
     getProjects,
     createProject,
+    updateProject,
+    deleteProject,
     closeProject,
     reopenProject,
     getProjectById,
     createTask,
-    createReport,
+    createReport: createReportTask,
     getProjectReports,
-    getMyReports
+    getMyReports,
+    addProjectMember,
+    removeProjectMember,
+    createReportTask,
+    updateReportTask,
+    deleteReportTask,
+    getReportTasks
 };

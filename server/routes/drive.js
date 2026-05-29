@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { auth } = require('../middleware/auth');
 const { auditLogger } = require('../middleware/auditLogger');
+const { enforceStorageQuota } = require('../middleware/storageQuota');
 const driveController = require('../controllers/driveController');
 
 router.use(auth);
@@ -26,7 +27,7 @@ const upload = multer({ storage });
 
 router.get('/contents', driveController.getContents);
 router.get('/storage-usage', driveController.getStorageUsage);
-router.post('/upload', upload.single('file'), driveController.uploadFile);
+router.post('/upload', upload.single('file'), enforceStorageQuota, driveController.uploadFile);
 router.post('/folder', driveController.createFolder);
 router.patch('/folders/:id', driveController.renameFolder);
 router.delete('/folders/:id', driveController.deleteFolder);

@@ -102,6 +102,10 @@ const rewriteSelectHelpers = (sql) => sql
     .replace(/COUNT\(\*\)\s+FROM/g, 'COUNT(*) AS count FROM')
     .replace(/COUNT\(\*\)\s+as\s+count/gi, 'COUNT(*) AS count');
 
+const rewriteNullsOrdering = (sql) => sql
+    .replace(/\bNULLS\s+LAST\b/gi, '')
+    .replace(/\bNULLS\s+FIRST\b/gi, '');
+
 const rewritePgSpecificSyntax = (sql) => {
     let next = sql;
     next = rewriteCasts(next);
@@ -114,6 +118,7 @@ const rewritePgSpecificSyntax = (sql) => {
     next = rewriteConflict(next);
     next = rewriteSelectHelpers(next);
     next = rewriteBooleanLiterals(next);
+    next = rewriteNullsOrdering(next);
     return next;
 };
 

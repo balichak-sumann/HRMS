@@ -41,6 +41,12 @@ const sanitizeObject = (obj, depth = 0) => {
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
         if (typeof value === 'string') {
+            // Skip truncation for token/auth fields (JWTs can be 500+ chars)
+            if (key.includes('token') || key.includes('Token') || key === 'authorization' || key === 'password' || key === 'password_hash') {
+                result[key] = value.trim().replace(/\0/g, '');
+                continue;
+            }
+
             // Determine max length based on field name
             let maxLen = MAX_STRING_LENGTH;
             if (key.includes('name') || key.includes('title')) maxLen = MAX_NAME_LENGTH;

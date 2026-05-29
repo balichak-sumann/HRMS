@@ -5,6 +5,7 @@ const fs = require('fs');
 
 const { auth, authorize } = require('../middleware/auth');
 const { auditLogger } = require('../middleware/auditLogger');
+const { enforceStorageQuota } = require('../middleware/storageQuota');
 const incomeTaxController = require('../controllers/incomeTaxController');
 
 const router = express.Router();
@@ -35,7 +36,7 @@ router.get('/my/list', authorize(['employee']), incomeTaxController.getMyDeclara
 router.post('/my/versions', authorize(['employee']), incomeTaxController.createMyDeclarationVersion);
 router.put('/my', authorize(['employee']), incomeTaxController.saveMyDeclaration);
 router.post('/my/submit', authorize(['employee']), incomeTaxController.submitMyDeclaration);
-router.post('/my/items/:itemId/proofs', authorize(['employee']), upload.single('proof'), incomeTaxController.uploadProof);
+router.post('/my/items/:itemId/proofs', authorize(['employee']), upload.single('proof'), enforceStorageQuota, incomeTaxController.uploadProof);
 router.get('/my/form16', authorize(['employee']), incomeTaxController.getMyForm16Summary);
 
 router.get('/hr/declarations', authorize(['hr']), incomeTaxController.getDeclarationsForHR);

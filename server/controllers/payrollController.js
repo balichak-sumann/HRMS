@@ -18,23 +18,29 @@ const ensurePayrollSchemaCompatibility = async () => {
     if (payrollSchemaEnsured) return;
 
     try {
-        await pool.query(`
-            ALTER TABLE payroll_statutory_settings
-            ADD COLUMN IF NOT EXISTS basic_ratio DECIMAL(10,4) DEFAULT 0.4,
-            ADD COLUMN IF NOT EXISTS hra_ratio DECIMAL(10,4) DEFAULT 0.2,
-            ADD COLUMN IF NOT EXISTS conveyance_amount DECIMAL(10,4) DEFAULT 0.2,
-            ADD COLUMN IF NOT EXISTS fixed_pf_deduction DECIMAL(10,2) DEFAULT 1800,
-            ADD COLUMN IF NOT EXISTS fixed_employer_pf_deduction DECIMAL(10,2) DEFAULT 1800,
-            ADD COLUMN IF NOT EXISTS fixed_insurance_deduction DECIMAL(10,2) DEFAULT 450,
-            ADD COLUMN IF NOT EXISTS fixed_ptax_deduction DECIMAL(10,2) DEFAULT 200
-        `);
-
-        await pool.query(`
-            ALTER TABLE payroll
-            ADD COLUMN IF NOT EXISTS gross_salary DECIMAL(10,2) DEFAULT NULL
-        `);
+        // Add columns one by one (MySQL 8 doesn't support ADD COLUMN IF NOT EXISTS)
+        const cols = [
+            ['basic_ratio', 'DECIMAL(10,4) DEFAULT 0.4'],
+            ['hra_ratio', 'DECIMAL(10,4) DEFAULT 0.2'],
+            ['conveyance_amount', 'DECIMAL(10,4) DEFAULT 0.2'],
+            ['fixed_pf_deduction', 'DECIMAL(10,2) DEFAULT 1800'],
+            ['fixed_employer_pf_deduction', 'DECIMAL(10,2) DEFAULT 1800'],
+            ['fixed_insurance_deduction', 'DECIMAL(10,2) DEFAULT 450'],
+            ['fixed_ptax_deduction', 'DECIMAL(10,2) DEFAULT 200'],
+        ];
+        for (const [name, def] of cols) {
+            try {
+                await pool.query(`ALTER TABLE payroll_statutory_settings ADD COLUMN ${name} ${def}`);
+            } catch (e) { /* column already exists */ }
+        }
+        try {
+            await pool.query(`ALTER TABLE payroll ADD COLUMN gross_salary DECIMAL(10,2) DEFAULT NULL`);
+        } catch (e) { /* column already exists */ }
+        try {
+            await pool.query(`ALTER TABLE payroll ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
+        } catch (e) { /* column already exists */ }
     } catch (e) {
-        // Ignore if columns already exist or DB doesn't support IF NOT EXISTS
+        // Ignore schema errors
     }
 
     payrollSchemaEnsured = true;
@@ -112,7 +118,7 @@ const getDaysInMonth = (month, year) => {
 
 const getAttendanceSummary = async (employeeId, month, year) => {
     const { startDate, endDate, monthNumber, yearNumber } = getMonthBounds(month, year);
-    const processedDays = getDaysInMonth(month, year);
+    const totalDaysInMonth = getDaysInMonth(month, year);
 
     // 1. Fetch Employee Joining Date
     const empRes = await pool.query('SELECT joining_date FROM employees WHERE id = $1', [employeeId]);
@@ -130,36 +136,7 @@ const getAttendanceSummary = async (employeeId, month, year) => {
         attendanceMap[d] = Number(r.credit);
     });
 
-    // 3. Fetch Approved Leaves
-    const leavesRes = await pool.query(
-        `SELECT start_date, end_date, days FROM leaves 
-         WHERE employee_id = $1 AND status = 'Approved' 
-         AND ((start_date BETWEEN $2::date AND $3::date) OR (end_date BETWEEN $2::date AND $3::date) 
-         OR (start_date <= $2::date AND end_date >= $3::date))`,
-        [employeeId, startDate, endDate]
-    );
-    const leaveDaysMap = {};
-    leavesRes.rows.forEach(l => {
-        const startStr = String(l.start_date).slice(0, 10);
-        const endStr = String(l.end_date).slice(0, 10);
-        let curr = new Date(startStr + 'T00:00:00Z');
-        const end = new Date(endStr + 'T00:00:00Z');
-        // If it's a multi-day leave, we need to spread the 'days' count or assume 1 per day if days >= duration
-        // For simplicity, we'll mark the dates. 
-        // Note: some systems have complex half-day leave logic.
-        while (curr <= end) {
-            const dStr = curr.toISOString().slice(0, 10);
-            if (dStr >= startDate && dStr <= endDate) {
-                // We default to 1 day credit for approved leave unless it's a single day with < 1 day weight
-                const isSingleDay = startStr === endStr;
-                const weight = (isSingleDay && Number(l.days) < 1) ? Number(l.days) : 1;
-                leaveDaysMap[dStr] = Math.max(leaveDaysMap[dStr] || 0, weight);
-            }
-            curr.setDate(curr.getDate() + 1);
-        }
-    });
-
-    // 4. Fetch Holidays
+    // 3. Fetch Holidays
     const holidaysRes = await pool.query(
         "SELECT date FROM holidays WHERE date BETWEEN $1::date AND $2::date",
         [startDate, endDate]
@@ -170,9 +147,11 @@ const getAttendanceSummary = async (employeeId, month, year) => {
         holidaysMap[d] = 1;
     });
 
-    // 5. Calculate Final Paid Days
-    let paidDays = 0;
-    for (let i = 1; i <= processedDays; i++) {
+    // 4. Calculate working days (exclude weekends + holidays) and paid days
+    let workingDays = 0; // Total days where check-in is expected
+    let paidDays = 0;    // Days employee actually worked (attendance-based only)
+
+    for (let i = 1; i <= totalDaysInMonth; i++) {
         const dateObj = new Date(Date.UTC(yearNumber, monthNumber - 1, i));
         const dateStr = dateObj.toISOString().slice(0, 10);
 
@@ -180,23 +159,24 @@ const getAttendanceSummary = async (employeeId, month, year) => {
         if (joiningDate && dateObj < joiningDate) continue;
 
         const isWeekend = dateObj.getUTCDay() === 0 || dateObj.getUTCDay() === 6;
-        const attendanceCredit = attendanceMap[dateStr] || 0;
-        const leaveCredit = leaveDaysMap[dateStr] || 0;
-        const holidayCredit = holidaysMap[dateStr] || 0;
-        const weekendCredit = isWeekend ? 1 : 0;
+        const isHoliday = !!holidaysMap[dateStr];
 
-        // Priority Logic for a single day:
-        // A day is paid if it's a Weekend, Holiday, or Present.
-        // Approved leave is treated as unpaid (Loss of Pay) — salary is deducted for leave days.
-        const dayCredit = Math.max(attendanceCredit, holidayCredit, weekendCredit);
-        paidDays += dayCredit;
+        // Weekends and holidays don't count as working days
+        if (isWeekend || isHoliday) continue;
+
+        // This is a working day
+        workingDays += 1;
+
+        const attendanceCredit = attendanceMap[dateStr] || 0;
+        paidDays += attendanceCredit;
     }
 
     return {
         startDate,
         endDate,
-        processedDays,
-        paidDays: round2(paidDays),
+        processedDays: workingDays, // Actual working days (no weekends/holidays)
+        paidDays: round2(paidDays), // Only days employee actually checked in
+        totalCalendarDays: totalDaysInMonth,
     };
 };
 
@@ -227,20 +207,16 @@ const getStatutorySettingsData = async () => {
     const slabsRes = await pool.query(
         `SELECT id, name, income_from, income_to, rate
          FROM payroll_tds_slabs
-         ORDER BY income_from ASC, income_to ASC NULLS LAST`
+         ORDER BY income_from ASC, COALESCE(income_to, 999999999) ASC`
     );
 
     if (!settingsRes.rows[0]) {
         throw new Error('Statutory settings are not configured. Configure payroll statutory settings before generating payroll.');
     }
 
-    if (slabsRes.rows.length === 0) {
-        throw new Error('TDS slabs are not configured. Configure payroll statutory settings before generating payroll.');
-    }
-
     return {
         settings: settingsRes.rows[0],
-        tds_slabs: slabsRes.rows,
+        tds_slabs: slabsRes.rows || [],
     };
 };
 
@@ -534,9 +510,9 @@ const createPayroll = async (req, res) => {
                 employee_id, month, year, emp_code, designation, department, location,
                 attendance.processedDays, effectivePaidDays, pan_no, bank_account, bank_name,
                 proratedBasic, proratedHra, proratedConveyance, proratedSpecialAllowance, proratedAllowances,
-                statutoryBreakup.pf_employee,
-                statutoryBreakup.pf_employee,
-                statutoryBreakup.pf_employer,
+                fixedEmployeePf,
+                fixedEmployeePf,
+                fixedEmployerPf,
                 statutoryBreakup.esi_employee,
                 statutoryBreakup.esi_employer,
                 proratedPtax,
@@ -574,7 +550,12 @@ const createPayroll = async (req, res) => {
 
         res.json({
             ...result.rows[0],
-            statutory_breakup: statutoryBreakup,
+            statutory_breakup: {
+                ...statutoryBreakup,
+                pf_employee: fixedEmployeePf,
+                pf_employer: fixedEmployerPf,
+                fixed_insurance: fixedInsurance,
+            },
             financial_year: financialYear,
             approved_declaration_amount: approvedDeclarationAmount,
             annual_taxable_income: annualTaxableIncome,
@@ -650,8 +631,8 @@ const updateStatutorySettings = async (req, res) => {
         tds_slabs = [],
     } = req.body;
 
-    if (!Array.isArray(tds_slabs) || tds_slabs.length === 0) {
-        return res.status(400).json({ error: 'At least one TDS slab is required' });
+    if (!Array.isArray(tds_slabs)) {
+        return res.status(400).json({ error: 'tds_slabs must be an array' });
     }
 
     const client = await pool.connect();

@@ -656,7 +656,35 @@ const sendContactSubmissionNotification = async ({ name, email, company, submitt
     });
 };
 
+// ─── Generic Notification Email ──────────────────────────────────
+const sendNotificationEmail = async ({ to, name, title, message, actionUrl, actionLabel }) => {
+    if (!to) return;
+    try {
+        await sendMail({
+            from: FROM,
+            to,
+            subject: `${title} – IndusInnovate Technologies`,
+            html: `
+            <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">
+                <div style="background:linear-gradient(135deg,#1E3A8A,#3B82F6);padding:32px;border-radius:12px 12px 0 0;text-align:center;">
+                    <h1 style="color:white;margin:0;font-size:24px;">IndusInnovate Technologies</h1>
+                </div>
+                <div style="padding:32px;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 12px 12px;">
+                    <h2 style="color:#111827;margin-top:0;">${title}</h2>
+                    <p style="color:#6B7280;">Hi ${name || 'there'},</p>
+                    <p style="color:#374151;font-size:15px;line-height:1.6;">${message}</p>
+                    ${actionUrl ? `<a href="${actionUrl}" style="display:inline-block;background:#3B82F6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px;">${actionLabel || 'View Details'}</a>` : ''}
+                    <p style="color:#9CA3AF;font-size:12px;margin-top:32px;">© 2026 IndusInnovate Technologies. All rights reserved.</p>
+                </div>
+            </div>`
+        });
+    } catch (err) {
+        console.warn(`[NotificationEmail] Failed to send to ${to}:`, err.message);
+    }
+};
+
 module.exports = {
+    sendMail,
     isConsoleEmailEnabled: () => useConsoleEmail,
     sendWelcomeEmail,
     sendPasswordResetEmail,
@@ -670,4 +698,5 @@ module.exports = {
     sendOnboardingAssignedEmail,
     sendOfferLetterEmail,
     sendContactSubmissionNotification,
+    sendNotificationEmail,
 };

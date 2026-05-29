@@ -129,6 +129,19 @@ const processCelebrations = async (io) => {
             const nMessage = announcement.content;
             await createNotificationsForAllProfiles(client, nTitle, nMessage, { type: 'celebration' });
 
+            // Email the celebrated person
+            if (celebration.email) {
+                const { sendNotificationEmail } = require('./emailService');
+                sendNotificationEmail({
+                    to: celebration.email,
+                    name: celebration.full_name,
+                    title: nTitle,
+                    message: nMessage,
+                    actionUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/employee/dashboard`,
+                    actionLabel: 'View Announcement',
+                });
+            }
+
             created += 1;
             createdPayloads.push({
                 employeeId: celebration.id,

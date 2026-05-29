@@ -44,6 +44,12 @@ const emitTicketUpdate = (io, ticketId, targetUserId, eventType, data) => {
 // ─── Create ticket ──────────────────────────────────────────────
 const createTicket = async (req, res) => {
     const { category, subject, description, priority } = req.body;
+    if (!subject || !String(subject).trim()) {
+        return res.status(400).json({ error: 'Subject is required' });
+    }
+    if (!category || !String(category).trim()) {
+        return res.status(400).json({ error: 'Category is required' });
+    }
     try {
         const emp = await getEmployeeByEmail(req.user.email);
         if (!emp) return res.status(404).json({ error: 'Employee not found' });
@@ -406,6 +412,17 @@ const updateAssignment = async (req, res) => {
 
                     req.io.to(ownerProfileRes.rows[0].profile_id).emit('notification_created', notificationRes.rows[0]);
                     req.io.to(String(ticket.employee_id)).emit('notification_created', notificationRes.rows[0]);
+
+                    // Send email notification
+                    const { sendNotificationEmail } = require('../services/emailService');
+                    sendNotificationEmail({
+                        to: ownerProfileRes.rows[0].email || null,
+                        name: ticket.full_name || null,
+                        title: 'Ticket Assignment Updated',
+                        message: notificationMessage,
+                        actionUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/employee/helpdesk`,
+                        actionLabel: 'View Ticket',
+                    });
                 } else {
                     req.io.to(String(ticket.employee_id)).emit('notification_created', {
                         id: `rt_assign_${Date.now()}`,
